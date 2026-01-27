@@ -33,3 +33,7 @@ logs/
 .env
 .env.local
 config.local.*
+
+# MCP local config (contains secrets)
+.mcp.json
+codex.mcp.json

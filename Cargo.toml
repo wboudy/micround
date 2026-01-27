@@ -6,7 +6,8 @@ license = "MIT"
 description = "Live microscope wallpaper"
 
 [features]
-default = []
+default = ["secure-zero"]
+secure-zero = []
 windows = ["dep:windows"]
 macos = ["dep:objc2", "dep:block2"]
 linux = ["dep:v4l", "dep:x11rb"]
@@ -20,7 +21,7 @@ egui = "0.28"
 winit = "0.29"
 
 # Async
-tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

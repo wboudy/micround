@@ -6,6 +6,7 @@ use anyhow::Result;
 use tracing::{info, Level};
 
 mod core;
+mod platform;
 mod capture;
 mod process;
 mod render;

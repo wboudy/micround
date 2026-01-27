@@ -1,0 +1,35 @@
+# bv (beads viewer) local config and caches
+.bv/
+
+# Rust build artifacts
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+# Build outputs
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+
+# Log files
+*.log
+logs/
+
+# Local configuration
+.env
+.env.local
+config.local.*

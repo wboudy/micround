@@ -58,6 +58,17 @@ pub struct CaptureSettings {
     pub format: Option<PixelFormat>,
 }
 
+impl Default for CaptureSettings {
+    fn default() -> Self {
+        Self {
+            width: 1920,
+            height: 1080,
+            framerate: 30.0,
+            format: None,
+        }
+    }
+}
+
 /// A single captured frame
 pub struct Frame {
     /// Raw pixel data
@@ -74,9 +85,10 @@ pub struct Frame {
     pub sequence: u64,
 }
 
+#[cfg(feature = "secure-zero")]
 impl Drop for Frame {
     fn drop(&mut self) {
-        // Privacy: Zero out frame data before deallocation
+        // Privacy: Zero out frame data before deallocation (opt-in)
         self.data.iter_mut().for_each(|b| *b = 0);
     }
 }

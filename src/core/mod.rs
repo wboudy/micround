@@ -12,6 +12,5 @@ pub use types::*;
 pub use error::*;
 pub use logging::LoggingError;
 pub use events::{
-    AppContext, AppHandle, AppState, Command, Event, EventBus, EventSubscriber,
-    CaptureSettings as EventCaptureSettings,
+    AppContext, AppHandle, AppState, Command, Event, EventBus, EventSubscriber, FrameDropReason,
 };

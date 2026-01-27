@@ -10,10 +10,10 @@
 //! - Type-safe (strongly typed messages)
 //! - No global mutable state
 
-use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 
-use super::types::*;
+use super::error::MicroundError;
+use super::types::{CameraDevice, CaptureSettings, DeviceId, DisplayId, Flip, Rotation, ScalingMode};
 
 // ============================================================================
 // Commands (UI → Components)
@@ -93,11 +93,11 @@ pub enum Event {
     /// Snapshot was taken
     SnapshotTaken { to_clipboard: bool },
     /// An error occurred
-    Error { error: AppError },
+    Error { error: MicroundError },
     /// Settings were changed
     SettingsChanged,
     /// Application state changed
-    StateChanged { new_state: AppState },
+    StateChanged { old_state: AppState, new_state: AppState },
 }
 
 /// Reasons a frame might be dropped
@@ -187,30 +187,6 @@ impl std::fmt::Display for AppState {
             Self::Reconnecting => write!(f, "Reconnecting"),
             Self::Error => write!(f, "Error"),
             Self::ShuttingDown => write!(f, "ShuttingDown"),
-        }
-    }
-}
-
-/// Application errors that can be reported via events
-#[derive(Debug, Clone)]
-pub enum AppError {
-    /// Camera error
-    Capture(String),
-    /// Render error
-    Render(String),
-    /// Configuration error
-    Config(String),
-    /// Generic error
-    Other(String),
-}
-
-impl std::fmt::Display for AppError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Capture(msg) => write!(f, "Capture error: {}", msg),
-            Self::Render(msg) => write!(f, "Render error: {}", msg),
-            Self::Config(msg) => write!(f, "Config error: {}", msg),
-            Self::Other(msg) => write!(f, "Error: {}", msg),
         }
     }
 }
@@ -380,30 +356,6 @@ impl AppHandle {
     /// Subscribe to events
     pub fn subscribe_events(&self) -> EventSubscriber {
         self.events.subscribe()
-    }
-}
-
-// ============================================================================
-// Capture Settings (needed for Command)
-// ============================================================================
-
-/// Settings for starting capture
-#[derive(Debug, Clone)]
-pub struct CaptureSettings {
-    pub width: u32,
-    pub height: u32,
-    pub fps: f32,
-    pub format: Option<PixelFormat>,
-}
-
-impl Default for CaptureSettings {
-    fn default() -> Self {
-        Self {
-            width: 1920,
-            height: 1080,
-            fps: 30.0,
-            format: None,
-        }
     }
 }
 

@@ -122,7 +122,7 @@ impl fmt::Display for ErrorContext {
 // ============================================================================
 
 /// Top-level error type for Micround application
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum MicroundError {
     #[error("Capture error: {source}")]
     Capture {
@@ -223,7 +223,7 @@ impl MicroundError {
 // ============================================================================
 
 /// Errors that can occur during camera capture
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum CaptureError {
     #[error("Camera device not found: {0}")]
     DeviceNotFound(String),
@@ -307,7 +307,7 @@ impl CaptureError {
 // ============================================================================
 
 /// Errors that can occur during rendering
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum RenderError {
     #[error("Failed to create render surface: {0}")]
     SurfaceCreation(String),
@@ -380,7 +380,7 @@ impl RenderError {
 // ============================================================================
 
 /// Errors that can occur with configuration
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum ConfigError {
     #[error("Failed to read config file: {0}")]
     ReadFailed(String),

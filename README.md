@@ -1,40 +1,39 @@
 # Micround
 
-Live microscope camera feed as your desktop wallpaper.
-
-## Overview
-
-Micround captures video from a USB microscope camera and displays it as your system's desktop wallpaper in real time. Place a sample under your microscope and watch as bacteria, crystals, cells, or water samples become your continuous visual environment.
-
-## Features
-
-- **Plug and play**: Auto-detects UVC cameras, starts displaying within seconds
-- **Low latency**: Target <100ms from sensor to screen
-- **Resource efficient**: <10% CPU, <15% GPU on idle desktop
-- **Cross-platform**: Windows (primary), macOS, Linux X11
-- **Privacy first**: No network connections, no recording by default
-- **Reliable**: Survives sleep/wake, camera disconnects, display changes
+Micround is a desktop application that displays a live microscope camera feed as your system wallpaper. The goal is a low‑latency, reliable, cross‑platform experience that turns the desktop background into a continuously updating microscopic view.
 
 ## Status
+- **Planning/architecture phase** (no implementation yet)
+- Default tech stack: **Rust** (decision tracked in bead `bd-3jn`)
+- See the comprehensive plan in `docs/PROJECT_PLAN.md`
 
-**Development stage**: Prototype
+## Repository Structure (Planned)
+```
+micround/
+├── src/
+│   ├── core/          # Platform-independent logic
+│   ├── capture/       # Video ingest layer
+│   ├── process/       # Frame processing
+│   ├── render/        # Wallpaper backends
+│   │   ├── windows/
+│   │   ├── macos/
+│   │   └── linux/
+│   ├── ui/            # Control surface
+│   └── config/        # Configuration handling
+├── tests/
+├── docs/
+├── assets/
+└── scripts/
+```
 
-This project is under active development. See `docs/PROJECT_PLAN.md` for the full specification.
+## Key Principles
+- **Low latency** (target ≤100ms p95)
+- **Privacy-first** (no network, no recording by default)
+- **Cross-platform** (Windows, macOS, Linux)
+- **Reliability** (auto-recovery from disconnects, sleep/wake, display changes)
 
-## Requirements
-
-- USB microscope camera (UVC compatible)
-- Windows 10 1903+ / Windows 11, macOS 12+, or Linux with X11
-- Display resolution 1280x720 or higher
-
-## Building
-
-*Build instructions will be added once the core implementation is in place.*
+## Issue Tracking
+This project uses Beads for tracking tasks in `.beads/`.
 
 ## License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## Contributing
-
-Contributions welcome! Please read the project plan first to understand the architecture and scope.
+MIT (default).

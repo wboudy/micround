@@ -6,7 +6,12 @@
 pub mod types;
 pub mod error;
 pub mod logging;
+pub mod events;
 
 pub use types::*;
 pub use error::*;
 pub use logging::LoggingError;
+pub use events::{
+    AppContext, AppHandle, AppState, Command, Event, EventBus, EventSubscriber,
+    CaptureSettings as EventCaptureSettings,
+};

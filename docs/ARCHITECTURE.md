@@ -156,6 +156,21 @@ linux = ["v4l", "wgpu/vulkan"]
 3. **Fail Gracefully**: Errors propagate with context; app never crashes, always recovers
 4. **Observable**: Comprehensive logging and metrics for debugging
 5. **Testable**: Mock backends enable unit testing without hardware
+6. **Privacy by Design**: No network, no recording, local-only operation (see PRIVACY.md)
+
+## Privacy Architecture
+
+Privacy is a foundational constraint, not an afterthought. See `docs/PRIVACY.md` for full details.
+
+### Forbidden in Codebase
+- Network client libraries (reqwest, hyper, etc.)
+- Video file encoding/writing (except snapshot feature)
+- Telemetry or analytics
+
+### Required Patterns
+- Frame buffers zeroed on drop
+- No frame data in logs
+- Paths sanitized before logging
 
 ## Performance Budget
 

@@ -130,6 +130,67 @@ pub enum AppState {
     ShuttingDown,
 }
 
+impl AppState {
+    /// Check if a transition from self to target is valid
+    pub fn can_transition_to(&self, target: AppState) -> bool {
+        matches!(
+            (self, target),
+            // From Idle
+            (AppState::Idle, AppState::Starting)
+                | (AppState::Idle, AppState::ShuttingDown)
+                // From Starting
+                | (AppState::Starting, AppState::Running)
+                | (AppState::Starting, AppState::Idle)
+                | (AppState::Starting, AppState::Error)
+                | (AppState::Starting, AppState::ShuttingDown)
+                // From Running
+                | (AppState::Running, AppState::Idle)
+                | (AppState::Running, AppState::Paused)
+                | (AppState::Running, AppState::Error)
+                | (AppState::Running, AppState::Reconnecting)
+                | (AppState::Running, AppState::ShuttingDown)
+                // From Paused
+                | (AppState::Paused, AppState::Running)
+                | (AppState::Paused, AppState::Idle)
+                | (AppState::Paused, AppState::Error)
+                | (AppState::Paused, AppState::ShuttingDown)
+                // From Reconnecting
+                | (AppState::Reconnecting, AppState::Running)
+                | (AppState::Reconnecting, AppState::Idle)
+                | (AppState::Reconnecting, AppState::Error)
+                | (AppState::Reconnecting, AppState::ShuttingDown)
+                // From Error
+                | (AppState::Error, AppState::Idle)
+                | (AppState::Error, AppState::Starting)
+                | (AppState::Error, AppState::ShuttingDown)
+        )
+    }
+
+    /// Returns true if the application is in an active capture state
+    pub fn is_capturing(&self) -> bool {
+        matches!(self, AppState::Running | AppState::Paused | AppState::Reconnecting)
+    }
+
+    /// Returns true if the application can accept user commands
+    pub fn can_accept_commands(&self) -> bool {
+        matches!(self, AppState::Idle | AppState::Running | AppState::Paused | AppState::Error)
+    }
+}
+
+impl std::fmt::Display for AppState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::Starting => write!(f, "Starting"),
+            Self::Running => write!(f, "Running"),
+            Self::Paused => write!(f, "Paused"),
+            Self::Reconnecting => write!(f, "Reconnecting"),
+            Self::Error => write!(f, "Error"),
+            Self::ShuttingDown => write!(f, "ShuttingDown"),
+        }
+    }
+}
+
 /// Application errors that can be reported via events
 #[derive(Debug, Clone)]
 pub enum AppError {

@@ -130,3 +130,40 @@ pub enum Flip {
     Vertical,
     Both,
 }
+
+/// Result of format negotiation when opening a camera stream
+///
+/// This struct reports what was actually negotiated with the camera,
+/// which may differ from what was requested if the exact settings
+/// weren't available.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NegotiatedFormat {
+    /// Actual width in pixels
+    pub width: u32,
+    /// Actual height in pixels
+    pub height: u32,
+    /// Actual framerate achieved
+    pub framerate: f32,
+    /// Actual pixel format
+    pub format: PixelFormat,
+    /// Whether this exactly matched the request
+    pub exact_match: bool,
+}
+
+impl NegotiatedFormat {
+    /// Create a NegotiatedFormat from a CameraCapability
+    pub fn from_capability(cap: &CameraCapability, exact_match: bool) -> Self {
+        Self {
+            width: cap.width,
+            height: cap.height,
+            framerate: cap.framerate,
+            format: cap.format,
+            exact_match,
+        }
+    }
+
+    /// Check if resolution matches the requested values
+    pub fn resolution_matches(&self, width: u32, height: u32) -> bool {
+        self.width == width && self.height == height
+    }
+}

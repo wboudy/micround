@@ -10,10 +10,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::capture::enumerator::{fourcc_to_format, CameraEnumerator, CameraEvent, CameraEventHandler};
+use crate::capture::enumerator::{fourcc_to_format, format_to_fourcc, CameraEnumerator, CameraEvent, CameraEventHandler};
+use crate::capture::negotiation::negotiate_format;
 use crate::capture::CaptureBackend;
 use crate::core::{
-    CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, PixelFormat,
+    CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat, PixelFormat,
 };
 
 #[cfg(feature = "linux")]
@@ -276,6 +277,10 @@ pub struct V4l2Backend {
     device: Option<Device>,
     #[cfg(feature = "linux")]
     stream: Option<MmapStream<'static>>,
+    /// Currently negotiated format
+    negotiated_format: Option<NegotiatedFormat>,
+    /// Cached enumerator for device queries
+    enumerator: V4l2Enumerator,
     capturing: bool,
     sequence: u64,
 }
@@ -287,6 +292,8 @@ impl V4l2Backend {
             device: None,
             #[cfg(feature = "linux")]
             stream: None,
+            negotiated_format: None,
+            enumerator: V4l2Enumerator::new(),
             capturing: false,
             sequence: 0,
         }
@@ -306,35 +313,81 @@ impl CaptureBackend for V4l2Backend {
     }
 
     #[cfg(feature = "linux")]
-    fn open(&mut self, device_id: &DeviceId, settings: CaptureSettings) -> Result<(), CaptureError> {
-        let path = Path::new(&device_id.0);
-        let device = Device::with_path(path)
-            .map_err(|e| CaptureError::Platform(format!("Failed to open device: {}", e)))?;
+    fn open(&mut self, device_id: &DeviceId, settings: CaptureSettings) -> Result<NegotiatedFormat, CaptureError> {
+        // Close any existing device first
+        self.close();
 
-        // Set the format
-        let fourcc = settings
-            .format
-            .and_then(crate::capture::enumerator::format_to_fourcc)
+        let path = Path::new(&device_id.0);
+
+        // Check if device exists
+        if !path.exists() {
+            return Err(CaptureError::DeviceNotFound(device_id.0.clone()));
+        }
+
+        // Try to open the device
+        let device = Device::with_path(path).map_err(|e| {
+            let err_str = e.to_string();
+            if err_str.contains("busy") || err_str.contains("EBUSY") {
+                CaptureError::DeviceBusy
+            } else if err_str.contains("permission") || err_str.contains("EACCES") {
+                CaptureError::PermissionDenied(device_id.0.clone())
+            } else {
+                CaptureError::Platform(format!("Failed to open device: {}", e))
+            }
+        })?;
+
+        // Get device capabilities for negotiation
+        let capabilities = self.enumerator
+            .get_capabilities(device_id)
+            .unwrap_or_default();
+
+        // Negotiate the best format
+        let negotiated = negotiate_format(&capabilities, &settings)
+            .ok_or_else(|| CaptureError::FormatNegotiationFailed(
+                "No suitable format available".into()
+            ))?;
+
+        // Get the fourcc for the negotiated format
+        let fourcc = format_to_fourcc(negotiated.format)
             .unwrap_or(0x47504A4D); // Default to MJPEG
 
+        // Set the format on the device
         let mut fmt = device
             .format()
             .map_err(|e| CaptureError::Platform(format!("Failed to get format: {}", e)))?;
 
-        fmt.width = settings.width;
-        fmt.height = settings.height;
+        fmt.width = negotiated.width;
+        fmt.height = negotiated.height;
         fmt.fourcc = FourCC::new(&fourcc.to_le_bytes());
 
         device
             .set_format(&fmt)
             .map_err(|e| CaptureError::FormatNegotiationFailed(format!("{}", e)))?;
 
+        // Read back what the driver actually set (may differ from request)
+        let actual_fmt = device
+            .format()
+            .map_err(|e| CaptureError::Platform(format!("Failed to read format: {}", e)))?;
+
+        // Create the final negotiated format based on what driver accepted
+        let final_negotiated = NegotiatedFormat {
+            width: actual_fmt.width,
+            height: actual_fmt.height,
+            framerate: negotiated.framerate, // Driver doesn't always report this
+            format: fourcc_to_format(actual_fmt.fourcc.repr),
+            exact_match: actual_fmt.width == settings.width
+                && actual_fmt.height == settings.height
+                && settings.format.map_or(true, |f| f == fourcc_to_format(actual_fmt.fourcc.repr)),
+        };
+
         self.device = Some(device);
-        Ok(())
+        self.negotiated_format = Some(final_negotiated.clone());
+
+        Ok(final_negotiated)
     }
 
     #[cfg(not(feature = "linux"))]
-    fn open(&mut self, _device_id: &DeviceId, _settings: CaptureSettings) -> Result<(), CaptureError> {
+    fn open(&mut self, _device_id: &DeviceId, _settings: CaptureSettings) -> Result<NegotiatedFormat, CaptureError> {
         Err(CaptureError::Platform(
             "V4L2 support requires the 'linux' feature".into(),
         ))
@@ -382,10 +435,15 @@ impl CaptureBackend for V4l2Backend {
         {
             self.device = None;
         }
+        self.negotiated_format = None;
     }
 
     fn is_capturing(&self) -> bool {
         self.capturing
+    }
+
+    fn current_format(&self) -> Option<NegotiatedFormat> {
+        self.negotiated_format.clone()
     }
 
     #[cfg(feature = "linux")]

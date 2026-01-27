@@ -24,10 +24,17 @@ fn main() -> Result<()> {
         "Application initialized"
     );
 
-    // TODO: Initialize application
     // 1. Load or create configuration
+    let config = config::load_config()?;
+    tracing::debug!(?config, "Configuration loaded");
+
     // 2. Initialize capture backend
+    let capture_backend = capture::create_backend();
+
     // 3. Initialize render backend
+    let render_backend = render::create_renderer()?;
+
+    // TODO: Initialize application
     // 4. Start UI event loop
 
     info!("Micround ready");

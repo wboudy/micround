@@ -10,11 +10,13 @@
 //! - **DesktopWindow**: Low-level window at desktop level for wallpaper rendering
 //! - **SystemEvents**: Sleep/wake, display connect/disconnect, power state
 //! - **Paths**: Platform-appropriate config, log, and data directories
+//! - **Wallpaper**: Backup and restore of user's original wallpaper
 
 pub mod display;
 pub mod window;
 pub mod system;
 pub mod paths;
+pub mod wallpaper;
 
 #[cfg(test)]
 pub mod mock;
@@ -23,3 +25,4 @@ pub use display::*;
 pub use window::*;
 pub use system::*;
 pub use paths::*;
+pub use wallpaper::{capture_wallpaper, restore_wallpaper, restore_wallpaper_from_path, WallpaperInfo};

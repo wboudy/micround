@@ -48,15 +48,16 @@ pub fn log_directory() -> PathBuf {
 
     #[cfg(target_os = "linux")]
     {
-        // XDG_DATA_HOME/Micround/logs/ or ~/.local/share/Micround/logs/
-        dirs::data_dir()
-            .unwrap_or_else(|| {
+        // XDG_STATE_HOME/micround/logs/ or ~/.local/state/micround/logs/
+        std::env::var("XDG_STATE_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
                 dirs::home_dir()
                     .unwrap_or_else(|| PathBuf::from("."))
                     .join(".local")
-                    .join("share")
+                    .join("state")
             })
-            .join("Micround")
+            .join("micround")
             .join("logs")
     }
 
@@ -143,7 +144,6 @@ pub fn init(default_level: Option<Level>) -> Result<(), LoggingError> {
         .map_err(|e: tracing_subscriber::util::TryInitError| LoggingError::InitError(e.to_string()))?;
 
     tracing::info!(
-        log_dir = %log_dir.display(),
         level = %default_level.unwrap_or(Level::INFO),
         "Logging initialized"
     );
@@ -179,7 +179,9 @@ fn rotate_logs(log_dir: &PathBuf) -> Result<(), LoggingError> {
         let from = log_dir.join(format!("{}.{}", LOG_FILE_NAME, i));
         let to = log_dir.join(format!("{}.{}", LOG_FILE_NAME, i + 1));
         if from.exists() {
-            let _ = std::fs::rename(&from, &to);
+            // On Windows, rename fails if destination exists.
+            let _ = std::fs::remove_file(&to);
+            std::fs::rename(&from, &to).map_err(|e| LoggingError::IoError(e.to_string()))?;
         }
     }
 

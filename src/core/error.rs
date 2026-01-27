@@ -434,11 +434,71 @@ impl ConfigError {
 }
 
 // ============================================================================
+// Platform Errors
+// ============================================================================
+
+/// Errors related to platform-specific operations
+#[derive(Error, Debug, Clone)]
+pub enum PlatformError {
+    #[error("Operation not supported on this platform: {0}")]
+    Unsupported(String),
+
+    #[error("Platform command failed: {0}")]
+    CommandFailed(String),
+
+    #[error("Invalid platform state: {0}")]
+    InvalidState(String),
+
+    #[error("Resource not found: {0}")]
+    ResourceNotFound(String),
+
+    #[error("Permission denied: {0}")]
+    PermissionDenied(String),
+}
+
+impl PlatformError {
+    /// Get the severity of this platform error
+    pub fn severity(&self) -> ErrorSeverity {
+        match self {
+            Self::Unsupported(_) => ErrorSeverity::UserActionable,
+            Self::CommandFailed(_) => ErrorSeverity::Recoverable,
+            Self::InvalidState(_) => ErrorSeverity::UserActionable,
+            Self::ResourceNotFound(_) => ErrorSeverity::UserActionable,
+            Self::PermissionDenied(_) => ErrorSeverity::UserActionable,
+        }
+    }
+
+    /// Get a user-friendly message for this error
+    pub fn user_message(&self) -> String {
+        match self {
+            Self::Unsupported(msg) => {
+                format!("This feature is not available on your system: {}", msg)
+            }
+            Self::CommandFailed(_) => {
+                "A system command failed. Please check your desktop environment configuration.".into()
+            }
+            Self::InvalidState(msg) => {
+                format!("Operation cannot be completed: {}", msg)
+            }
+            Self::ResourceNotFound(msg) => {
+                format!("Required resource not found: {}", msg)
+            }
+            Self::PermissionDenied(_) => {
+                "Permission denied. Please check your system settings.".into()
+            }
+        }
+    }
+}
+
+// ============================================================================
 // Result Type Aliases
 // ============================================================================
 
 /// Result type for Micround operations
 pub type Result<T> = std::result::Result<T, MicroundError>;
+
+/// Result type for platform operations
+pub type PlatformResult<T> = std::result::Result<T, PlatformError>;
 
 /// Result type for capture operations
 pub type CaptureResult<T> = std::result::Result<T, CaptureError>;

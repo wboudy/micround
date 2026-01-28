@@ -406,7 +406,7 @@ fn test_camera_selection_device_busy() {
 // ============================================================================
 
 /// Tests camera selection with async capture loop.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_camera_selection_with_capture_loop() {
     let mut logger = TestLogger::new("camera_selection_with_capture_loop", 6);
 

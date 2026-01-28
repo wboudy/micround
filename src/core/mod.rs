@@ -7,10 +7,16 @@ pub mod types;
 pub mod error;
 pub mod logging;
 pub mod events;
+pub mod error_injector;
+pub mod latency;
 
 pub use types::*;
 pub use error::*;
 pub use logging::LoggingError;
 pub use events::{
     AppContext, AppHandle, AppState, Command, Event, EventBus, EventSubscriber, FrameDropReason,
+};
+pub use latency::{
+    FrameMetrics, LatencyHistogram, LatencyTracker, LatencySummaryReport,
+    SharedLatencyTracker, StageBreakdown, shared_latency_tracker,
 };

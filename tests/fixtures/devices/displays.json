@@ -1,0 +1,21 @@
+{
+  "description": "Sample display configurations for testing display enumeration",
+  "displays": [
+    {
+      "id": "DISPLAY1",
+      "name": "DELL U2720Q",
+      "is_primary": true,
+      "bounds": { "x": 0, "y": 0, "width": 3840, "height": 2160 },
+      "dpi": 163,
+      "refresh_rate": 60.0
+    },
+    {
+      "id": "DISPLAY2",
+      "name": "ASUS VG248",
+      "is_primary": false,
+      "bounds": { "x": 3840, "y": 0, "width": 1920, "height": 1080 },
+      "dpi": 92,
+      "refresh_rate": 144.0
+    }
+  ]
+}

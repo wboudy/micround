@@ -1,0 +1,22 @@
+# Invalid configuration - malformed TOML for error testing
+# Contains syntax errors and invalid values
+
+version = 1
+
+[camera]
+device_id = "some_device"
+width = "not a number"  # Invalid: should be integer
+height = -100           # Invalid: negative dimension
+framerate = "fast"      # Invalid: should be float
+
+[display]
+target =
+scaling_mode = "invalid_mode"
+rotation = 45          # Invalid: must be 0/90/180/270
+flip_horizontal = "maybe"  # Invalid: should be boolean
+
+[startup
+launch_at_login = true  # Syntax error: missing closing bracket above
+
+[unknown_section]
+mystery_field = "test"

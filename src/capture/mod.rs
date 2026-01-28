@@ -30,8 +30,8 @@ use crate::core::{CameraDevice, CaptureSettings, DeviceId, Frame, CaptureError, 
 pub use enumerator::*;
 pub use negotiation::{negotiate_format, filter_acceptable_capabilities};
 pub use capture_loop::{
-    start_capture_loop, CaptureLoopHandle, CaptureMetrics, CaptureState,
-    FrameReceiver, MetricsSnapshot,
+    start_capture_loop, CaptureLoopHandle, CaptureLoopError, CaptureMetrics,
+    CaptureState, FrameReceiver, MetricsSnapshot,
 };
 pub use state::{
     CameraState, CameraStateManager, CameraErrorInfo, StateTransition,

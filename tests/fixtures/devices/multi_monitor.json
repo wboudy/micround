@@ -1,0 +1,47 @@
+{
+  "description": "Complex multi-monitor setup for testing display handling edge cases",
+  "displays": [
+    {
+      "id": "DP-1",
+      "name": "LG 27UK850 (Primary)",
+      "is_primary": true,
+      "bounds": { "x": 0, "y": 540, "width": 3840, "height": 2160 },
+      "dpi": 163,
+      "refresh_rate": 60.0,
+      "notes": "Primary display, vertically centered with secondary"
+    },
+    {
+      "id": "DP-2",
+      "name": "ASUS ROG Swift",
+      "is_primary": false,
+      "bounds": { "x": 3840, "y": 0, "width": 2560, "height": 1440 },
+      "dpi": 109,
+      "refresh_rate": 165.0,
+      "notes": "Gaming monitor, to the right, higher position"
+    },
+    {
+      "id": "HDMI-1",
+      "name": "Samsung TV",
+      "is_primary": false,
+      "bounds": { "x": -1920, "y": 800, "width": 1920, "height": 1080 },
+      "dpi": 40,
+      "refresh_rate": 60.0,
+      "notes": "TV to the left, negative X coordinate"
+    },
+    {
+      "id": "DP-3",
+      "name": "Vertical Monitor",
+      "is_primary": false,
+      "bounds": { "x": 6400, "y": 0, "width": 1080, "height": 1920 },
+      "dpi": 92,
+      "refresh_rate": 60.0,
+      "notes": "Portrait orientation - rotated 90 degrees"
+    }
+  ],
+  "layout_notes": [
+    "Total desktop spans: -1920 to 7480 horizontally",
+    "Displays are at different vertical positions",
+    "One display is in portrait mode (rotated)",
+    "TV has negative X coordinate (to the left of origin)"
+  ]
+}

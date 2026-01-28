@@ -1,0 +1,19 @@
+# Legacy configuration format (v0 - pre-release)
+# Tests migration from old format to current schema
+
+# Old format didn't have version field (implicitly v0)
+
+# Old format used flat structure
+camera_device = "USB Camera"
+camera_width = 640
+camera_height = 480
+camera_fps = 15.0
+
+# Old names for display settings
+display_monitor = "default"
+display_scale = "fit"
+display_rotation_degrees = 0
+
+# Old startup flags
+autostart = true
+minimized_start = false

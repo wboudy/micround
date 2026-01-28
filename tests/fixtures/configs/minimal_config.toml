@@ -1,0 +1,4 @@
+# Minimal configuration - only required fields
+# Everything else should use defaults
+
+version = 1

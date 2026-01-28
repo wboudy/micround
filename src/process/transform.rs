@@ -97,7 +97,6 @@ fn apply_rotation(
 /// Flip horizontally (mirror across vertical axis)
 fn flip_horizontal(data: &[u8], width: u32, height: u32) -> Vec<u8> {
     let mut output = vec![0u8; data.len()];
-    let row_bytes = (width * 4) as usize;
 
     for y in 0..height {
         for x in 0..width {

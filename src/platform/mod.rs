@@ -12,6 +12,7 @@
 //! - **Paths**: Platform-appropriate config, log, and data directories
 //! - **Wallpaper**: Backup and restore of user's original wallpaper
 
+pub mod autostart;
 pub mod display;
 pub mod window;
 pub mod system;
@@ -26,3 +27,7 @@ pub use window::*;
 pub use system::*;
 pub use paths::*;
 pub use wallpaper::{capture_wallpaper, restore_wallpaper, restore_wallpaper_from_path, WallpaperInfo};
+pub use autostart::{
+    is_autostart_enabled, enable_autostart, disable_autostart, set_autostart,
+    AutostartError, AutostartResult,
+};

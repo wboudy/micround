@@ -41,6 +41,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Image processing
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
+# GPU data transfer
+bytemuck = { version = "1", features = ["derive"] }
+
 # Platform: Windows
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", optional = true, features = [
@@ -60,6 +63,7 @@ x11rb = { version = "0.13", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
+serde_json = "1"
 
 [profile.release]
 lto = true

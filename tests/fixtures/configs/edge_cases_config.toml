@@ -1,0 +1,30 @@
+# Edge case configuration - tests unusual but valid values
+# Unicode paths, special characters, extreme values
+
+version = 1
+
+[camera]
+# Unicode device ID (international characters)
+device_id = "USB\\VID_ABCD&PID_1234\\日本語デバイス"
+# Maximum reasonable resolution
+width = 7680
+height = 4320
+# High framerate (some cameras support 120fps)
+framerate = 120.0
+
+[display]
+# Display ID with spaces and special characters
+target = "DELL U2720Q (DisplayPort) #2"
+scaling_mode = "stretch"
+rotation = 270
+flip_horizontal = true
+flip_vertical = true
+
+[startup]
+launch_at_login = true
+auto_start_feed = false
+
+[internal]
+# Path with Unicode and spaces
+original_wallpaper_path = "/home/用户/Pictures/My Wallpapers/风景.jpg"
+last_clean_shutdown = false

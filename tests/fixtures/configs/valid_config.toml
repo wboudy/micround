@@ -1,0 +1,25 @@
+# Full valid configuration for Micround
+# Tests all configurable options with typical values
+
+version = 1
+
+[camera]
+device_id = "USB\\VID_046D&PID_0825\\123456789"
+width = 1920
+height = 1080
+framerate = 30.0
+
+[display]
+target = "primary"
+scaling_mode = "fill"
+rotation = 0
+flip_horizontal = false
+flip_vertical = false
+
+[startup]
+launch_at_login = false
+auto_start_feed = true
+
+[internal]
+original_wallpaper_path = "/home/user/Pictures/wallpaper.png"
+last_clean_shutdown = true

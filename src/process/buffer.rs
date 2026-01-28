@@ -135,20 +135,51 @@ impl PoolStatsSnapshot {
 /// Internal state for a buffer slot
 struct BufferSlot {
     /// The actual data buffer
-    data: Vec<u8>,
+    /// Using UnsafeCell to allow interior mutability when slot is acquired exclusively
+    data: std::cell::UnsafeCell<Vec<u8>>,
     /// Whether this slot is currently in use
     in_use: AtomicBool,
     /// When this buffer was acquired (for timeout warnings)
     acquired_at: Mutex<Option<Instant>>,
 }
 
+// SAFETY: BufferSlot is Send because:
+// - data is only accessed mutably when in_use is true (exclusive access)
+// - in_use provides synchronization via atomic operations
+// - acquired_at is protected by Mutex
+unsafe impl Send for BufferSlot {}
+
+// SAFETY: BufferSlot is Sync because:
+// - data access is gated by in_use atomic flag (only one accessor at a time)
+// - in_use uses Acquire/Release ordering for proper synchronization
+// - acquired_at uses Mutex for thread-safe access
+unsafe impl Sync for BufferSlot {}
+
 impl BufferSlot {
     fn new(size: usize) -> Self {
         Self {
-            data: vec![0u8; size],
+            data: std::cell::UnsafeCell::new(vec![0u8; size]),
             in_use: AtomicBool::new(false),
             acquired_at: Mutex::new(None),
         }
+    }
+
+    /// Get immutable access to data
+    /// SAFETY: Caller must ensure exclusive access (in_use flag set)
+    unsafe fn data(&self) -> &[u8] {
+        &*self.data.get()
+    }
+
+    /// Get mutable access to data
+    /// SAFETY: Caller must ensure exclusive access (in_use flag set)
+    unsafe fn data_mut(&self) -> &mut [u8] {
+        &mut *self.data.get()
+    }
+
+    /// Get data length without requiring mutable access
+    fn data_len(&self) -> usize {
+        // SAFETY: Reading length is safe as Vec layout is stable
+        unsafe { (*self.data.get()).len() }
     }
 
     fn try_acquire(&self) -> bool {
@@ -279,23 +310,23 @@ impl FrameBuffer {
 
     /// Get the buffer data as a slice
     pub fn data(&self) -> &[u8] {
-        &self.pool.slots[self.slot_idx].data
+        let slot = &self.pool.slots[self.slot_idx];
+        // SAFETY: We have exclusive access via FrameBuffer ownership
+        // and the slot is marked in_use (checked in try_acquire)
+        unsafe { slot.data() }
     }
 
     /// Get the buffer data as a mutable slice
     pub fn data_mut(&mut self) -> &mut [u8] {
-        // SAFETY: We have exclusive access via FrameBuffer ownership
-        // and the slot is marked in_use
         let slot = &self.pool.slots[self.slot_idx];
-        unsafe {
-            let ptr = slot.data.as_ptr() as *mut u8;
-            std::slice::from_raw_parts_mut(ptr, slot.data.len())
-        }
+        // SAFETY: We have exclusive mutable access via &mut self
+        // and the slot is marked in_use (checked in try_acquire)
+        unsafe { slot.data_mut() }
     }
 
     /// Get buffer size in bytes
     pub fn size(&self) -> usize {
-        self.pool.slots[self.slot_idx].data.len()
+        self.pool.slots[self.slot_idx].data_len()
     }
 
     /// Copy data into this buffer

@@ -22,7 +22,9 @@ use v4l::prelude::*;
 #[cfg(feature = "linux")]
 use v4l::video::Capture;
 #[cfg(feature = "linux")]
-use v4l::{Format, FourCC};
+use v4l::io::traits::CaptureStream;
+#[cfg(feature = "linux")]
+use v4l::FourCC;
 
 /// V4L2-based camera enumerator
 pub struct V4l2Enumerator {
@@ -116,7 +118,7 @@ impl V4l2Enumerator {
         // Enumerate supported formats
         if let Ok(formats) = device.enum_formats() {
             for fmt_desc in formats {
-                let pixel_format = fourcc_to_format(fmt_desc.fourcc.repr);
+                let pixel_format = fourcc_to_format(u32::from_le_bytes(fmt_desc.fourcc.repr));
 
                 // Enumerate frame sizes for this format
                 if let Ok(sizes) = device.enum_framesizes(fmt_desc.fourcc) {
@@ -272,11 +274,18 @@ impl CameraEnumerator for V4l2Enumerator {
 }
 
 /// V4L2-based capture backend
+///
+/// # Safety Note
+/// This struct uses a Box<Device> to ensure stable memory location, allowing
+/// MmapStream to safely borrow from it. The stream must always be dropped
+/// before the device - this is enforced by the Drop implementation.
 pub struct V4l2Backend {
     #[cfg(feature = "linux")]
-    device: Option<Device>,
+    device: Option<Box<Device>>,
+    /// Stream that borrows from device. MUST be dropped before device.
+    /// Using ManuallyDrop to control drop order explicitly.
     #[cfg(feature = "linux")]
-    stream: Option<MmapStream<'static>>,
+    stream: Option<std::mem::ManuallyDrop<MmapStream<'static>>>,
     /// Currently negotiated format
     negotiated_format: Option<NegotiatedFormat>,
     /// Cached enumerator for device queries
@@ -297,6 +306,26 @@ impl V4l2Backend {
             capturing: false,
             sequence: 0,
         }
+    }
+
+    /// Safely drop the stream before the device
+    #[cfg(feature = "linux")]
+    fn drop_stream(&mut self) {
+        if let Some(mut stream) = self.stream.take() {
+            // SAFETY: We're dropping the stream while device is still valid
+            unsafe {
+                std::mem::ManuallyDrop::drop(&mut stream);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "linux")]
+impl Drop for V4l2Backend {
+    fn drop(&mut self) {
+        // CRITICAL: Drop stream before device to maintain borrow validity
+        self.drop_stream();
+        // Device will be dropped automatically after this
     }
 }
 
@@ -374,13 +403,13 @@ impl CaptureBackend for V4l2Backend {
             width: actual_fmt.width,
             height: actual_fmt.height,
             framerate: negotiated.framerate, // Driver doesn't always report this
-            format: fourcc_to_format(actual_fmt.fourcc.repr),
+            format: fourcc_to_format(u32::from_le_bytes(actual_fmt.fourcc.repr)),
             exact_match: actual_fmt.width == settings.width
                 && actual_fmt.height == settings.height
-                && settings.format.map_or(true, |f| f == fourcc_to_format(actual_fmt.fourcc.repr)),
+                && settings.format.map_or(true, |f| f == fourcc_to_format(u32::from_le_bytes(actual_fmt.fourcc.repr))),
         };
 
-        self.device = Some(device);
+        self.device = Some(Box::new(device));
         self.negotiated_format = Some(final_negotiated.clone());
 
         Ok(final_negotiated)
@@ -401,13 +430,18 @@ impl CaptureBackend for V4l2Backend {
             .ok_or_else(|| CaptureError::Platform("No device opened".into()))?;
 
         // Create memory-mapped stream
-        // Note: We need to handle lifetime properly here
-        let stream = MmapStream::with_buffers(device, v4l::buffer::Type::VideoCapture, 4)
+        // The device is in a Box which has a stable address, so the borrow is safe
+        // as long as we drop the stream before the device (enforced by Drop impl)
+        let stream = MmapStream::with_buffers(device.as_ref(), v4l::buffer::Type::VideoCapture, 4)
             .map_err(|e| CaptureError::Platform(format!("Failed to create stream: {}", e)))?;
 
-        // SAFETY: We're storing the stream with the device, so the lifetime is valid
-        // as long as both are held together
-        self.stream = Some(unsafe { std::mem::transmute(stream) });
+        // SAFETY: The stream borrows from device which is in a Box with stable address.
+        // We use ManuallyDrop and our Drop impl ensures stream is dropped before device.
+        // The 'static lifetime is a lie but safe because:
+        // 1. Device is boxed (stable address)
+        // 2. Drop order is enforced (stream dropped first)
+        // 3. All access to stream happens while device is valid
+        self.stream = Some(std::mem::ManuallyDrop::new(unsafe { std::mem::transmute(stream) }));
         self.capturing = true;
         self.sequence = 0;
         Ok(())
@@ -423,7 +457,8 @@ impl CaptureBackend for V4l2Backend {
     fn stop(&mut self) -> Result<(), CaptureError> {
         #[cfg(feature = "linux")]
         {
-            self.stream = None;
+            // Use drop_stream to ensure proper cleanup
+            self.drop_stream();
         }
         self.capturing = false;
         Ok(())
@@ -433,6 +468,7 @@ impl CaptureBackend for V4l2Backend {
         let _ = self.stop();
         #[cfg(feature = "linux")]
         {
+            // Device is dropped after stream (stream already dropped in stop())
             self.device = None;
         }
         self.negotiated_format = None;
@@ -453,8 +489,8 @@ impl CaptureBackend for V4l2Backend {
             .as_mut()
             .ok_or_else(|| CaptureError::Platform("Stream not started".into()))?;
 
-        let (buf, meta) = stream
-            .next()
+        // Use CaptureStream trait's next() method through the ManuallyDrop wrapper
+        let (buf, meta) = CaptureStream::next(&mut **stream)
             .map_err(|e| CaptureError::Platform(format!("Failed to capture frame: {}", e)))?;
 
         let device = self.device.as_ref().unwrap();
@@ -464,7 +500,7 @@ impl CaptureBackend for V4l2Backend {
 
         Ok(Frame {
             data: buf.to_vec(),
-            format: fourcc_to_format(fmt.fourcc.repr),
+            format: fourcc_to_format(u32::from_le_bytes(fmt.fourcc.repr)),
             width: fmt.width,
             height: fmt.height,
             timestamp_ns: meta.timestamp.sec as u64 * 1_000_000_000

@@ -35,11 +35,18 @@
 
 pub mod buffer;
 pub mod decode;
+pub mod gpu;
+pub mod overlay;
 pub mod scale;
 pub mod transform;
 
 pub use buffer::{FrameBuffer, FrameBufferPool, PoolConfig, PoolStats, PoolStatsSnapshot};
 pub use decode::{decode_frame, DecodedFrame, DecodeError};
+pub use gpu::{GpuContext, GpuError, GpuProcessConfig, GpuProcessedFrame, GpuProcessMetrics, GpuProcessor};
+pub use overlay::{
+    composite_overlays, Color, Overlay, OverlayConfig, OverlayContent, OverlayError,
+    OverlayPosition, OverlayStyle, TextSize,
+};
 pub use scale::{scale_frame, ScaledFrame, ScaleConfig, ScaleFilter, ScaleError, Region};
 pub use transform::{transform_frame, TransformedFrame, TransformError};
 

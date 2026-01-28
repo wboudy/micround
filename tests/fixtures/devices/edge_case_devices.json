@@ -1,0 +1,53 @@
+{
+  "description": "Edge case device configurations for testing unusual scenarios",
+  "cameras": [
+    {
+      "id": "",
+      "name": "Camera with Empty ID",
+      "manufacturer": null,
+      "is_available": true,
+      "capabilities": [],
+      "notes": "Tests handling of empty device IDs"
+    },
+    {
+      "id": "USB\\VID_FFFF&PID_FFFF\\UNICODE_日本語",
+      "name": "カメラ with Unicode Name",
+      "manufacturer": "日本メーカー",
+      "is_available": true,
+      "capabilities": [
+        { "width": 640, "height": 480, "framerate": 30.0, "format": "Mjpeg" }
+      ],
+      "notes": "Tests Unicode handling in device names"
+    },
+    {
+      "id": "USB\\VID_0000&PID_0000\\INVALID",
+      "name": "Camera with Zero VID/PID",
+      "manufacturer": null,
+      "is_available": true,
+      "capabilities": [
+        { "width": 1, "height": 1, "framerate": 0.1, "format": "Unknown" }
+      ],
+      "notes": "Tests handling of minimal/edge capabilities"
+    }
+  ],
+  "displays": [
+    {
+      "id": "VIRTUAL-1",
+      "name": "Virtual Display",
+      "is_primary": false,
+      "bounds": { "x": 0, "y": 0, "width": 800, "height": 600 },
+      "dpi": 96,
+      "refresh_rate": 60.0,
+      "notes": "Simulated virtual display"
+    },
+    {
+      "id": "PROJECTOR-1",
+      "name": "Conference Room Projector",
+      "is_primary": false,
+      "bounds": { "x": 5000, "y": 0, "width": 1024, "height": 768 },
+      "dpi": 0,
+      "refresh_rate": 30.0,
+      "notes": "Low refresh rate, unusual resolution, zero DPI"
+    }
+  ]
+}

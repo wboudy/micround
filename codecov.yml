@@ -1,0 +1,48 @@
+# Codecov configuration for Micround
+# https://docs.codecov.com/docs/codecovyml-reference
+
+coverage:
+  precision: 2
+  round: down
+  range: "60...100"
+
+  status:
+    project:
+      default:
+        # Don't fail CI if coverage drops, just report
+        informational: true
+        # Require at least 50% coverage
+        target: 50%
+        # Allow 5% drop before warning
+        threshold: 5%
+
+    patch:
+      default:
+        # New code should have some coverage
+        informational: true
+        target: 40%
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      macro: no
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
+
+ignore:
+  - "tests/**/*"
+  - "src/main.rs"
+  - "**/mock*"
+  - "**/*_test.rs"
+
+flags:
+  unittests:
+    paths:
+      - src/
+    carryforward: true

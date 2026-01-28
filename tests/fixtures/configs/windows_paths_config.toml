@@ -1,0 +1,25 @@
+# Windows-specific paths configuration
+# Tests Windows path handling
+
+version = 1
+
+[camera]
+device_id = "\\\\?\\USB#VID_046D&PID_0825#123456789#{e5323777-f976-4f5b-9b55-b94699c46e44}"
+width = 1920
+height = 1080
+framerate = 30.0
+
+[display]
+target = "\\\\.\\DISPLAY1"
+scaling_mode = "fill"
+rotation = 0
+flip_horizontal = false
+flip_vertical = false
+
+[startup]
+launch_at_login = true
+auto_start_feed = true
+
+[internal]
+original_wallpaper_path = "C:\\Users\\John Doe\\Pictures\\Saved Pictures\\wallpaper.jpg"
+last_clean_shutdown = true

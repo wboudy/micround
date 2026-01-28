@@ -315,7 +315,7 @@ impl CaptureManager {
             .ok_or_else(|| CaptureError::Platform("No camera selected".into()))?;
 
         // Check state allows opening
-        if !handle.state.state().can_open() && !matches!(handle.state.state(), CameraState::Available) {
+        if !handle.state.state().can_open() {
             return Err(CaptureError::Platform(format!(
                 "Cannot start capture in state: {}",
                 handle.state.state()
@@ -345,12 +345,15 @@ impl CaptureManager {
 
                 Ok(format)
             }
-            Err(e) => {
-                // Return backend on failure
-                // Note: backend is moved to capture loop, so on failure we don't get it back
-                // This is a limitation - we'd need to refactor start_capture_loop to return backend on error
-                handle.state.open_failed(&e)?;
-                Err(e)
+            Err(loop_error) => {
+                // Recover the backend so we can retry later (if available)
+                if let Some(recovered_backend) = loop_error.backend {
+                    *self.backend.lock().unwrap() = Some(recovered_backend);
+                }
+                // If backend was None, it was irrecoverably lost (thread spawn failure)
+                // The manager will need a new backend created to continue
+                handle.state.open_failed(&loop_error.error)?;
+                Err(loop_error.error)
             }
         }
     }

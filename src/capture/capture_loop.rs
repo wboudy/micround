@@ -174,6 +174,24 @@ impl Drop for CaptureLoopHandle {
 /// Receiver for frames from the capture loop
 pub type FrameReceiver = mpsc::Receiver<Frame>;
 
+/// Error from starting capture loop, may include the backend for recovery
+pub struct CaptureLoopError {
+    /// The error that occurred
+    pub error: CaptureError,
+    /// The backend, returned so caller can recover or retry.
+    /// None if the backend was irrecoverably lost (e.g., thread spawn failure).
+    pub backend: Option<Box<dyn CaptureBackend>>,
+}
+
+impl std::fmt::Debug for CaptureLoopError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CaptureLoopError")
+            .field("error", &self.error)
+            .field("backend_recovered", &self.backend.is_some())
+            .finish()
+    }
+}
+
 /// Start a capture loop on a dedicated thread
 ///
 /// Opens the camera, starts capture, and delivers frames to the returned channel.
@@ -186,17 +204,23 @@ pub type FrameReceiver = mpsc::Receiver<Frame>;
 ///
 /// # Returns
 /// * `Ok((handle, receiver))` - Handle to control the loop and receiver for frames
-/// * `Err(e)` - If the camera couldn't be opened
+/// * `Err(CaptureLoopError)` - If the camera couldn't be opened (includes backend for recovery)
 pub fn start_capture_loop(
     mut backend: Box<dyn CaptureBackend>,
     device_id: DeviceId,
     settings: CaptureSettings,
-) -> Result<(CaptureLoopHandle, FrameReceiver), CaptureError> {
+) -> Result<(CaptureLoopHandle, FrameReceiver), CaptureLoopError> {
     // Open the camera and get negotiated format
-    let format = backend.open(&device_id, settings)?;
+    let format = match backend.open(&device_id, settings) {
+        Ok(f) => f,
+        Err(e) => return Err(CaptureLoopError { error: e, backend: Some(backend) }),
+    };
 
     // Start capture
-    backend.start()?;
+    if let Err(e) = backend.start() {
+        backend.close();
+        return Err(CaptureLoopError { error: e, backend: Some(backend) });
+    }
 
     // Create frame channel
     let (tx, rx) = mpsc::channel(FRAME_CHANNEL_CAPACITY);
@@ -211,12 +235,26 @@ pub fn start_capture_loop(
     let format_clone = format.clone();
 
     // Spawn capture thread
-    let thread_handle = thread::Builder::new()
+    // Note: If spawn fails, the backend is lost (moved into the closure).
+    // This is acceptable since spawn failures only occur on extreme resource
+    // exhaustion (thread limit exceeded), which is unrecoverable anyway.
+    let thread_handle = match thread::Builder::new()
         .name("micround-capture".into())
         .spawn(move || {
             capture_thread_main(backend, tx, stop_signal_clone, metrics_clone)
-        })
-        .map_err(|e| CaptureError::Platform(format!("Failed to spawn capture thread: {}", e)))?;
+        }) {
+        Ok(handle) => handle,
+        Err(e) => {
+            // Backend is lost here, but this is extremely rare (thread limit exceeded)
+            return Err(CaptureLoopError {
+                error: CaptureError::Platform(format!(
+                    "Failed to spawn capture thread: {}. Backend was lost; recreate it.",
+                    e
+                )),
+                backend: None, // Cannot recover - backend was moved into the closure
+            });
+        }
+    };
 
     let handle = CaptureLoopHandle {
         stop_signal,

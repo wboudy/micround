@@ -92,10 +92,11 @@ impl AppConfig {
             });
         }
 
-        if self.camera.framerate <= 0.0 || self.camera.framerate > 240.0 {
+        if self.camera.framerate <= 0.0 || self.camera.framerate > 240.0
+            || !self.camera.framerate.is_finite() {
             errors.push(ConfigValidationError {
                 field: "camera.framerate".into(),
-                message: "Framerate must be between 0 and 240".into(),
+                message: "Framerate must be a finite number between 0 and 240".into(),
             });
         }
 
@@ -118,7 +119,8 @@ impl AppConfig {
         if self.camera.height == 0 {
             self.camera.height = 1080;
         }
-        if self.camera.framerate <= 0.0 || self.camera.framerate > 240.0 {
+        if self.camera.framerate <= 0.0 || self.camera.framerate > 240.0
+            || !self.camera.framerate.is_finite() {
             self.camera.framerate = 30.0;
         }
         if !matches!(self.display.rotation, 0 | 90 | 180 | 270) {

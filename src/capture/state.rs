@@ -289,7 +289,9 @@ pub struct CameraStateManager {
     /// Transition counter for debugging
     transition_count: AtomicU64,
     /// Callback for state changes
-    on_state_change: RwLock<Option<Box<dyn Fn(&StateTransition) + Send + Sync>>>,
+    /// Uses Arc to allow cloning the callback out of the lock before invoking,
+    /// which prevents deadlock if the callback tries to modify state.
+    on_state_change: RwLock<Option<Arc<dyn Fn(&StateTransition) + Send + Sync>>>,
 }
 
 impl CameraStateManager {
@@ -340,11 +342,15 @@ impl CameraStateManager {
     }
 
     /// Set a callback to be called on state changes
+    ///
+    /// Note: The callback is invoked outside of any locks, so it is safe for
+    /// the callback to call methods on this CameraStateManager (including
+    /// set_on_state_change itself).
     pub fn set_on_state_change<F>(&self, callback: F)
     where
         F: Fn(&StateTransition) + Send + Sync + 'static,
     {
-        *self.on_state_change.write().unwrap() = Some(Box::new(callback));
+        *self.on_state_change.write().unwrap() = Some(Arc::new(callback));
     }
 
     /// Get recent state transition history
@@ -387,8 +393,11 @@ impl CameraStateManager {
         // Update counter
         self.transition_count.fetch_add(1, Ordering::Relaxed);
 
-        // Fire callback
-        if let Some(ref callback) = *self.on_state_change.read().unwrap() {
+        // Fire callback - clone the Arc out of the lock to avoid potential deadlock
+        // if the callback tries to modify state. This is safe because we clone the
+        // Arc reference, then drop the lock before invoking the callback.
+        let callback_clone = self.on_state_change.read().unwrap().clone();
+        if let Some(ref callback) = callback_clone {
             callback(&transition);
         }
 

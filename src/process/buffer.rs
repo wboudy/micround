@@ -52,13 +52,41 @@ impl PoolConfig {
     }
 
     /// Calculate buffer size in bytes
+    ///
+    /// Uses checked arithmetic to prevent overflow on 32-bit systems.
+    /// Returns None if the calculation would overflow.
+    pub fn buffer_size_checked(&self) -> Option<usize> {
+        let pixels = (self.width as usize).checked_mul(self.height as usize)?;
+        pixels.checked_mul(self.bytes_per_pixel)
+    }
+
+    /// Calculate buffer size in bytes
+    ///
+    /// # Panics
+    /// Panics if the calculation would overflow (extremely large dimensions).
+    /// For safe handling, use `buffer_size_checked()` instead.
     pub fn buffer_size(&self) -> usize {
-        (self.width as usize) * (self.height as usize) * self.bytes_per_pixel
+        self.buffer_size_checked()
+            .expect("Buffer size calculation overflow - dimensions too large")
     }
 
     /// Calculate total pool memory usage in bytes
+    ///
+    /// Uses checked arithmetic to prevent overflow.
+    /// Returns None if the calculation would overflow.
+    pub fn total_memory_checked(&self) -> Option<usize> {
+        let buffer_size = self.buffer_size_checked()?;
+        buffer_size.checked_mul(self.capacity)
+    }
+
+    /// Calculate total pool memory usage in bytes
+    ///
+    /// # Panics
+    /// Panics if the calculation would overflow.
+    /// For safe handling, use `total_memory_checked()` instead.
     pub fn total_memory(&self) -> usize {
-        self.buffer_size() * self.capacity
+        self.total_memory_checked()
+            .expect("Total memory calculation overflow - pool too large")
     }
 }
 
@@ -215,18 +243,31 @@ pub struct FrameBufferPool {
 
 impl FrameBufferPool {
     /// Create a new buffer pool with the given configuration
+    ///
+    /// # Panics
+    /// Panics if the buffer dimensions would cause integer overflow.
+    /// For fallible creation, use `try_new()` instead.
     pub fn new(config: PoolConfig) -> Arc<Self> {
-        let buffer_size = config.buffer_size();
+        Self::try_new(config).expect("Failed to create buffer pool: dimensions too large")
+    }
+
+    /// Try to create a new buffer pool with the given configuration
+    ///
+    /// Returns `None` if the buffer dimensions would cause integer overflow.
+    pub fn try_new(config: PoolConfig) -> Option<Arc<Self>> {
+        // Validate dimensions don't overflow
+        let buffer_size = config.buffer_size_checked()?;
+
         let slots: Vec<_> = (0..config.capacity)
             .map(|_| Arc::new(BufferSlot::new(buffer_size)))
             .collect();
 
-        Arc::new_cyclic(|weak| Self {
+        Some(Arc::new_cyclic(|weak| Self {
             config,
             slots,
             stats: Arc::new(PoolStats::default()),
             pool_ref: weak.clone(),
-        })
+        }))
     }
 
     /// Create a pool with default settings for the given resolution

@@ -113,7 +113,7 @@ where
 
     // Get initial device list
     let devices = enumerator.enumerate()?;
-    let mut known_devices: HashSet<DeviceId> = devices.iter().map(|d| d.id.clone()).collect();
+    let known_devices: HashSet<DeviceId> = devices.iter().map(|d| d.id.clone()).collect();
 
     tracing::info!(
         device_count = known_devices.len(),

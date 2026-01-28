@@ -300,7 +300,7 @@ impl WallpaperRenderer for X11Renderer {
         ))
     }
 
-    fn render(&mut self, frame: &ProcessedFrame) -> Result<(), RenderError> {
+    fn render(&mut self, _frame: &ProcessedFrame) -> Result<(), RenderError> {
         if !self.initialized {
             return Err(RenderError::Platform("Renderer not initialized".into()));
         }

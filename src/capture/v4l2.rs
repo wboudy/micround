@@ -10,11 +10,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::capture::enumerator::{fourcc_to_format, format_to_fourcc, CameraEnumerator, CameraEvent, CameraEventHandler};
-use crate::capture::negotiation::negotiate_format;
+use crate::capture::enumerator::CameraEnumerator;
 use crate::capture::CaptureBackend;
 use crate::core::{
-    CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat, PixelFormat,
+    CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat,
 };
 
 #[cfg(feature = "linux")]
@@ -288,9 +287,12 @@ pub struct V4l2Backend {
     stream: Option<std::mem::ManuallyDrop<MmapStream<'static>>>,
     /// Currently negotiated format
     negotiated_format: Option<NegotiatedFormat>,
-    /// Cached enumerator for device queries
+    /// Cached enumerator for device queries (reserved for future cache optimization)
+    #[allow(dead_code)]
     enumerator: V4l2Enumerator,
     capturing: bool,
+    /// Frame sequence counter (reserved for future frame ordering/sync)
+    #[allow(dead_code)]
     sequence: u64,
 }
 

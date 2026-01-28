@@ -12,9 +12,9 @@
 use std::path::PathBuf;
 use std::io;
 
-use crate::core::error::MicroundError;
 
-/// Application name for autostart entries
+/// Application name for autostart entries (reserved for future platform support)
+#[allow(dead_code)]
 const APP_NAME: &str = "micround";
 
 /// Desktop entry filename for Linux

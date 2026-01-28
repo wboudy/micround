@@ -39,7 +39,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use crate::core::{CaptureError, ConfigError, ErrorContext, MicroundError, PlatformError, RenderError};
+use crate::core::{CaptureError, ConfigError, MicroundError, PlatformError, RenderError};
 
 /// Trigger conditions for error injection
 pub enum InjectionTrigger {

@@ -11,7 +11,6 @@
 //! - **Center**: No scaling, center in bounds (crop or pad as needed)
 
 use crate::core::ScalingMode;
-use crate::process::buffer::{FrameBuffer, FrameBufferPool};
 use crate::process::decode::DecodedFrame;
 
 use image::{ImageBuffer, Rgba, imageops::FilterType};
@@ -374,7 +373,7 @@ fn calculate_fill_scale(src_w: u32, src_h: u32, dst_w: u32, dst_h: u32) -> (f64,
 }
 
 /// Fill output buffer with background color
-fn fill_background(output: &mut [u8], width: u32, height: u32, color: [u8; 4]) {
+fn fill_background(output: &mut [u8], _width: u32, _height: u32, color: [u8; 4]) {
     for pixel in output.chunks_exact_mut(4) {
         pixel.copy_from_slice(&color);
     }

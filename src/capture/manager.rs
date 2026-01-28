@@ -37,7 +37,7 @@
 use std::sync::{Arc, Mutex, RwLock};
 use std::collections::HashMap;
 
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 
 use crate::core::{
     CameraCapability, CameraDevice, CaptureError, CaptureSettings,
@@ -45,7 +45,7 @@ use crate::core::{
 };
 use crate::capture::{
     CaptureBackend, CameraEnumerator,
-    CameraState, CameraStateManager, SharedCameraState, shared_camera_state,
+    CameraState, SharedCameraState, shared_camera_state,
     start_capture_loop, CaptureLoopHandle, FrameReceiver, MetricsSnapshot,
 };
 

@@ -238,6 +238,8 @@ pub struct FrameBufferPool {
     config: PoolConfig,
     slots: Vec<Arc<BufferSlot>>,
     stats: Arc<PoolStats>,
+    /// Self-reference for buffer return (reserved for future auto-reclamation)
+    #[allow(dead_code)]
     pool_ref: Weak<FrameBufferPool>,
 }
 

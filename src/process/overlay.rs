@@ -432,7 +432,7 @@ fn format_timestamp(format: &str) -> String {
 /// Convert days since epoch to (year, month, day)
 fn days_to_ymd(days: i64) -> (i32, u32, u32) {
     // Simplified algorithm - good enough for display purposes
-    let mut remaining = days + 719468; // Days from year 0 to epoch
+    let remaining = days + 719468; // Days from year 0 to epoch
     let era = remaining / 146097;
     let doe = remaining - era * 146097;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;

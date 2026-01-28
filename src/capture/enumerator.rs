@@ -3,7 +3,7 @@
 //! Provides platform-independent traits and types for discovering
 //! available video capture devices and negotiating capture formats.
 
-use crate::core::{CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, PixelFormat};
+use crate::core::{CameraCapability, CameraDevice, CaptureError, DeviceId, PixelFormat};
 
 /// Event indicating a change in available camera devices
 #[derive(Debug, Clone)]

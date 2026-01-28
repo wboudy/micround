@@ -34,7 +34,8 @@ const FRAME_CHANNEL_CAPACITY: usize = 2;
 /// Maximum consecutive errors before entering error state
 const MAX_CONSECUTIVE_ERRORS: u32 = 10;
 
-/// Frame timeout in milliseconds
+/// Frame timeout in milliseconds (reserved for future timeout handling)
+#[allow(dead_code)]
 const FRAME_TIMEOUT_MS: u64 = 1000;
 
 /// Statistics tracked by the capture loop

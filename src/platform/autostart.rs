@@ -352,6 +352,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     mod linux_tests {
         use super::*;
+        use serial_test::serial;
 
         #[test]
         fn test_desktop_entry_content() {
@@ -367,6 +368,7 @@ mod tests {
         }
 
         #[test]
+        #[serial]
         fn test_enable_disable_cycle() {
             // Create a temp directory for XDG_CONFIG_HOME
             let temp_dir = TempDir::new().unwrap();
@@ -395,6 +397,7 @@ mod tests {
         }
 
         #[test]
+        #[serial]
         fn test_is_enabled_with_hidden_flag() {
             let temp_dir = TempDir::new().unwrap();
             env::set_var("XDG_CONFIG_HOME", temp_dir.path());

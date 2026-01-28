@@ -113,7 +113,7 @@ fn test_v4l2_backend_enumeration() {
     test_step_ok!(logger);
 
     test_step!(logger, "Listing camera devices");
-    let devices = enumerator.list_devices();
+    let devices = enumerator.enumerate().unwrap_or_default();
     test_step_ok!(logger, "Found {} camera(s)", devices.len());
 
     test_step!(logger, "Validating device info");
@@ -152,6 +152,7 @@ fn test_x11_display_connection() {
     #[cfg(feature = "linux")]
     {
         use x11rb::connect;
+        use x11rb::connection::Connection;
 
         match connect(None) {
             Ok((conn, screen_num)) => {

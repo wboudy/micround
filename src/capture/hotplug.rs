@@ -461,11 +461,17 @@ mod tests {
 
         assert!(handle.is_running());
 
-        // Stop the monitor
+        // Stop the monitor and wait for it to finish
         handle.stop();
-        thread::sleep(Duration::from_millis(100));
+        // Wait up to 500ms for the thread to stop (may take longer on loaded systems)
+        for _ in 0..10 {
+            if !handle.is_running() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
 
         // Monitor should be stopped
-        assert!(!handle.is_running());
+        assert!(!handle.is_running(), "Monitor thread did not stop in time");
     }
 }

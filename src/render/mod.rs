@@ -26,6 +26,9 @@ pub trait WallpaperRenderer: Send {
 #[cfg(target_os = "linux")]
 pub mod linux;
 
+// Simulator for testing (no feature gate - always available for testing)
+pub mod simulator;
+
 /// Create a platform-appropriate wallpaper renderer
 #[cfg(target_os = "linux")]
 pub fn create_renderer() -> Result<Box<dyn WallpaperRenderer>, RenderError> {

@@ -25,6 +25,9 @@ pub mod state;
 #[cfg(target_os = "linux")]
 pub mod v4l2;
 
+// Simulator module is always available - it's production code, not mocks
+pub mod simulator;
+
 use crate::core::{CameraDevice, CaptureSettings, DeviceId, Frame, CaptureError, NegotiatedFormat};
 
 pub use enumerator::*;
@@ -102,4 +105,16 @@ pub fn create_backend() -> Box<dyn CaptureBackend> {
 #[cfg(not(target_os = "linux"))]
 pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
     unimplemented!("Camera enumerator not implemented for this platform")
+}
+
+/// Create a simulator backend for testing (requires test-simulator feature)
+#[cfg(feature = "test-simulator")]
+pub fn create_simulator_backend() -> Box<dyn CaptureBackend> {
+    Box::new(simulator::SimulatorBackend::new_default())
+}
+
+/// Create a simulator backend with custom configuration
+#[cfg(feature = "test-simulator")]
+pub fn create_simulator_backend_with_config(config: simulator::SimulatorConfig) -> Box<dyn CaptureBackend> {
+    Box::new(simulator::SimulatorBackend::new(config))
 }

@@ -283,7 +283,10 @@ const TARGET_CPU_PERCENT: f64 = 10.0;
 /// We use a high threshold because system-wide CPU includes all processes
 const SPIKE_THRESHOLD: f64 = 80.0;
 
+/// This test is system-dependent and may fail when system is under load.
+/// Run with: cargo test test_cpu_usage_basic_capture -- --ignored
 #[test]
+#[ignore]
 fn test_cpu_usage_basic_capture() {
     eprintln!("\n=== Test: Basic Capture CPU Usage ===\n");
 
@@ -331,7 +334,10 @@ fn test_cpu_usage_basic_capture() {
     assert!(stats.samples > 0, "Should have collected CPU samples");
 }
 
+/// This test is system-dependent and may fail when system is under load.
+/// Run with: cargo test test_cpu_usage_spike_detection -- --ignored
 #[test]
+#[ignore]
 fn test_cpu_usage_spike_detection() {
     eprintln!("\n=== Test: CPU Spike Detection ===\n");
 

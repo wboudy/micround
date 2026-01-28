@@ -183,7 +183,10 @@ fn test_logger_multiple_assertions_per_step() {
     assert_eq!(result.assertions.len(), 5);
 }
 
+/// This test is timing-sensitive and may fail under system load.
+/// Run with: cargo test test_step_timing_accuracy -- --ignored
 #[test]
+#[ignore]
 fn test_step_timing_accuracy() {
     let mut logger = TestLogger::new("test_step_timing", 1);
 

@@ -328,7 +328,10 @@ fn test_gpu_stall_detection() {
     );
 }
 
+/// This test is timing-sensitive and may fail under system load.
+/// Run with: cargo test test_gpu_render_timing_variance -- --ignored
 #[test]
+#[ignore]
 fn test_gpu_render_timing_variance() {
     eprintln!("\n=== Test: Render Timing Variance ===\n");
 

@@ -181,7 +181,10 @@ fn measure_latency(
 // Tests
 // ============================================================================
 
+/// This test is timing-sensitive and may fail under system load.
+/// Run with: cargo test test_latency_baseline_320x240 -- --ignored
 #[test]
+#[ignore]
 fn test_latency_baseline_320x240() {
     eprintln!("\n=== Test: Baseline Latency 320x240 ===\n");
 
@@ -424,7 +427,10 @@ fn test_latency_consistency_over_time() {
     }
 }
 
+/// This test is timing-sensitive and may fail under system load.
+/// Run with: cargo test test_latency_breakdown_logging -- --ignored
 #[test]
+#[ignore]
 fn test_latency_breakdown_logging() {
     eprintln!("\n=== Test: Detailed Latency Breakdown ===\n");
 

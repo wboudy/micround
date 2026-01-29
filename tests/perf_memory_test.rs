@@ -363,6 +363,7 @@ fn test_memory_basic_capture() {
         height: 480,
         latency_ms: 0,
         error_rate: 0.0,
+        frame_history_size: 0, // Disable frame history to avoid expected memory growth
         ..Default::default()
     };
 
@@ -376,6 +377,7 @@ fn test_memory_basic_capture() {
     analysis.print_memory_graph();
 
     // No severe memory leak (growth < 50% or trend < 10 KB/s)
+    // With frame history disabled, we should see minimal memory growth
     assert!(
         !analysis.suspected_leak || analysis.growth_percent < 50.0,
         "Potential memory leak: {:.1}% growth, {:.2} KB/s trend",
@@ -405,6 +407,7 @@ fn test_memory_allocation_patterns() {
         height: 240,
         latency_ms: 0,
         error_rate: 0.0,
+        frame_history_size: 0, // Disable for memory testing
         ..Default::default()
     };
 
@@ -459,6 +462,7 @@ fn test_memory_trend_detection() {
         height: 480,
         latency_ms: 0,
         error_rate: 0.0,
+        frame_history_size: 0, // Disable for memory testing
         ..Default::default()
     };
 
@@ -508,6 +512,7 @@ fn test_memory_detailed_report() {
         height: 240,
         latency_ms: 0,
         error_rate: 0.0,
+        frame_history_size: 0, // Disable for memory testing
         ..Default::default()
     };
 
@@ -552,6 +557,7 @@ fn test_memory_extended_60sec() {
         height: 480,
         latency_ms: 0,
         error_rate: 0.0,
+        frame_history_size: 0, // Disable for memory testing
         ..Default::default()
     };
 
@@ -595,6 +601,7 @@ fn test_memory_soak_10min() {
         height: 480,
         latency_ms: 0,
         error_rate: 0.0,
+        frame_history_size: 0, // Disable for memory testing
         ..Default::default()
     };
 
@@ -643,6 +650,7 @@ fn test_memory_hd_capture() {
         height: 1080,
         latency_ms: 0,
         error_rate: 0.0,
+        frame_history_size: 0, // Disable for memory testing
         ..Default::default()
     };
 

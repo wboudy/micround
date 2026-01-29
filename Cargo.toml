@@ -13,6 +13,8 @@ macos = ["dep:objc2", "dep:block2"]
 linux = ["dep:v4l", "dep:x11rb"]
 # System tray integration - requires GTK3 on Linux
 tray = ["dep:tray-icon", "dep:muda"]
+# Global keyboard shortcuts
+hotkeys = ["dep:global-hotkey"]
 # Test simulator for headless testing - generates synthetic frames
 test-simulator = []
 # Clipboard support for snapshot feature (requires platform-specific deps)
@@ -27,6 +29,7 @@ egui = "0.28"
 winit = "0.29"
 tray-icon = { version = "0.19", optional = true }
 muda = { version = "0.15", optional = true }
+global-hotkey = { version = "0.6", optional = true }
 
 # Async
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "signal"] }

@@ -11,6 +11,7 @@ pub mod error_injector;
 pub mod latency;
 pub mod messages;
 pub mod recovery;
+pub mod hotkeys;
 
 pub use types::*;
 pub use error::*;

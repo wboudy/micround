@@ -56,6 +56,14 @@ impl FreezeBuffer {
         *self.frame.write().unwrap() = Some(Arc::new(frame));
     }
 
+    /// Store an already-Arc'd frame in the freeze buffer (avoids clone)
+    ///
+    /// More efficient than `freeze` when you already have an Arc<ProcessedFrame>.
+    /// This avoids cloning the frame data (~8MB for HD frames).
+    pub fn freeze_arc(&self, frame: Arc<ProcessedFrame>) {
+        *self.frame.write().unwrap() = Some(frame);
+    }
+
     /// Get a reference to the frozen frame
     ///
     /// Returns None if no frame has been frozen.
@@ -254,14 +262,9 @@ impl DisplayEngine {
         let mut state = self.state.write().unwrap();
         if *state == DisplayState::Running {
             // Capture the last frame to freeze buffer
-            if let Some(frame) = self.last_frame.read().unwrap().as_ref() {
-                // Clone the frame data for the freeze buffer
-                let frozen = ProcessedFrame::new(
-                    frame.data.clone(),
-                    frame.width,
-                    frame.height,
-                );
-                self.freeze_buffer.freeze(frozen);
+            // Use Arc clone instead of data clone - this is O(1) vs O(n) for HD frames
+            if let Some(frame) = self.last_frame.read().unwrap().clone() {
+                self.freeze_buffer.freeze_arc(frame);
             }
 
             *state = DisplayState::Paused;
@@ -284,9 +287,9 @@ impl DisplayEngine {
             // Update pause time metrics
             self.update_pause_metrics();
 
-            // Clear the freeze buffer (optional: could keep for snapshot)
-            // For now, we keep it so snapshot while paused works
-            // self.freeze_buffer.clear();
+            // Clear the freeze buffer to free memory (~8MB for HD frames)
+            // The last_frame is still available for snapshots when running
+            self.freeze_buffer.clear();
 
             // Publish event
             self.event_bus.publish(Event::DisplayResumed);
@@ -435,9 +438,12 @@ impl DisplayEngine {
     }
 }
 
-// Thread-safe wrapper for sharing across threads
-unsafe impl Send for DisplayEngine {}
-unsafe impl Sync for DisplayEngine {}
+// Note: DisplayEngine is automatically Send + Sync because:
+// - RwLock<T> is Send + Sync when T: Send + Sync
+// - AtomicBool is Send + Sync
+// - EventBus is Send + Sync (uses Arc internally)
+// - FreezeBuffer contains RwLock<Option<Arc<ProcessedFrame>>> which is Send + Sync
+// No unsafe impl needed.
 
 // ============================================================================
 // Engine Handle for Async Context

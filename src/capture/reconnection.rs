@@ -481,9 +481,12 @@ impl CameraEventHandler for ReconnectionEventHandler {
     }
 }
 
-// Thread-safe wrapper for sharing across threads
-unsafe impl Send for ReconnectionManager {}
-unsafe impl Sync for ReconnectionManager {}
+// Note: ReconnectionManager is automatically Send + Sync because:
+// - RwLock<T> is Send + Sync when T: Send + Sync
+// - AtomicBool is Send + Sync
+// - EventBus is Send + Sync
+// - All inner types (DeviceMatchStrategy, CaptureSettings, etc.) are Send + Sync
+// No unsafe impl needed.
 
 // ============================================================================
 // Tests

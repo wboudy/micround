@@ -28,8 +28,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use muda::{
     accelerator::Accelerator,
-    Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu,
-    CheckMenuItem, IconMenuItem,
+    Menu, MenuEvent, MenuItem, PredefinedMenuItem,
 };
 use tray_icon::{
     TrayIcon as TrayIconInner, TrayIconBuilder, TrayIconEvent,
@@ -651,10 +650,6 @@ fn generate_state_icon(state: IconState) -> Vec<u8> {
     data
 }
 
-/// Generate a simple fallback icon (backward compatibility)
-fn generate_fallback_icon() -> Vec<u8> {
-    generate_state_icon(IconState::Idle)
-}
 
 // ============================================================================
 // Error Types
@@ -789,8 +784,8 @@ mod tests {
     }
 
     #[test]
-    fn test_fallback_icon_generation() {
-        let icon = generate_fallback_icon();
+    fn test_idle_icon_generation() {
+        let icon = generate_state_icon(IconState::Idle);
         assert_eq!(icon.len(), 32 * 32 * 4); // 32x32 RGBA
     }
 

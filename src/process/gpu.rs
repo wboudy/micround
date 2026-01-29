@@ -1162,7 +1162,7 @@ mod tests {
     #[test]
     fn test_calculate_scale_region_fill() {
         // 16:9 source into 4:3 target
-        let (x, y, w, h) = calculate_scale_region(1920, 1080, 800, 600, ScalingMode::Fill);
+        let (_x, _y, w, h) = calculate_scale_region(1920, 1080, 800, 600, ScalingMode::Fill);
         // Should fill completely, cropping edges
         assert!(w >= 800.0 || h >= 600.0);
     }

@@ -551,7 +551,8 @@ impl CaptureBackend for V4l2Backend {
         let (buf, meta) = CaptureStream::next(&mut **stream)
             .map_err(|e| CaptureError::Platform(format!("Failed to capture frame: {}", e)))?;
 
-        let device = self.device.as_ref().unwrap();
+        let device = self.device.as_ref()
+            .ok_or_else(|| CaptureError::Platform("Device not open".into()))?;
         let fmt = device.format().map_err(|e| CaptureError::Platform(e.to_string()))?;
 
         self.sequence += 1;

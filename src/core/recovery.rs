@@ -55,7 +55,12 @@ impl StartupState {
                 if *wallpaper_restored {
                     Some(messages::recovery::recovered_from_crash())
                 } else {
-                    Some(messages::recovery::wallpaper_restored())
+                    // Wallpaper was NOT restored - show a different message
+                    Some(messages::UserMessage::new(
+                        "Micround recovered from unexpected shutdown. Unable to restore your original wallpaper.",
+                    )
+                    .with_error_code("MIC-REC-002")
+                    .with_action(messages::RecoveryAction::primary("Dismiss", messages::RecoveryActionId::Dismiss)))
                 }
             }
         }

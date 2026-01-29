@@ -92,13 +92,6 @@ impl X11Renderer {
     }
 
     #[cfg(feature = "linux")]
-    fn get_screen(&self) -> Option<&Screen> {
-        self.connection
-            .as_ref()
-            .map(|conn| &conn.setup().roots[self.screen_num])
-    }
-
-    #[cfg(feature = "linux")]
     fn find_visual(&self, screen: &Screen) -> Option<Visualid> {
         // Find a TrueColor visual for proper RGBA rendering
         for depth in &screen.allowed_depths {

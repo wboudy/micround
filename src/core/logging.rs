@@ -7,7 +7,7 @@
 //! - NEVER log file paths that might reveal user data
 //! - DO log: device IDs, resolutions, frame counts, timings, errors
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::Level;
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
@@ -161,7 +161,7 @@ pub fn init_test() {
 }
 
 /// Rotate log files if the current one exceeds MAX_LOG_SIZE
-fn rotate_logs(log_dir: &PathBuf) -> Result<(), LoggingError> {
+fn rotate_logs(log_dir: &Path) -> Result<(), LoggingError> {
     let log_file = log_dir.join(LOG_FILE_NAME);
 
     if !log_file.exists() {

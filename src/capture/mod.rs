@@ -20,6 +20,7 @@ pub mod enumerator;
 pub mod hotplug;
 pub mod manager;
 pub mod negotiation;
+pub mod reconnection;
 pub mod state;
 
 #[cfg(target_os = "linux")]

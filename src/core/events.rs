@@ -98,6 +98,12 @@ pub enum Event {
     SettingsChanged,
     /// Application state changed
     StateChanged { old_state: AppState, new_state: AppState },
+    /// Camera was reconnected after disconnection
+    CameraReconnected { device_id: DeviceId },
+    /// Camera reconnection failed
+    CameraReconnectionFailed { device_id: DeviceId },
+    /// Camera reconnection timed out
+    CameraReconnectionTimedOut { device_id: DeviceId },
 }
 
 /// Reasons a frame might be dropped

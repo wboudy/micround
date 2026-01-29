@@ -26,6 +26,12 @@ pub mod state;
 #[cfg(target_os = "linux")]
 pub mod v4l2;
 
+#[cfg(target_os = "windows")]
+pub mod media_foundation;
+
+#[cfg(target_os = "macos")]
+pub mod avfoundation;
+
 // Simulator module is always available - it's production code, not mocks
 pub mod simulator;
 
@@ -97,13 +103,37 @@ pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
     Box::new(v4l2::V4l2Enumerator::new())
 }
 
-// Placeholder for other platforms
-#[cfg(not(target_os = "linux"))]
+/// Create a platform-appropriate capture backend (Windows)
+#[cfg(target_os = "windows")]
+pub fn create_backend() -> Box<dyn CaptureBackend> {
+    Box::new(media_foundation::MediaFoundationBackend::new())
+}
+
+/// Create a platform-appropriate camera enumerator (Windows)
+#[cfg(target_os = "windows")]
+pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
+    Box::new(media_foundation::MediaFoundationEnumerator::new())
+}
+
+/// Create a platform-appropriate capture backend (macOS)
+#[cfg(target_os = "macos")]
+pub fn create_backend() -> Box<dyn CaptureBackend> {
+    Box::new(avfoundation::AVFoundationBackend::new())
+}
+
+/// Create a platform-appropriate camera enumerator (macOS)
+#[cfg(target_os = "macos")]
+pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
+    Box::new(avfoundation::AVFoundationEnumerator::new())
+}
+
+// Placeholder for other platforms (e.g., FreeBSD, etc.)
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn create_backend() -> Box<dyn CaptureBackend> {
     unimplemented!("Capture backend not implemented for this platform")
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
     unimplemented!("Camera enumerator not implemented for this platform")
 }

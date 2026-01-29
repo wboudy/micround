@@ -2,6 +2,7 @@
 //!
 //! Provides platform-independent handling of system-level events like
 //! sleep/wake, power state changes, and session events.
+#![allow(dead_code)] // System events infrastructure
 //!
 //! # Platform Implementations
 //! - Windows: Win32 WM_POWERBROADCAST, WM_WTSSESSION_CHANGE

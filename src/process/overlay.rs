@@ -1,6 +1,7 @@
 //! Overlay compositing system
 //!
 //! Renders text and graphics overlays onto processed frames.
+#![allow(dead_code)] // Complete API for overlay feature
 //! Supports timestamp, custom text, and debug information.
 //!
 //! # Overlay Types

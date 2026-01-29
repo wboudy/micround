@@ -2,6 +2,7 @@
 //!
 //! Implements the algorithm for selecting the best available capture format
 //! when the exact requested settings aren't available.
+#![allow(dead_code)] // Format negotiation infrastructure
 
 use crate::core::{CameraCapability, CaptureSettings, NegotiatedFormat, PixelFormat};
 

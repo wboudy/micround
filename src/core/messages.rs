@@ -1,6 +1,7 @@
 //! User-facing error messages and recovery guidance
 //!
 //! This module centralizes all user-visible error messages, following these principles:
+#![allow(dead_code)] // Complete API for future UI integration
 //!
 //! 1. **Tell users what happened** (in plain language)
 //! 2. **Tell users what to do** (specific action)

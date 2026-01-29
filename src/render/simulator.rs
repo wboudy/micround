@@ -2,6 +2,7 @@
 //!
 //! Provides a simulated display backend that captures rendered frames to memory
 //! buffers for verification. This enables headless testing without a real display.
+#![allow(dead_code)] // Test simulator infrastructure
 //!
 //! # Feature Gate
 //!

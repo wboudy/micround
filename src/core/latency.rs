@@ -1,6 +1,7 @@
 //! Latency Measurement Tooling
 //!
 //! Provides end-to-end latency tracking from camera capture to display presentation.
+#![allow(dead_code)] // Performance measurement infrastructure
 //! Essential for validating the <100ms latency requirement.
 //!
 //! # Architecture

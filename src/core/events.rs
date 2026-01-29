@@ -1,6 +1,7 @@
 //! Internal event/message bus for Micround
 //!
 //! Provides type-safe, thread-safe communication between components:
+#![allow(dead_code)] // Full event system API
 //! - Commands: Synchronous dispatch from UI to components
 //! - Events: Asynchronous notification from components to UI
 //!

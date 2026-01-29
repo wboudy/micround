@@ -1,6 +1,7 @@
 //! V4L2 (Video4Linux2) camera support for Linux
 //!
 //! Provides camera enumeration and capture using the V4L2 API.
+#![allow(dead_code)] // V4L2 backend
 //!
 //! # Requirements
 //! - Linux kernel with V4L2 support

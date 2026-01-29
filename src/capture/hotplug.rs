@@ -1,6 +1,7 @@
 //! Camera hot-plug detection and monitoring
 //!
 //! Detects when cameras are connected or disconnected and fires events.
+#![allow(dead_code)] // Hotplug detection infrastructure
 //!
 //! # Platform Support
 //!

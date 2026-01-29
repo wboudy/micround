@@ -2,6 +2,8 @@
 //!
 //! This module contains the shared types, traits, and utilities used across
 //! all platform-specific implementations.
+#![allow(dead_code)] // Core API exports
+#![allow(unused_imports)] // Library API re-exports
 
 pub mod types;
 pub mod error;

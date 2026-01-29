@@ -1,6 +1,7 @@
 //! Global keyboard shortcuts
 //!
 //! Provides cross-platform global hotkey support using the `global-hotkey` crate.
+#![allow(dead_code)] // Hotkey system API
 //! Hotkeys work even when the application is not focused.
 //!
 //! # Platform Notes

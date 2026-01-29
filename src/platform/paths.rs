@@ -2,6 +2,7 @@
 //!
 //! Provides platform-appropriate directories for application data, configuration,
 //! logs, and temporary files.
+#![allow(dead_code)] // Platform path abstractions
 //!
 //! # Platform Directories
 //!

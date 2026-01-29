@@ -1,6 +1,7 @@
 //! Configuration and persistence
 //!
 //! Handles loading, saving, and managing application settings.
+#![allow(dead_code)] // Configuration API
 //!
 //! # File Format
 //!

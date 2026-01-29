@@ -1,6 +1,7 @@
 //! GPU-accelerated frame processing
 //!
 //! Uses wgpu compute shaders for high-performance frame processing.
+#![allow(dead_code)] // GPU pipeline infrastructure
 //! Provides significant CPU savings and enables sustained 60fps on integrated GPUs.
 //!
 //! # Architecture

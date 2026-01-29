@@ -2,6 +2,7 @@
 //!
 //! Provides platform-independent traits for creating and managing windows at the
 //! desktop level (behind icons, at wallpaper layer).
+#![allow(dead_code)] // Cross-platform window API
 //!
 //! # Platform Implementations
 //! - Windows: WorkerW window behind SHELLDLL_DefView

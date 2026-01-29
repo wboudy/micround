@@ -5,6 +5,8 @@
 //! backends provide the actual implementations.
 //!
 //! # Abstractions
+#![allow(dead_code)] // Platform abstraction layer
+#![allow(unused_imports)] // Library API re-exports
 //!
 //! - **Display**: Screen enumeration, geometry, DPI, change detection
 //! - **DesktopWindow**: Low-level window at desktop level for wallpaper rendering

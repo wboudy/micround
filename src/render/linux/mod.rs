@@ -1,6 +1,7 @@
 //! Linux wallpaper backend
 //!
 //! Uses X11 root window drawing for wallpaper integration.
+#![allow(dead_code)] // Linux renderer implementation
 //!
 //! # Implementation Strategy
 //!

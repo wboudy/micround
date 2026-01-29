@@ -4,6 +4,8 @@
 //! the `CaptureBackend` trait.
 //!
 //! # Architecture
+#![allow(dead_code)] // Capture subsystem API
+#![allow(unused_imports)] // Library API re-exports
 //!
 //! The capture system is divided into:
 //! - **Enumeration**: Discovering available camera devices

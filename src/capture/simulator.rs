@@ -2,6 +2,7 @@
 //!
 //! Provides a simulated camera backend that generates frames with configurable
 //! patterns. This enables testing without real hardware.
+#![allow(dead_code)] // Test simulator infrastructure
 //!
 //! # Feature Gate
 //!

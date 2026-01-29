@@ -1,6 +1,7 @@
 //! System tray integration
 //!
 //! Provides cross-platform system tray icon and menu functionality.
+#![allow(dead_code)] // Tray UI API
 //! Works on Windows, macOS, and Linux.
 //!
 //! # Platform Notes

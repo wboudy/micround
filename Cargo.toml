@@ -19,6 +19,8 @@ hotkeys = ["dep:global-hotkey"]
 test-simulator = []
 # Clipboard support for snapshot feature (requires platform-specific deps)
 clipboard = []
+# Crash recovery and clean shutdown handling
+recovery = []
 
 [dependencies]
 # Graphics - wgpu handles platform selection automatically

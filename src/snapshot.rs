@@ -1,6 +1,7 @@
 //! Snapshot feature - capture current frame to file or clipboard
 //!
 //! Allows users to capture a still image of the current feed:
+#![allow(dead_code)] // Snapshot feature API
 //! - Save to file (PNG format by default)
 //! - Copy to clipboard (platform-specific)
 //!

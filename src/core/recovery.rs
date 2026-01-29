@@ -1,6 +1,7 @@
 //! Crash detection and recovery
 //!
 //! Detects unclean shutdown (crash) and recovers gracefully on next startup.
+#![allow(dead_code)] // Recovery infrastructure
 //! The user should never be left with a stuck frame as their wallpaper.
 //!
 //! # Detection Mechanism

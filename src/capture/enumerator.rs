@@ -2,6 +2,7 @@
 //!
 //! Provides platform-independent traits and types for discovering
 //! available video capture devices and negotiating capture formats.
+#![allow(dead_code)] // Camera enumeration API
 
 use crate::core::{CameraCapability, CameraDevice, CaptureError, DeviceId, PixelFormat};
 

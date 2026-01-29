@@ -1,6 +1,7 @@
 //! Application engine - orchestrates capture, processing, and rendering
 //!
 //! The engine is the central coordinator that connects all subsystems:
+#![allow(dead_code)] // Engine and pause/freeze API
 //! - Receives frames from the capture subsystem
 //! - Processes frames through the pipeline
 //! - Manages pause/freeze state with a frozen frame buffer

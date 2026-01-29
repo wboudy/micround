@@ -2,6 +2,7 @@
 //!
 //! Converts raw camera frames (MJPEG, YUYV, etc.) into RGBA format
 //! for the processing pipeline.
+#![allow(dead_code)] // Decoder infrastructure for capture pipeline
 //!
 //! # Supported Formats
 //! - MJPEG: Motion JPEG (decoded using image crate)

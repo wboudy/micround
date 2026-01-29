@@ -2,6 +2,7 @@
 //!
 //! Provides efficient buffer management to avoid per-frame allocation
 //! and support for zero-copy paths where possible.
+#![allow(dead_code)] // Buffer pool infrastructure
 //!
 //! # Design
 //!

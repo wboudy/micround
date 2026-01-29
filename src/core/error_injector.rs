@@ -2,6 +2,7 @@
 //!
 //! Provides controllable, deterministic error injection for testing error handling
 //! and recovery paths in the application.
+#![allow(dead_code)] // Test infrastructure
 //!
 //! # Feature Gate
 //!

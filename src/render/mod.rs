@@ -1,6 +1,7 @@
 //! Wallpaper rendering backends
 //!
 //! Platform-specific implementations for rendering frames to the desktop wallpaper.
+#![allow(dead_code)] // Renderer API
 
 use crate::config::AppConfig;
 use crate::core::{DisplayId, RenderError};

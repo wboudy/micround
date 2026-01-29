@@ -1,6 +1,7 @@
 //! User interface components
 //!
 //! System tray integration and settings window using egui.
+#![allow(dead_code)] // UI components API
 //!
 //! # Features
 //!

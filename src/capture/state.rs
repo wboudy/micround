@@ -2,6 +2,7 @@
 //!
 //! Manages the state machine for camera operations, ensuring clean transitions
 //! between states and proper resource management.
+#![allow(dead_code)] // Camera state machine
 //!
 //! # Camera States
 //!

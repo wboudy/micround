@@ -1,6 +1,7 @@
 //! Frame scaling engine
 //!
 //! Resizes camera frames to fit display dimensions with multiple scaling modes.
+#![allow(dead_code)] // Full API for frame scaling feature
 //! Supports high-quality filtering for both upscaling and downscaling.
 //!
 //! # Scaling Modes

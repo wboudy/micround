@@ -1,6 +1,7 @@
 //! Geometric transforms for frames
 //!
 //! Implements rotation (90° increments) and flip (horizontal/vertical) transforms.
+#![allow(dead_code)] // Transform pipeline infrastructure
 //! These are applied before scaling to correct camera orientation mismatches.
 //!
 //! # Transform Order

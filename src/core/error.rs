@@ -1,6 +1,7 @@
 //! Error types and handling strategy for Micround
 //!
 //! This module defines the error taxonomy, representation, and handling patterns.
+#![allow(dead_code)] // Complete error taxonomy
 //!
 //! # Error Categories
 //!

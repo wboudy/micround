@@ -2,6 +2,7 @@
 //!
 //! Manages continuous frame acquisition from a camera backend,
 //! delivering frames to consumers via a bounded channel.
+#![allow(dead_code)] // Capture loop infrastructure
 //!
 //! # Architecture
 //!

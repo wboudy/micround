@@ -3,6 +3,7 @@
 //! This module provides platform-specific functions to capture the user's
 //! current wallpaper settings and restore them later. This is critical for
 //! maintaining user trust - we must never "lose" their wallpaper.
+#![allow(dead_code)] // Wallpaper backup/restore API
 //!
 //! # Platform Support
 //!

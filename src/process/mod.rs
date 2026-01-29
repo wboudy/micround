@@ -2,6 +2,8 @@
 //!
 //! Transforms raw camera frames into display-ready images.
 //! Includes color conversion, scaling, rotation, and overlay compositing.
+#![allow(dead_code)] // Processing pipeline infrastructure
+#![allow(unused_imports)] // Library API re-exports
 //!
 //! # Pipeline Stages
 //!

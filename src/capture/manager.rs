@@ -1,6 +1,7 @@
 //! Unified capture API
 //!
 //! Platform-agnostic interface for the capture subsystem.
+#![allow(dead_code)] // Capture manager API
 //! Hides complexity of V4L2/MediaFoundation/AVFoundation behind a simple API.
 //!
 //! # Thread Safety

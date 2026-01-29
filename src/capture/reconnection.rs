@@ -2,6 +2,7 @@
 //!
 //! Automatically reconnects to the camera when it becomes available again after
 //! disconnection. Essential for day-30 reliability where USB devices may be bumped.
+#![allow(dead_code)] // Reconnection infrastructure
 //!
 //! # Reconnection Flow
 //!

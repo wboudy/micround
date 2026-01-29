@@ -2,6 +2,7 @@
 //!
 //! Provides platform-specific methods to enable or disable launching the
 //! application at user login.
+#![allow(dead_code)] // Complete API for autostart feature
 //!
 //! # Platform Support
 //!

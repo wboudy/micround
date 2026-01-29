@@ -21,10 +21,13 @@ pub trait WallpaperRenderer: Send {
     fn shutdown(&mut self);
 }
 
-// Platform-specific implementations will be added when those features are implemented
+// Platform-specific implementations
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+
+#[cfg(target_os = "windows")]
+pub mod windows;
 
 // Simulator for testing (no feature gate - always available for testing)
 pub mod simulator;
@@ -35,8 +38,14 @@ pub fn create_renderer() -> Result<Box<dyn WallpaperRenderer>, RenderError> {
     Ok(Box::new(linux::X11Renderer::new()?))
 }
 
-// Placeholder for other platforms
-#[cfg(not(target_os = "linux"))]
+/// Create a platform-appropriate wallpaper renderer (Windows)
+#[cfg(target_os = "windows")]
+pub fn create_renderer() -> Result<Box<dyn WallpaperRenderer>, RenderError> {
+    Ok(Box::new(windows::WindowsRenderer::new()?))
+}
+
+// Placeholder for other platforms (macOS)
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn create_renderer() -> Result<Box<dyn WallpaperRenderer>, RenderError> {
     unimplemented!("Wallpaper renderer not implemented for this platform")
 }

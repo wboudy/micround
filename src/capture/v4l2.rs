@@ -25,6 +25,61 @@ use v4l::io::traits::CaptureStream;
 #[cfg(feature = "linux")]
 use v4l::FourCC;
 
+// ============================================================================
+// Permission Helpers
+// ============================================================================
+
+/// Check if the current user is in the 'video' group
+///
+/// Returns true if the user is in the video group, false otherwise.
+/// This is used to provide better error messages for permission issues.
+#[cfg(target_os = "linux")]
+#[allow(dead_code)] // Used only in error paths
+fn is_user_in_video_group() -> bool {
+    use std::process::Command;
+
+    // Try using the 'groups' command to list user's groups
+    Command::new("groups")
+        .output()
+        .map(|output| {
+            let groups = String::from_utf8_lossy(&output.stdout);
+            groups.split_whitespace().any(|g| g == "video")
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn is_user_in_video_group() -> bool {
+    true // Always return true on non-Linux (no video group concept)
+}
+
+/// Generate a helpful permission denied error message
+///
+/// On Linux, this includes specific guidance about the video group
+/// if the user is not a member.
+#[allow(dead_code)] // Used only in error paths
+fn permission_denied_message(device_path: &str) -> String {
+    #[cfg(target_os = "linux")]
+    {
+        if !is_user_in_video_group() {
+            format!(
+                "Permission denied for '{}'. Your user is not in the 'video' group. \
+                Run: sudo usermod -a -G video $USER (then log out and back in)",
+                device_path
+            )
+        } else {
+            format!(
+                "Permission denied for '{}'. Check device permissions or try: sudo chmod 666 {}",
+                device_path, device_path
+            )
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        format!("Permission denied for '{}'", device_path)
+    }
+}
+
 /// V4L2-based camera enumerator
 pub struct V4l2Enumerator {
     /// Cached device list
@@ -361,7 +416,8 @@ impl CaptureBackend for V4l2Backend {
             if err_str.contains("busy") || err_str.contains("EBUSY") {
                 CaptureError::DeviceBusy
             } else if err_str.contains("permission") || err_str.contains("EACCES") {
-                CaptureError::PermissionDenied(device_id.0.clone())
+                // Use enhanced message with video group guidance on Linux
+                CaptureError::PermissionDenied(permission_denied_message(&device_id.0))
             } else {
                 CaptureError::Platform(format!("Failed to open device: {}", e))
             }
@@ -532,8 +588,28 @@ mod tests {
         // This test just verifies the function doesn't panic
         // Actual devices may or may not be present
         let devices = V4l2Enumerator::find_video_devices();
-        // Should return a vec (possibly empty)
-        assert!(devices.len() >= 0);
+        // Should return a vec (possibly empty) - just verify it's a valid Vec
+        let _ = devices.len();
+    }
+
+    #[test]
+    fn test_permission_helpers() {
+        // Test that the video group check doesn't panic
+        let in_group = is_user_in_video_group();
+        // Result depends on system configuration, just verify it returns
+        assert!(in_group || !in_group);
+
+        // Test permission denied message generation
+        let msg = permission_denied_message("/dev/video0");
+        assert!(msg.contains("/dev/video0"));
+        // On Linux, should mention video group if not in it
+        #[cfg(target_os = "linux")]
+        {
+            if !in_group {
+                assert!(msg.contains("video"));
+                assert!(msg.contains("usermod"));
+            }
+        }
     }
 
     #[test]

@@ -300,20 +300,23 @@ impl WallpaperRenderer for X11Renderer {
         ))
     }
 
-    fn render(&mut self, _frame: &ProcessedFrame) -> Result<(), RenderError> {
+    fn render(&mut self, frame: &ProcessedFrame) -> Result<(), RenderError> {
         if !self.initialized {
             return Err(RenderError::Platform("Renderer not initialized".into()));
         }
 
         #[cfg(feature = "linux")]
         {
-            self.render_frame_to_window(frame)
+            return self.render_frame_to_window(frame);
         }
 
         #[cfg(not(feature = "linux"))]
-        Err(RenderError::Platform(
-            "Linux X11 renderer not available on this platform".into(),
-        ))
+        {
+            let _ = frame; // Suppress unused warning when feature is disabled
+            Err(RenderError::Platform(
+                "Linux X11 renderer not available on this platform".into(),
+            ))
+        }
     }
 
     fn restore(&mut self, config: &AppConfig) -> Result<(), RenderError> {

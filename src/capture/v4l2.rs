@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::capture::enumerator::CameraEnumerator;
-use crate::capture::CaptureBackend;
+use crate::capture::enumerator::{CameraEnumerator, fourcc_to_format, format_to_fourcc};
+use crate::capture::{CaptureBackend, negotiate_format};
 use crate::core::{
     CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat,
 };

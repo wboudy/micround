@@ -12,6 +12,7 @@ mod process;
 mod render;
 mod ui;
 mod config;
+mod engine;
 
 fn main() -> Result<()> {
     // Initialize logging with file output and rotation

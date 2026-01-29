@@ -33,6 +33,35 @@ pub enum PathError {
     InvalidUtf8,
 }
 
+impl PathError {
+    /// Get the severity of this error
+    pub fn severity(&self) -> crate::core::ErrorSeverity {
+        match self {
+            Self::NoHomeDir | Self::NoDirFor(_) => crate::core::ErrorSeverity::Fatal,
+            Self::CreateFailed(_) => crate::core::ErrorSeverity::UserActionable,
+            Self::InvalidUtf8 => crate::core::ErrorSeverity::Fatal,
+        }
+    }
+
+    /// Get a user-friendly message for this error
+    pub fn user_message(&self) -> String {
+        match self {
+            Self::NoHomeDir => {
+                "Unable to find your home directory. Please check your system configuration.".into()
+            }
+            Self::NoDirFor(purpose) => {
+                format!("Unable to find the {} directory. Please check your system configuration.", purpose)
+            }
+            Self::CreateFailed(_) => {
+                "Unable to create application directory. Please check that you have write permissions.".into()
+            }
+            Self::InvalidUtf8 => {
+                "A file path contains invalid characters. Please use standard characters in directory names.".into()
+            }
+        }
+    }
+}
+
 /// Application directories for different types of data
 #[derive(Debug, Clone)]
 pub struct AppPaths {

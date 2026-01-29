@@ -50,6 +50,32 @@ impl std::fmt::Display for AutostartError {
 
 impl std::error::Error for AutostartError {}
 
+impl AutostartError {
+    /// Get the severity of this error
+    pub fn severity(&self) -> crate::core::ErrorSeverity {
+        match self {
+            Self::Io(_) => crate::core::ErrorSeverity::UserActionable,
+            Self::NotSupported(_) => crate::core::ErrorSeverity::UserActionable,
+            Self::PathError(_) => crate::core::ErrorSeverity::UserActionable,
+        }
+    }
+
+    /// Get a user-friendly message for this error
+    pub fn user_message(&self) -> String {
+        match self {
+            Self::Io(_) => {
+                "Unable to change autostart settings. Please check that you have write permissions.".into()
+            }
+            Self::NotSupported(_) => {
+                "Autostart is not available on your system. You can manually add Micround to your startup applications.".into()
+            }
+            Self::PathError(_) => {
+                "Unable to find the autostart directory. Please check your system configuration.".into()
+            }
+        }
+    }
+}
+
 impl From<io::Error> for AutostartError {
     fn from(err: io::Error) -> Self {
         AutostartError::Io(err.to_string())

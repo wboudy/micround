@@ -190,7 +190,7 @@ impl SnapshotManager {
                     )
                     .map_err(|e| SnapshotError::Encode(e.to_string()))?;
             }
-            SnapshotFormat::Jpeg { quality: _ } => {
+            SnapshotFormat::Jpeg { quality } => {
                 // Convert RGBA to RGB for JPEG (no alpha channel)
                 let rgb_data: Vec<u8> = frame
                     .data
@@ -205,8 +205,17 @@ impl SnapshotManager {
                 )
                 .ok_or_else(|| SnapshotError::Encode("Failed to create RGB image buffer".into()))?;
 
-                rgb_img
-                    .save(&output_path)
+                // Use the specified JPEG quality
+                let file = File::create(&output_path)?;
+                let writer = BufWriter::new(file);
+                let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(writer, quality);
+                encoder
+                    .encode(
+                        rgb_img.as_raw(),
+                        frame.width,
+                        frame.height,
+                        image::ExtendedColorType::Rgb8,
+                    )
                     .map_err(|e| SnapshotError::Encode(e.to_string()))?;
             }
         }

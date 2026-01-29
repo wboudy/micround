@@ -18,6 +18,8 @@
 use std::fmt;
 use thiserror::Error;
 
+use super::messages::{self, UserMessage};
+
 // ============================================================================
 // Error Severity
 // ============================================================================
@@ -175,6 +177,16 @@ impl MicroundError {
         }
     }
 
+    /// Get a full user message with recovery actions and error code
+    pub fn user_message_full(&self) -> UserMessage {
+        match self {
+            Self::Capture { source, .. } => source.user_message_full(),
+            Self::Render { source, .. } => source.user_message_full(),
+            Self::Config { source, .. } => source.user_message_full(),
+            Self::Internal { message, .. } => messages::internal::unexpected(message),
+        }
+    }
+
     /// Get the error context
     pub fn context(&self) -> &ErrorContext {
         match self {
@@ -293,6 +305,22 @@ impl CaptureError {
         }
     }
 
+    /// Get a full user message with recovery actions and error code
+    pub fn user_message_full(&self) -> UserMessage {
+        match self {
+            Self::DeviceNotFound(name) => messages::camera::camera_not_found(name),
+            Self::DeviceBusy => messages::camera::camera_busy(),
+            Self::FormatNegotiationFailed(details) => {
+                messages::camera::format_negotiation_failed(details)
+            }
+            Self::Timeout(_) => messages::camera::timeout(),
+            Self::PermissionDenied(_) => messages::camera::permission_denied(),
+            Self::Disconnected => messages::camera::disconnected(),
+            Self::NoCameras => messages::camera::no_camera_found(),
+            Self::Platform(msg) => messages::platform::error(msg),
+        }
+    }
+
     /// Create a MicroundError with context
     pub fn with_context(self, context: ErrorContext) -> MicroundError {
         MicroundError::Capture {
@@ -366,6 +394,18 @@ impl RenderError {
         }
     }
 
+    /// Get a full user message with recovery actions and error code
+    pub fn user_message_full(&self) -> UserMessage {
+        match self {
+            Self::SurfaceCreation(details) => messages::display::surface_creation_failed(details),
+            Self::DisplayNotFound(name) => messages::display::not_found(name),
+            Self::Gpu(details) => messages::display::gpu_error(details),
+            Self::WallpaperIntegration(details) => messages::display::wallpaper_failed(details),
+            Self::FrameProcessing(_) => messages::feed::processing_error(),
+            Self::Platform(msg) => messages::platform::error(msg),
+        }
+    }
+
     /// Create a MicroundError with context
     pub fn with_context(self, context: ErrorContext) -> MicroundError {
         MicroundError::Render {
@@ -421,6 +461,16 @@ impl ConfigError {
             Self::NotFound(_) => {
                 "Settings file not found. Using default configuration.".into()
             }
+        }
+    }
+
+    /// Get a full user message with recovery actions and error code
+    pub fn user_message_full(&self) -> UserMessage {
+        match self {
+            Self::ReadFailed(_) => messages::config::read_failed(),
+            Self::WriteFailed(_) => messages::config::save_failed(),
+            Self::Invalid(_) => messages::config::corrupted(),
+            Self::NotFound(_) => messages::config::not_found(),
         }
     }
 
@@ -486,6 +536,17 @@ impl PlatformError {
             Self::PermissionDenied(_) => {
                 "Permission denied. Please check your system settings.".into()
             }
+        }
+    }
+
+    /// Get a full user message with recovery actions and error code
+    pub fn user_message_full(&self) -> UserMessage {
+        match self {
+            Self::Unsupported(feature) => messages::platform::unsupported(feature),
+            Self::CommandFailed(details) => messages::platform::error(details),
+            Self::InvalidState(msg) => messages::platform::error(msg),
+            Self::ResourceNotFound(resource) => messages::platform::error(resource),
+            Self::PermissionDenied(msg) => messages::platform::error(msg),
         }
     }
 }

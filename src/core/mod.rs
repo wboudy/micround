@@ -9,6 +9,8 @@ pub mod logging;
 pub mod events;
 pub mod error_injector;
 pub mod latency;
+pub mod messages;
+pub mod recovery;
 
 pub use types::*;
 pub use error::*;
@@ -20,3 +22,5 @@ pub use latency::{
     FrameMetrics, LatencyHistogram, LatencyTracker, LatencySummaryReport,
     SharedLatencyTracker, StageBreakdown, shared_latency_tracker,
 };
+pub use messages::{RecoveryAction, RecoveryActionId, UserMessage};
+pub use recovery::{RecoveryManager, SignalKind, StartupState, init_recovery, install_signal_handlers};

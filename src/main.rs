@@ -28,11 +28,11 @@ fn main() -> Result<()> {
     let config = config::load_config()?;
     tracing::debug!(?config, "Configuration loaded");
 
-    // 2. Initialize capture backend
-    let capture_backend = capture::create_backend();
+    // 2. Initialize capture backend (TODO: wire into event loop)
+    let _capture_backend = capture::create_backend();
 
-    // 3. Initialize render backend
-    let render_backend = render::create_renderer()?;
+    // 3. Initialize render backend (TODO: wire into event loop)
+    let _render_backend = render::create_renderer()?;
 
     // TODO: Initialize application
     // 4. Start UI event loop

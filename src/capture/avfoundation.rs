@@ -68,12 +68,6 @@ mod objc_bindings {
 
     /// Request camera access (blocking - calls completion handler)
     pub fn request_access() -> bool {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        use std::sync::Arc;
-
-        let granted = Arc::new(AtomicBool::new(false));
-        let granted_clone = granted.clone();
-
         // Note: In a real implementation, we'd use a proper async/completion handler
         // This is a simplified synchronous version
         unsafe {
@@ -355,9 +349,8 @@ impl AVFoundationBackend {
                 if objc_bindings::request_access() {
                     Ok(())
                 } else {
-                    Err(CaptureError::PermissionDenied(
-                        "Camera access not yet granted - please allow in System Preferences".to_string(),
-                    ))
+                    warn!("Camera permission not determined; proceeding to trigger prompt");
+                    Ok(())
                 }
             }
             objc_bindings::AVAuthorizationStatus::Denied => {
@@ -420,6 +413,15 @@ impl AVFoundationBackend {
                 (w, h) if w >= 640 && h >= 480 => "AVCaptureSessionPreset640x480",
                 _ => "AVCaptureSessionPresetHigh",
             };
+            let preset_ns = string_to_nsstring(preset);
+            let can_set: bool = msg_send![session, canSetSessionPreset: preset_ns];
+            if can_set {
+                let _: () = msg_send![session, setSessionPreset: preset_ns];
+            } else {
+                warn!(preset, "Session preset not supported; falling back to High");
+                let fallback = string_to_nsstring("AVCaptureSessionPresetHigh");
+                let _: () = msg_send![session, setSessionPreset: fallback];
+            }
 
             // Create device input
             let input_cls = class!(AVCaptureDeviceInput);
@@ -429,6 +431,7 @@ impl AVFoundationBackend {
 
             if input.is_null() {
                 let _: () = msg_send![session, commitConfiguration];
+                let _: () = msg_send![session, release];
                 return Err(CaptureError::Platform("Failed to create device input".to_string()));
             }
 
@@ -436,6 +439,7 @@ impl AVFoundationBackend {
             let can_add: bool = msg_send![session, canAddInput: input];
             if !can_add {
                 let _: () = msg_send![session, commitConfiguration];
+                let _: () = msg_send![session, release];
                 return Err(CaptureError::DeviceBusy(
                     "Cannot add device input to session".to_string(),
                 ));
@@ -447,6 +451,7 @@ impl AVFoundationBackend {
             let output: *const objc2::runtime::AnyObject = msg_send![output_cls, new];
             if output.is_null() {
                 let _: () = msg_send![session, commitConfiguration];
+                let _: () = msg_send![session, release];
                 return Err(CaptureError::Platform("Failed to create video output".to_string()));
             }
 
@@ -457,6 +462,8 @@ impl AVFoundationBackend {
             let can_add_output: bool = msg_send![session, canAddOutput: output];
             if !can_add_output {
                 let _: () = msg_send![session, commitConfiguration];
+                let _: () = msg_send![output, release];
+                let _: () = msg_send![session, release];
                 return Err(CaptureError::Platform("Cannot add video output to session".to_string()));
             }
             let _: () = msg_send![session, addOutput: output];
@@ -601,11 +608,17 @@ impl CaptureBackend for AVFoundationBackend {
     fn close(&mut self) {
         #[cfg(target_os = "macos")]
         {
+            use objc2::msg_send;
+
             if self.is_capturing {
                 let _ = self.stop();
             }
-            self.capture_session = None;
-            self.video_output = None;
+            if let Some(session) = self.capture_session.take() {
+                let _: () = msg_send![session, release];
+            }
+            if let Some(output) = self.video_output.take() {
+                let _: () = msg_send![output, release];
+            }
         }
         self.current_device = None;
         self.current_format = None;

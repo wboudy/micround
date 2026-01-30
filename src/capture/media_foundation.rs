@@ -455,7 +455,7 @@ impl MediaFoundationBackend {
                                 let hr = e.code();
                                 if hr.0 == 0xC00D36B4u32 as i32 {
                                     // MF_E_HW_MFT_FAILED_START_STREAMING or device busy
-                                    return Err(CaptureError::DeviceBusy(device_id.0.clone()));
+                                    return Err(CaptureError::DeviceBusy);
                                 }
                                 return Err(CaptureError::Platform(format!(
                                     "Failed to activate device: {:?}",
@@ -534,11 +534,12 @@ impl MediaFoundationBackend {
                 }
             }
 
-            let selected_type =
-                best_type.ok_or(CaptureError::FormatNegotiationFailed {
-                    requested: format!("{}x{}", settings.width, settings.height),
-                    available: vec![],
-                })?;
+            let selected_type = best_type.ok_or_else(|| {
+                CaptureError::FormatNegotiationFailed(format!(
+                    "No compatible formats for requested {}x{}",
+                    settings.width, settings.height
+                ))
+            })?;
 
             // Set the media type
             reader
@@ -614,9 +615,7 @@ impl MediaFoundationBackend {
                 return Err(CaptureError::Platform("End of stream".to_string()));
             }
 
-            let sample = sample.ok_or_else(|| {
-                CaptureError::FrameTimeout(std::time::Duration::from_millis(100))
-            })?;
+            let sample = sample.ok_or_else(|| CaptureError::Timeout(100))?;
 
             // Get the buffer from the sample
             let buffer: IMFMediaBuffer = sample.ConvertToContiguousBuffer().map_err(|e| {

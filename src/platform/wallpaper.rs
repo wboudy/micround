@@ -25,6 +25,7 @@
 //! restore_wallpaper(&backup)?;
 //! ```
 
+use crate::core::logging::{log_safe_path, log_safe_path_opt};
 use crate::core::PlatformError;
 use std::path::PathBuf;
 use std::process::Command;
@@ -387,9 +388,10 @@ fn restore_wallpaper_linux(info: &WallpaperInfo) -> Result<(), PlatformError> {
         .unwrap_or_else(|| "GNOME".into());
     let de_upper = de.to_uppercase();
 
+    let safe_path = log_safe_path_opt(info.path.as_deref().map(std::path::Path::new));
     tracing::info!(
         desktop_env = %de_upper,
-        path = ?info.path,
+        path = %safe_path,
         "Restoring wallpaper on Linux"
     );
 
@@ -497,7 +499,7 @@ fn restore_wallpaper_gnome(info: &WallpaperInfo) -> Result<(), PlatformError> {
             .status();
     }
 
-    tracing::info!(path = %path, "Restored GNOME wallpaper");
+    tracing::info!(path = %log_safe_path(std::path::Path::new(path)), "Restored GNOME wallpaper");
     Ok(())
 }
 
@@ -525,7 +527,7 @@ fn restore_wallpaper_xfce(info: &WallpaperInfo) -> Result<(), PlatformError> {
         ));
     }
 
-    tracing::info!(path = %path, "Restored XFCE wallpaper");
+    tracing::info!(path = %log_safe_path(std::path::Path::new(path)), "Restored XFCE wallpaper");
     Ok(())
 }
 
@@ -551,7 +553,7 @@ fn restore_wallpaper_mate(info: &WallpaperInfo) -> Result<(), PlatformError> {
         ));
     }
 
-    tracing::info!(path = %path, "Restored MATE wallpaper");
+    tracing::info!(path = %log_safe_path(std::path::Path::new(path)), "Restored MATE wallpaper");
     Ok(())
 }
 
@@ -579,7 +581,7 @@ fn restore_wallpaper_cinnamon(info: &WallpaperInfo) -> Result<(), PlatformError>
         ));
     }
 
-    tracing::info!(path = %path, "Restored Cinnamon wallpaper");
+    tracing::info!(path = %log_safe_path(std::path::Path::new(path)), "Restored Cinnamon wallpaper");
     Ok(())
 }
 

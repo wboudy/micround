@@ -13,6 +13,7 @@
 use std::path::{Path, PathBuf};
 use std::io;
 
+use crate::core::logging::log_safe_path;
 
 /// Application name for autostart entries (reserved for future platform support)
 #[allow(dead_code)]
@@ -259,7 +260,7 @@ X-GNOME-Autostart-enabled=true
         fs::write(&desktop_path, content)?;
 
         tracing::info!(
-            path = %desktop_path.display(),
+            path = %log_safe_path(&desktop_path),
             "Autostart enabled"
         );
 
@@ -272,7 +273,7 @@ X-GNOME-Autostart-enabled=true
         if desktop_path.exists() {
             fs::remove_file(&desktop_path)?;
             tracing::info!(
-                path = %desktop_path.display(),
+                path = %log_safe_path(&desktop_path),
                 "Autostart disabled"
             );
         }

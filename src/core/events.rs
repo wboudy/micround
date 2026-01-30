@@ -45,6 +45,10 @@ pub enum Command {
     SetRotation { rotation: Rotation },
     /// Update flip
     SetFlip { flip: Flip },
+    /// Refresh camera list
+    RefreshCameras,
+    /// Show settings window
+    ShowSettings,
     /// Quit the application
     Quit,
 }
@@ -263,15 +267,29 @@ impl EventSubscriber {
     /// Returns `None` if the bus is closed.
     /// May skip events if the subscriber falls behind (lagged).
     pub async fn recv(&mut self) -> Option<Event> {
+        let mut consecutive_lags = 0u32;
         loop {
             match self.receiver.recv().await {
-                Ok(event) => return Some(event),
+                Ok(event) => {
+                    return Some(event);
+                }
                 Err(broadcast::error::RecvError::Lagged(count)) => {
-                    // Log that we dropped events and continue
+                    consecutive_lags = consecutive_lags.saturating_add(1);
+                    // Log that we dropped events
                     tracing::warn!(
                         dropped = count,
+                        consecutive_lags,
                         "Event subscriber lagged, dropped events"
                     );
+                    // If severely lagging, yield to allow other tasks to run
+                    // and prevent spinning
+                    if consecutive_lags > 3 {
+                        tracing::error!(
+                            consecutive_lags,
+                            "Event subscriber severely lagged, yielding"
+                        );
+                        tokio::task::yield_now().await;
+                    }
                     continue;
                 }
                 Err(broadcast::error::RecvError::Closed) => return None,
@@ -280,15 +298,28 @@ impl EventSubscriber {
     }
 
     /// Try to receive an event without blocking
+    ///
+    /// Returns `None` if no event is available or the bus is closed.
+    /// May skip events if the subscriber fell behind (lagged).
     pub fn try_recv(&mut self) -> Option<Event> {
+        // Limit iterations to prevent infinite loop if continuously lagging
+        const MAX_LAG_ITERATIONS: u32 = 10;
+        let mut iterations = 0;
+
         loop {
             match self.receiver.try_recv() {
                 Ok(event) => return Some(event),
                 Err(broadcast::error::TryRecvError::Lagged(count)) => {
+                    iterations += 1;
                     tracing::warn!(
                         dropped = count,
+                        iteration = iterations,
                         "Event subscriber lagged, dropped events"
                     );
+                    if iterations >= MAX_LAG_ITERATIONS {
+                        tracing::error!("Event subscriber exceeded max lag iterations, giving up");
+                        return None;
+                    }
                     continue;
                 }
                 Err(_) => return None,

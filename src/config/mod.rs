@@ -44,6 +44,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::logging::log_safe_path;
 use crate::core::{ConfigError, DeviceId, DisplayId, Flip, Rotation, ScalingMode};
 
 /// Current configuration schema version
@@ -340,20 +341,25 @@ pub fn save_config(config: &AppConfig) -> Result<(), ConfigError> {
         let mut file = fs::File::create(&temp_path).map_err(|e| {
             ConfigError::WriteFailed(format!("Failed to create temp file: {}", e))
         })?;
-        file.write_all(contents.as_bytes()).map_err(|e| {
-            ConfigError::WriteFailed(format!("Failed to write temp file: {}", e))
-        })?;
-        file.sync_all().map_err(|e| {
-            ConfigError::WriteFailed(format!("Failed to sync temp file: {}", e))
-        })?;
+
+        // Write and sync, cleaning up temp file on failure
+        if let Err(e) = file.write_all(contents.as_bytes()) {
+            let _ = fs::remove_file(&temp_path); // Best-effort cleanup
+            return Err(ConfigError::WriteFailed(format!("Failed to write temp file: {}", e)));
+        }
+        if let Err(e) = file.sync_all() {
+            let _ = fs::remove_file(&temp_path); // Best-effort cleanup
+            return Err(ConfigError::WriteFailed(format!("Failed to sync temp file: {}", e)));
+        }
     }
 
     // Rename temp to final (atomic on most filesystems)
-    fs::rename(&temp_path, &path).map_err(|e| {
-        ConfigError::WriteFailed(format!("Failed to rename config file: {}", e))
-    })?;
+    if let Err(e) = fs::rename(&temp_path, &path) {
+        let _ = fs::remove_file(&temp_path); // Best-effort cleanup
+        return Err(ConfigError::WriteFailed(format!("Failed to rename config file: {}", e)));
+    }
 
-    tracing::debug!(path = %path.display(), "Config saved");
+    tracing::debug!(path = %log_safe_path(&path), "Config saved");
     Ok(())
 }
 

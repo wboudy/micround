@@ -440,9 +440,7 @@ impl AVFoundationBackend {
             if !can_add {
                 let _: () = msg_send![session, commitConfiguration];
                 let _: () = msg_send![session, release];
-                return Err(CaptureError::DeviceBusy(
-                    "Cannot add device input to session".to_string(),
-                ));
+                return Err(CaptureError::DeviceBusy);
             }
             let _: () = msg_send![session, addInput: input];
 
@@ -652,7 +650,7 @@ impl CaptureBackend for AVFoundationBackend {
         }
 
         // No frame available - in production, would wait with timeout
-        Err(CaptureError::FrameTimeout(std::time::Duration::from_millis(100)))
+        Err(CaptureError::Timeout(100))
     }
 
     #[cfg(not(target_os = "macos"))]

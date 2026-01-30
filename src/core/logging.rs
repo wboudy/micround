@@ -25,6 +25,39 @@ const MAX_LOG_FILES: usize = 3;
 /// Log file name
 const LOG_FILE_NAME: &str = "micround.log";
 
+/// Sanitize a filesystem path for logging (privacy safe).
+///
+/// Replaces the user's home directory with `~` and scrubs the username
+/// when present elsewhere in the path.
+pub fn log_safe_path(path: &Path) -> String {
+    if let Some(home) = dirs::home_dir() {
+        if let Ok(stripped) = path.strip_prefix(&home) {
+            let remainder = stripped.to_string_lossy();
+            if remainder.is_empty() {
+                return "~".to_string();
+            }
+            return format!("~{}{}", std::path::MAIN_SEPARATOR, remainder);
+        }
+    }
+
+    let mut sanitized = path.to_string_lossy().into_owned();
+    let username = std::env::var("USER").or_else(|_| std::env::var("USERNAME"));
+    if let Ok(user) = username {
+        if !user.is_empty() {
+            sanitized = sanitized.replace(&user, "<user>");
+        }
+    }
+    sanitized
+}
+
+/// Sanitize an optional path for logging.
+pub fn log_safe_path_opt(path: Option<&Path>) -> String {
+    match path {
+        Some(path) => log_safe_path(path),
+        None => "<none>".to_string(),
+    }
+}
+
 /// Get the platform-specific log directory
 pub fn log_directory() -> PathBuf {
     #[cfg(target_os = "windows")]

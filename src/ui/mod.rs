@@ -8,6 +8,7 @@
 //! - `tray`: Enable system tray integration (requires GTK3 on Linux)
 
 pub mod first_run;
+pub mod settings;
 
 #[cfg(feature = "tray")]
 pub mod tray;
@@ -15,6 +16,10 @@ pub mod tray;
 // Re-exports for first-run wizard (will be used by settings window integration)
 #[allow(unused_imports)]
 pub use first_run::{FirstRunState, FirstRunAction, FirstRunEvent, FirstRunController, StateContent};
+
+// Re-exports for settings window
+#[allow(unused_imports)]
+pub use settings::{SettingsController, SettingsUI, SettingsWindowState, SettingsError, DisplayInfo};
 
 #[cfg(feature = "tray")]
 #[allow(unused_imports)]

@@ -23,6 +23,7 @@
 //! 4. Return recovery status for optional user notification
 
 use crate::config::{load_config, save_config, AppConfig};
+use crate::core::logging::log_safe_path;
 use crate::core::{ConfigError, messages};
 use crate::platform::wallpaper::restore_wallpaper_from_path;
 
@@ -142,7 +143,10 @@ impl RecoveryManager {
     pub fn store_original_wallpaper(&mut self, path: &str) -> Result<(), ConfigError> {
         self.config.internal.original_wallpaper_path = Some(path.to_string());
         save_config(&self.config)?;
-        tracing::debug!(path = %path, "Original wallpaper path stored");
+        tracing::debug!(
+            path = %log_safe_path(std::path::Path::new(path)),
+            "Original wallpaper path stored"
+        );
         Ok(())
     }
 
@@ -172,7 +176,10 @@ impl RecoveryManager {
     /// Try to restore the original wallpaper
     fn try_restore_wallpaper(&self) -> bool {
         if let Some(ref path) = self.config.internal.original_wallpaper_path {
-            tracing::info!(path = %path, "Attempting to restore original wallpaper");
+            tracing::info!(
+                path = %log_safe_path(std::path::Path::new(path)),
+                "Attempting to restore original wallpaper"
+            );
             match restore_wallpaper_from_path(path) {
                 Ok(()) => {
                     tracing::info!("Original wallpaper restored successfully");

@@ -136,7 +136,16 @@ impl V4l2Enumerator {
         };
 
         // Query supported formats
-        let capabilities = Self::query_capabilities(&device).unwrap_or_default();
+        let capabilities = match Self::query_capabilities(&device) {
+            Some(caps) => caps,
+            None => {
+                tracing::debug!(
+                    device = %path.display(),
+                    "Failed to query device capabilities, device may have limited functionality"
+                );
+                vec![]
+            }
+        };
 
         Some(CameraDevice {
             id: DeviceId(device_id),

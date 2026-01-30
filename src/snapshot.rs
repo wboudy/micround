@@ -19,6 +19,7 @@ use image::{ImageBuffer, ImageEncoder, Rgba};
 use image::codecs::png::PngEncoder;
 use thiserror::Error;
 
+use crate::core::logging::log_safe_path;
 use crate::process::ProcessedFrame;
 
 /// Errors that can occur during snapshot operations
@@ -222,7 +223,7 @@ impl SnapshotManager {
         }
 
         tracing::info!(
-            path = %output_path.display(),
+            path = %log_safe_path(&output_path),
             width = frame.width,
             height = frame.height,
             "Snapshot saved to file"

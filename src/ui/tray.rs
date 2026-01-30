@@ -259,7 +259,7 @@ impl TrayController {
         // Build the tray icon
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
-            .with_tooltip(&initial_state.tooltip())
+            .with_tooltip(initial_state.tooltip())
             .with_icon(icon)
             .build()
             .map_err(|e| TrayError::Creation(e.to_string()))?;
@@ -307,7 +307,7 @@ impl TrayController {
     /// Refresh menu items based on current state
     fn refresh_menu(&self) {
         // Update status text
-        self.menu_items.status_item.set_text(&self.state.status_text());
+        self.menu_items.status_item.set_text(self.state.status_text());
 
         // Update enabled state of menu items
         self.menu_items.start_item.set_enabled(self.state.can_start());

@@ -41,19 +41,20 @@ use windows::{
         Graphics::Gdi::{
             BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC,
             DeleteObject, EndPaint, GetDC, ReleaseDC, SelectObject, SetDIBitsToDevice,
-            BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, PAINTSTRUCT,
-            RGBQUAD, SRCCOPY,
+            BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ,
+            PAINTSTRUCT, RGBQUAD, SRCCOPY,
         },
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows,
             FindWindowExW, FindWindowW, GetClassNameW, GetClientRect, GetWindowLongPtrW,
-            PeekMessageW, RegisterClassExW, SendMessageTimeoutW, SetParent,
+            IsWindow, PeekMessageW, RegisterClassExW, SendMessageTimeoutW, SetParent,
             SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW,
             CS_VREDRAW, CW_USEDEFAULT, GWLP_USERDATA, HWND_BOTTOM, MSG, PM_REMOVE,
             SMTO_NORMAL, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
-            WINDOW_EX_STYLE, WM_DESTROY, WM_PAINT, WNDCLASSEXW, WS_CHILD, WS_EX_LAYERED,
-            WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
+            WINDOW_EX_STYLE, WM_DESTROY, WM_DISPLAYCHANGE, WM_DPICHANGED, WM_PAINT,
+            WNDCLASSEXW, WS_CHILD, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+            WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
         },
     },
 };
@@ -61,7 +62,7 @@ use windows::{
 #[cfg(all(target_os = "windows", feature = "windows"))]
 use std::ptr;
 #[cfg(all(target_os = "windows", feature = "windows"))]
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, Ordering};
 
 /// The magic message to spawn WorkerW windows
 /// This is an undocumented Windows message that tells Progman to create
@@ -72,6 +73,67 @@ const WM_SPAWN_WORKER: u32 = 0x052C;
 /// Global storage for the found WorkerW handle during enumeration
 #[cfg(all(target_os = "windows", feature = "windows"))]
 static FOUND_WORKERW: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(ptr::null_mut());
+
+// ========================================================================
+// Display change tracking (Windows)
+// ========================================================================
+
+#[cfg(all(target_os = "windows", feature = "windows"))]
+struct WindowEventState {
+    resize_pending: AtomicBool,
+    new_width: AtomicU32,
+    new_height: AtomicU32,
+}
+
+#[cfg(all(target_os = "windows", feature = "windows"))]
+impl WindowEventState {
+    fn new() -> Self {
+        Self {
+            resize_pending: AtomicBool::new(false),
+            new_width: AtomicU32::new(0),
+            new_height: AtomicU32::new(0),
+        }
+    }
+
+    fn request_resize(&self, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return;
+        }
+        self.new_width.store(width, Ordering::Release);
+        self.new_height.store(height, Ordering::Release);
+        self.resize_pending.store(true, Ordering::Release);
+    }
+
+    fn take_resize(&self) -> Option<(u32, u32)> {
+        if !self.resize_pending.swap(false, Ordering::AcqRel) {
+            return None;
+        }
+        let width = self.new_width.load(Ordering::Acquire);
+        let height = self.new_height.load(Ordering::Acquire);
+        if width == 0 || height == 0 {
+            None
+        } else {
+            Some((width, height))
+        }
+    }
+}
+
+#[cfg(all(target_os = "windows", feature = "windows"))]
+static WINDOW_EVENT_STATE: AtomicPtr<WindowEventState> = AtomicPtr::new(ptr::null_mut());
+
+#[cfg(all(target_os = "windows", feature = "windows"))]
+fn with_window_event_state<F, R>(f: F) -> Option<R>
+where
+    F: FnOnce(&WindowEventState) -> R,
+{
+    let ptr = WINDOW_EVENT_STATE.load(Ordering::Acquire);
+    if ptr.is_null() {
+        None
+    } else {
+        // Safety: pointer is installed in WindowsRenderer::init and cleared on shutdown.
+        Some(f(unsafe { &*ptr }))
+    }
+}
 
 /// Windows wallpaper renderer using WorkerW technique
 pub struct WindowsRenderer {
@@ -94,6 +156,18 @@ pub struct WindowsRenderer {
     /// Memory DC for double-buffering
     #[cfg(all(target_os = "windows", feature = "windows"))]
     mem_dc: Option<HDC>,
+
+    /// Previous bitmap selected into the memory DC (for restoration)
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    old_bitmap: Option<HGDIOBJ>,
+
+    /// Reusable BGRA conversion buffer to avoid per-frame allocations
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    bgra_buffer: Vec<u8>,
+
+    /// Shared event state for display change notifications
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    event_state: Option<Box<WindowEventState>>,
 
     /// Current display width
     width: u32,
@@ -122,6 +196,12 @@ impl WindowsRenderer {
             back_buffer: None,
             #[cfg(all(target_os = "windows", feature = "windows"))]
             mem_dc: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            old_bitmap: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            bgra_buffer: Vec::new(),
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            event_state: None,
             width: 0,
             height: 0,
             initialized: false,
@@ -314,20 +394,153 @@ impl WindowsRenderer {
             }
 
             // Select bitmap into DC
-            SelectObject(mem_dc, bitmap);
+            let old_obj = SelectObject(mem_dc, bitmap);
 
             ReleaseDC(window, hdc);
 
             self.mem_dc = Some(mem_dc);
             self.back_buffer = Some(bitmap);
+            self.old_bitmap = Some(old_obj);
 
             Ok(())
         }
     }
 
+    /// Pump the Windows message queue for our thread
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn poll_events(&self) {
+        unsafe {
+            let mut msg = MSG::default();
+            while PeekMessageW(&mut msg, HWND(0), 0, 0, PM_REMOVE).as_bool() {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+    }
+
+    /// Ensure WorkerW and render window are valid (recreate if Explorer restarted)
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn ensure_workerw(&mut self) -> Result<(), RenderError> {
+        let workerw_valid = self
+            .workerw
+            .map(|handle| unsafe { IsWindow(handle).as_bool() })
+            .unwrap_or(false);
+
+        if workerw_valid {
+            return Ok(());
+        }
+
+        tracing::warn!("WorkerW handle missing or invalid; re-enumerating");
+
+        let progman = self
+            .progman
+            .ok_or_else(|| RenderError::Platform("No Progman handle".into()))?;
+
+        self.spawn_workerw(progman)?;
+        let workerw = self.find_workerw()?;
+        self.workerw = Some(workerw);
+
+        self.rebuild_render_window(workerw)?;
+        Ok(())
+    }
+
+    /// Recreate render window and back buffer for a new WorkerW
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn rebuild_render_window(&mut self, workerw: HWND) -> Result<(), RenderError> {
+        self.cleanup_back_buffer();
+
+        if let Some(window) = self.render_window.take() {
+            unsafe {
+                let _ = DestroyWindow(window);
+            }
+        }
+
+        let window = self.create_render_window(workerw)?;
+        self.render_window = Some(window);
+        self.create_back_buffer(window)?;
+
+        Ok(())
+    }
+
+    /// Read current WorkerW client dimensions
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn workerw_client_size(&self) -> Result<(u32, u32), RenderError> {
+        let workerw = self
+            .workerw
+            .ok_or_else(|| RenderError::Platform("No WorkerW handle".into()))?;
+
+        unsafe {
+            let mut rect = RECT::default();
+            if !GetClientRect(workerw, &mut rect).as_bool() {
+                return Err(RenderError::Platform("Failed to get WorkerW rect".into()));
+            }
+            let width = (rect.right - rect.left) as u32;
+            let height = (rect.bottom - rect.top) as u32;
+            Ok((width, height))
+        }
+    }
+
+    /// Resize the render window and recreate back buffer
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn resize_to(&mut self, width: u32, height: u32) -> Result<(), RenderError> {
+        if width == 0 || height == 0 {
+            return Ok(());
+        }
+        if self.width == width && self.height == height {
+            return Ok(());
+        }
+
+        let window = self
+            .render_window
+            .ok_or_else(|| RenderError::Platform("No render window".into()))?;
+
+        unsafe {
+            SetWindowPos(
+                window,
+                HWND_BOTTOM,
+                0,
+                0,
+                width as i32,
+                height as i32,
+                SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE,
+            );
+        }
+
+        self.width = width;
+        self.height = height;
+
+        self.cleanup_back_buffer();
+        self.create_back_buffer(window)?;
+
+        tracing::info!(width, height, "Windows renderer resized");
+        Ok(())
+    }
+
+    /// Apply pending display change events and refresh size if needed
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn handle_display_changes(&mut self) -> Result<(), RenderError> {
+        self.ensure_workerw()?;
+
+        if let Some(state) = self.event_state.as_ref() {
+            if let Some((width, height)) = state.take_resize() {
+                let target = self.workerw_client_size().unwrap_or((width, height));
+                self.resize_to(target.0, target.1)?;
+                return Ok(());
+            }
+        }
+
+        if let Ok((width, height)) = self.workerw_client_size() {
+            if width != self.width || height != self.height {
+                self.resize_to(width, height)?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Render a frame to the window
     #[cfg(all(target_os = "windows", feature = "windows"))]
-    fn render_frame_to_window(&self, frame: &ProcessedFrame) -> Result<(), RenderError> {
+    fn render_frame_to_window(&mut self, frame: &ProcessedFrame) -> Result<(), RenderError> {
         let window = self
             .render_window
             .ok_or_else(|| RenderError::Platform("No render window".into()))?;
@@ -356,8 +569,8 @@ impl WindowsRenderer {
                 bmiColors: [RGBQUAD::default()],
             };
 
-            // Convert RGBA to BGRA for Windows
-            let bgra_data = rgba_to_bgra(&frame.data);
+            // Convert RGBA to BGRA for Windows using reusable buffer
+            rgba_to_bgra_into(&frame.data, &mut self.bgra_buffer);
 
             // Draw to memory DC
             let result = SetDIBitsToDevice(
@@ -370,7 +583,7 @@ impl WindowsRenderer {
                 0,
                 0,
                 frame.height,
-                bgra_data.as_ptr() as *const _,
+                self.bgra_buffer.as_ptr() as *const _,
                 &bmi,
                 DIB_RGB_COLORS,
             );
@@ -404,11 +617,23 @@ impl WindowsRenderer {
     #[cfg(all(target_os = "windows", feature = "windows"))]
     fn cleanup_back_buffer(&mut self) {
         unsafe {
-            if let Some(bitmap) = self.back_buffer.take() {
-                DeleteObject(bitmap);
-            }
-            if let Some(dc) = self.mem_dc.take() {
+            let bitmap = self.back_buffer.take();
+            let old_obj = self.old_bitmap.take();
+            let dc = self.mem_dc.take();
+
+            if let (Some(dc), Some(old_obj)) = (dc, old_obj) {
+                let _ = SelectObject(dc, old_obj);
+                if let Some(bitmap) = bitmap {
+                    DeleteObject(bitmap);
+                }
                 DeleteDC(dc);
+            } else {
+                if let Some(bitmap) = bitmap {
+                    DeleteObject(bitmap);
+                }
+                if let Some(dc) = dc {
+                    DeleteDC(dc);
+                }
             }
         }
     }
@@ -443,6 +668,12 @@ impl WallpaperRenderer for WindowsRenderer {
             // Step 5: Create double-buffering resources
             self.create_back_buffer(window)?;
 
+            // Step 6: Install display change event state
+            let mut event_state = Box::new(WindowEventState::new());
+            let state_ptr = &mut *event_state as *mut WindowEventState;
+            WINDOW_EVENT_STATE.store(state_ptr, Ordering::SeqCst);
+            self.event_state = Some(event_state);
+
             self.initialized = true;
             tracing::info!(
                 "Windows WorkerW renderer initialized: {}x{}",
@@ -466,6 +697,8 @@ impl WallpaperRenderer for WindowsRenderer {
 
         #[cfg(all(target_os = "windows", feature = "windows"))]
         {
+            self.poll_events();
+            self.handle_display_changes()?;
             return self.render_frame_to_window(frame);
         }
 
@@ -490,6 +723,11 @@ impl WallpaperRenderer for WindowsRenderer {
         {
             // Clean up back buffer resources
             self.cleanup_back_buffer();
+
+            if self.event_state.is_some() {
+                WINDOW_EVENT_STATE.store(ptr::null_mut(), Ordering::SeqCst);
+                self.event_state = None;
+            }
 
             // Destroy our window
             if let Some(window) = self.render_window.take() {
@@ -554,6 +792,25 @@ unsafe extern "system" fn window_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match msg {
+        WM_DISPLAYCHANGE => {
+            let (width, height) = size_from_lparam(lparam);
+            let _ = with_window_event_state(|state| {
+                state.request_resize(width, height);
+            });
+            LRESULT(0)
+        }
+        WM_DPICHANGED => {
+            let rect_ptr = lparam.0 as *const RECT;
+            if !rect_ptr.is_null() {
+                let rect = *rect_ptr;
+                let width = (rect.right - rect.left) as u32;
+                let height = (rect.bottom - rect.top) as u32;
+                let _ = with_window_event_state(|state| {
+                    state.request_resize(width, height);
+                });
+            }
+            LRESULT(0)
+        }
         WM_PAINT => {
             // We handle painting via our render function, but we need to
             // validate the paint region to prevent continuous WM_PAINT messages
@@ -570,11 +827,23 @@ unsafe extern "system" fn window_proc(
     }
 }
 
-/// Convert RGBA to BGRA format for Windows GDI
-/// Windows bitmaps expect BGRA byte order
 #[cfg(all(target_os = "windows", feature = "windows"))]
-fn rgba_to_bgra(rgba: &[u8]) -> Vec<u8> {
-    let mut bgra = Vec::with_capacity(rgba.len());
+fn size_from_lparam(lparam: LPARAM) -> (u32, u32) {
+    let value = lparam.0 as u32;
+    let width = (value & 0xFFFF) as u32;
+    let height = ((value >> 16) & 0xFFFF) as u32;
+    (width, height)
+}
+
+/// Convert RGBA to BGRA format for Windows GDI, reusing a buffer
+/// Windows bitmaps expect BGRA byte order
+///
+/// This version reuses the output buffer to avoid per-frame allocations.
+/// At 1080p/30fps, this saves ~240MB/s of allocations.
+#[cfg(all(target_os = "windows", feature = "windows"))]
+fn rgba_to_bgra_into(rgba: &[u8], bgra: &mut Vec<u8>) {
+    bgra.clear();
+    bgra.reserve(rgba.len());
 
     for chunk in rgba.chunks_exact(4) {
         bgra.push(chunk[2]); // B
@@ -582,7 +851,14 @@ fn rgba_to_bgra(rgba: &[u8]) -> Vec<u8> {
         bgra.push(chunk[0]); // R
         bgra.push(chunk[3]); // A
     }
+}
 
+/// Convert RGBA to BGRA format for Windows GDI (allocating version for tests)
+/// Windows bitmaps expect BGRA byte order
+#[cfg(all(target_os = "windows", feature = "windows"))]
+fn rgba_to_bgra(rgba: &[u8]) -> Vec<u8> {
+    let mut bgra = Vec::with_capacity(rgba.len());
+    rgba_to_bgra_into(rgba, &mut bgra);
     bgra
 }
 
@@ -618,6 +894,20 @@ mod tests {
 
         let result = renderer.render(&frame);
         assert!(result.is_err());
+    }
+
+    #[test]
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn test_window_event_state_resize() {
+        let state = WindowEventState::new();
+        assert!(state.take_resize().is_none());
+
+        state.request_resize(1280, 720);
+        assert_eq!(state.take_resize(), Some((1280, 720)));
+        assert!(state.take_resize().is_none());
+
+        state.request_resize(0, 0);
+        assert!(state.take_resize().is_none());
     }
 
     #[test]

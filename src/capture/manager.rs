@@ -149,16 +149,13 @@ impl CaptureManager {
     /// Create a new capture manager with the default platform backend
     pub fn new() -> Result<Self, CaptureError> {
         // Create platform-specific backend and enumerator
-        #[cfg(target_os = "linux")]
-        let (backend, enumerator) = {
-            use crate::capture::v4l2::{V4l2Backend, V4l2Enumerator};
-            (
-                Box::new(V4l2Backend::new()) as Box<dyn CaptureBackend>,
-                Box::new(V4l2Enumerator::new()) as Box<dyn CameraEnumerator>,
-            )
-        };
+        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+        let (backend, enumerator) = (
+            crate::capture::create_backend(),
+            crate::capture::create_enumerator(),
+        );
 
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         let (backend, enumerator): (Box<dyn CaptureBackend>, Box<dyn CameraEnumerator>) = {
             return Err(CaptureError::Platform(
                 "Capture backend not implemented for this platform".into(),
@@ -178,6 +175,45 @@ impl CaptureManager {
             device_events: device_tx,
             cameras: RwLock::new(HashMap::new()),
         })
+    }
+
+    fn cleanup_stopped_capture(&self) -> Result<(), CaptureError> {
+        let mut handle_guard = self.capture_handle.lock().unwrap();
+        if let Some(handle) = handle_guard.as_ref() {
+            if handle.is_running() {
+                return Err(CaptureError::Platform(
+                    "Capture is still running".into(),
+                ));
+            }
+        }
+
+        if let Some(handle) = handle_guard.take() {
+            if let Err(err) = handle.join() {
+                tracing::warn!(error = %err, "Capture thread exited with error");
+            }
+        }
+
+        Ok(())
+    }
+
+    fn ensure_backend_available(&self) -> Result<(), CaptureError> {
+        self.cleanup_stopped_capture()?;
+
+        let mut backend_guard = self.backend.lock().unwrap();
+        if backend_guard.is_none() {
+            #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+            {
+                *backend_guard = Some(crate::capture::create_backend());
+            }
+            #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+            {
+                return Err(CaptureError::Platform(
+                    "Capture backend not implemented for this platform".into(),
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     /// Create a capture manager with a custom backend (for testing)
@@ -313,7 +349,9 @@ impl CaptureManager {
         // Get selected camera
         let selected = self.selected_camera.read().unwrap();
         let handle = selected.as_ref()
-            .ok_or_else(|| CaptureError::Platform("No camera selected".into()))?;
+            .ok_or_else(|| CaptureError::Platform("No camera selected".into()))?
+            .clone();
+        drop(selected);
 
         // Check state allows opening
         if !handle.state.state().can_open() {
@@ -322,6 +360,8 @@ impl CaptureManager {
                 handle.state.state()
             )));
         }
+
+        self.ensure_backend_available()?;
 
         // Take the backend (we give it to the capture loop)
         let backend = self.backend.lock().unwrap().take()
@@ -362,9 +402,8 @@ impl CaptureManager {
     /// Stop the current capture
     pub fn stop_capture(&self) -> Result<(), CaptureError> {
         // Stop capture loop
-        if let Some(loop_handle) = self.capture_handle.lock().unwrap().take() {
+        if let Some(loop_handle) = self.capture_handle.lock().unwrap().as_ref() {
             loop_handle.stop();
-            // Note: join would block, so we just signal stop
         }
 
         // Clear frame receiver

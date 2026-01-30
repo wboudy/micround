@@ -17,6 +17,7 @@ pub mod tray;
 pub use first_run::{FirstRunState, FirstRunAction, FirstRunEvent, FirstRunController, StateContent};
 
 #[cfg(feature = "tray")]
+#[allow(unused_imports)]
 pub use tray::{TrayController, TrayError, TrayState, TrayMenuId, IconState, process_events};
 
 /// System tray state (stub for when tray feature is disabled)

@@ -73,12 +73,13 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
     // Subscribe to events for state tracking
     let mut event_subscriber = app_handle.subscribe_events();
 
-    // Track application state
+    // Track application state (used by event handlers)
+    #[allow(unused_assignments)]
     let mut current_state = AppState::Idle;
 
     // Initialize system tray (if feature enabled)
     #[cfg(feature = "tray")]
-    let _tray = {
+    let mut _tray = {
         let initial_state = ui::TrayState::default();
         match ui::TrayController::new(app_handle.clone(), initial_state) {
             Ok(tray) => {
@@ -173,12 +174,12 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
 
                         // Update tray state when state changes
                         #[cfg(feature = "tray")]
-                        if let Some(ref tray) = _tray {
+                        if let Some(ref mut tray) = _tray {
                             let tray_state = ui::TrayState {
-                                is_running: current_state.is_capturing(),
-                                is_paused: current_state == AppState::Paused,
-                                fps: 0.0,
-                                resolution: String::new(),
+                                app_state: *new_state,
+                                resolution: None,
+                                fps: None,
+                                camera_name: None,
                             };
                             tray.update_state(tray_state);
                         }

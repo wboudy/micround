@@ -37,7 +37,7 @@ use tray_icon::{
 };
 use tracing::{debug, error, info, warn};
 
-use crate::core::events::{AppHandle, Command, Event, AppState};
+use crate::core::events::{AppHandle, Command, AppState};
 
 // ============================================================================
 // Menu Item IDs
@@ -318,7 +318,7 @@ impl TrayController {
 
         // Update visibility based on state
         // Show Start when stopped, Stop when running
-        let is_running = matches!(
+        let _is_running = matches!(
             self.state.app_state,
             AppState::Running | AppState::Paused | AppState::Reconnecting | AppState::Starting
         );

@@ -165,6 +165,15 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
                         info!("Refresh cameras requested");
                         // TODO: Re-enumerate cameras and update settings window
                     }
+                    Command::StartPreview { width, height } => {
+                        info!(width, height, "Start preview requested");
+                        // Preview capture would be handled by the capture subsystem
+                        // For now, just log - actual frame delivery requires capture integration
+                    }
+                    Command::StopPreview => {
+                        info!("Stop preview requested");
+                        // Stop preview capture
+                    }
                     _ => {
                         // Other commands handled by specific subsystems
                         engine.handle_command(&cmd);

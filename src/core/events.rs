@@ -49,6 +49,15 @@ pub enum Command {
     RefreshCameras,
     /// Show settings window
     ShowSettings,
+    /// Start camera preview in settings window (bd-37z)
+    StartPreview {
+        /// Preview width (typically smaller than capture)
+        width: u32,
+        /// Preview height
+        height: u32,
+    },
+    /// Stop camera preview in settings window
+    StopPreview,
     /// Quit the application
     Quit,
 }

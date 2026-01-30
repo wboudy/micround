@@ -2,12 +2,65 @@
 //!
 //! Provides the main configuration interface for users to adjust camera,
 //! display, overlay, and startup settings.
+//!
+//! # Camera Preview
+//! The settings window includes a live camera preview (bd-37z) that allows users
+//! to verify camera selection and see the effect of transforms before applying.
 
 use std::sync::{Arc, RwLock};
 
 use crate::config::{AppConfig, CameraConfig, DisplayConfig, StartupConfig};
 use crate::core::events::{AppHandle, Command};
 use crate::core::{CameraDevice, DisplayId, Flip, Rotation, ScalingMode};
+
+// ============================================================================
+// Preview State
+// ============================================================================
+
+/// Preview panel dimensions (16:9 aspect ratio at small size)
+const PREVIEW_WIDTH: u32 = 320;
+const PREVIEW_HEIGHT: u32 = 180;
+
+/// State of the camera preview in settings
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PreviewState {
+    /// Preview is not active
+    #[default]
+    Inactive,
+    /// Preview is starting (camera opening)
+    Starting,
+    /// Preview is running and showing live frames
+    Running,
+    /// Preview encountered an error
+    Error,
+    /// No camera is selected
+    NoCameraSelected,
+}
+
+impl std::fmt::Display for PreviewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PreviewState::Inactive => write!(f, "Preview inactive"),
+            PreviewState::Starting => write!(f, "Starting preview..."),
+            PreviewState::Running => write!(f, "Preview running"),
+            PreviewState::Error => write!(f, "Preview error"),
+            PreviewState::NoCameraSelected => write!(f, "Select a camera"),
+        }
+    }
+}
+
+/// Holds the current preview frame data for display
+#[derive(Default)]
+pub struct PreviewFrame {
+    /// RGBA pixel data
+    pub data: Vec<u8>,
+    /// Frame width
+    pub width: u32,
+    /// Frame height
+    pub height: u32,
+    /// Frame sequence number (for detecting updates)
+    pub sequence: u64,
+}
 
 // ============================================================================
 // Settings State
@@ -55,6 +108,12 @@ pub struct SettingsController {
     success_message: Option<String>,
     /// Whether the overlay section is expanded
     overlay_expanded: bool,
+    /// Preview state
+    preview_state: PreviewState,
+    /// Current preview frame (updated by capture thread)
+    preview_frame: Option<PreviewFrame>,
+    /// Preview error message
+    preview_error: Option<String>,
 }
 
 /// Simple display info for the UI
@@ -88,6 +147,9 @@ impl SettingsController {
             error_message: None,
             success_message: None,
             overlay_expanded: false,
+            preview_state: PreviewState::Inactive,
+            preview_frame: None,
+            preview_error: None,
         }
     }
 
@@ -230,6 +292,69 @@ impl SettingsController {
         self.startup_config = config.startup.clone();
         self.state = SettingsWindowState::Visible;
     }
+
+    // ========================================================================
+    // Preview Methods
+    // ========================================================================
+
+    /// Start the camera preview
+    pub fn start_preview(&mut self) {
+        if self.camera_config.device_id.is_none() {
+            self.preview_state = PreviewState::NoCameraSelected;
+            self.preview_error = Some("Please select a camera first".to_string());
+            return;
+        }
+
+        self.preview_state = PreviewState::Starting;
+        self.preview_error = None;
+
+        // Send command to start preview capture
+        let _ = self.app_handle.try_send_command(Command::StartPreview {
+            width: PREVIEW_WIDTH,
+            height: PREVIEW_HEIGHT,
+        });
+    }
+
+    /// Stop the camera preview
+    pub fn stop_preview(&mut self) {
+        self.preview_state = PreviewState::Inactive;
+        self.preview_frame = None;
+        self.preview_error = None;
+
+        // Send command to stop preview capture
+        let _ = self.app_handle.try_send_command(Command::StopPreview);
+    }
+
+    /// Check if preview is active
+    pub fn is_preview_active(&self) -> bool {
+        matches!(
+            self.preview_state,
+            PreviewState::Starting | PreviewState::Running
+        )
+    }
+
+    /// Update the preview frame (called by capture thread)
+    pub fn update_preview_frame(&mut self, frame: PreviewFrame) {
+        self.preview_state = PreviewState::Running;
+        self.preview_frame = Some(frame);
+        self.preview_error = None;
+    }
+
+    /// Set preview error state
+    pub fn set_preview_error(&mut self, error: String) {
+        self.preview_state = PreviewState::Error;
+        self.preview_error = Some(error);
+    }
+
+    /// Get current preview state
+    pub fn preview_state(&self) -> PreviewState {
+        self.preview_state
+    }
+
+    /// Get preview frame reference (if available)
+    pub fn preview_frame(&self) -> Option<&PreviewFrame> {
+        self.preview_frame.as_ref()
+    }
 }
 
 // ============================================================================
@@ -239,23 +364,36 @@ impl SettingsController {
 /// Settings UI state for egui rendering
 pub struct SettingsUI {
     controller: Arc<RwLock<SettingsController>>,
+    /// Texture handle for the preview (managed by egui)
+    preview_texture: Option<egui::TextureHandle>,
+    /// Last sequence number to detect frame updates
+    last_preview_sequence: u64,
 }
 
 impl SettingsUI {
     /// Create new settings UI
     pub fn new(controller: Arc<RwLock<SettingsController>>) -> Self {
-        Self { controller }
+        Self {
+            controller,
+            preview_texture: None,
+            last_preview_sequence: 0,
+        }
     }
 
     /// Render the settings window
     ///
     /// Returns true if the window should remain open, false if it should close.
     pub fn render(&mut self, ctx: &egui::Context) -> bool {
+        // Update preview texture if we have a new frame
+        self.update_preview_texture(ctx);
+
         let mut open = true;
         let mut should_apply = false;
         let mut should_reset = false;
         let mut should_refresh_cameras = false;
         let mut should_close = false;
+        let mut should_start_preview = false;
+        let mut should_stop_preview = false;
 
         egui::Window::new("Micround Settings")
             .open(&mut open)
@@ -279,6 +417,15 @@ impl SettingsUI {
                 ui.heading("Camera");
                 ui.separator();
                 self.render_camera_section(ui, &mut controller, &mut should_refresh_cameras);
+                ui.add_space(8.0);
+
+                // Camera preview section (bd-37z)
+                self.render_preview_section(
+                    ui,
+                    &controller,
+                    &mut should_start_preview,
+                    &mut should_stop_preview,
+                );
                 ui.add_space(16.0);
 
                 // Display section
@@ -338,12 +485,148 @@ impl SettingsUI {
             let controller = self.controller.read().unwrap();
             let _ = controller.app_handle.try_send_command(Command::RefreshCameras);
         }
+        if should_start_preview {
+            self.controller.write().unwrap().start_preview();
+        }
+        if should_stop_preview {
+            self.controller.write().unwrap().stop_preview();
+            // Clear the texture when stopping
+            self.preview_texture = None;
+            self.last_preview_sequence = 0;
+        }
 
         if !open {
-            self.controller.write().unwrap().hide();
+            // Stop preview when closing window
+            let mut controller = self.controller.write().unwrap();
+            if controller.is_preview_active() {
+                controller.stop_preview();
+            }
+            controller.hide();
+            self.preview_texture = None;
         }
 
         open
+    }
+
+    /// Update the preview texture from the latest frame
+    fn update_preview_texture(&mut self, ctx: &egui::Context) {
+        let controller = self.controller.read().unwrap();
+
+        if let Some(ref frame) = controller.preview_frame {
+            // Only update if we have a new frame
+            if frame.sequence > self.last_preview_sequence && !frame.data.is_empty() {
+                // Create ColorImage from RGBA data
+                let image = egui::ColorImage::from_rgba_unmultiplied(
+                    [frame.width as usize, frame.height as usize],
+                    &frame.data,
+                );
+
+                // Update or create texture
+                if let Some(ref mut texture) = self.preview_texture {
+                    texture.set(image, egui::TextureOptions::LINEAR);
+                } else {
+                    self.preview_texture = Some(ctx.load_texture(
+                        "camera_preview",
+                        image,
+                        egui::TextureOptions::LINEAR,
+                    ));
+                }
+
+                self.last_preview_sequence = frame.sequence;
+            }
+        }
+    }
+
+    /// Render the camera preview section (bd-37z)
+    fn render_preview_section(
+        &self,
+        ui: &mut egui::Ui,
+        controller: &SettingsController,
+        should_start: &mut bool,
+        should_stop: &mut bool,
+    ) {
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label("Preview");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Preview toggle button
+                    if controller.is_preview_active() {
+                        if ui.button("⏹ Stop").clicked() {
+                            *should_stop = true;
+                        }
+                    } else if ui.button("▶ Start Preview").clicked() {
+                        *should_start = true;
+                    }
+                });
+            });
+
+            ui.add_space(4.0);
+
+            // Preview area (fixed size)
+            let preview_size = egui::vec2(PREVIEW_WIDTH as f32, PREVIEW_HEIGHT as f32);
+
+            // Draw the preview or placeholder
+            match controller.preview_state {
+                PreviewState::Running => {
+                    if let Some(ref texture) = self.preview_texture {
+                        ui.image(egui::load::SizedTexture::new(texture.id(), preview_size));
+                    } else {
+                        // Texture not yet available, show loading
+                        self.render_preview_placeholder(ui, preview_size, "Loading...");
+                    }
+                }
+                PreviewState::Starting => {
+                    self.render_preview_placeholder(ui, preview_size, "Starting camera...");
+                }
+                PreviewState::Error => {
+                    let msg = controller.preview_error.as_deref().unwrap_or("Preview error");
+                    self.render_preview_placeholder(ui, preview_size, msg);
+                }
+                PreviewState::NoCameraSelected => {
+                    self.render_preview_placeholder(ui, preview_size, "Select a camera above");
+                }
+                PreviewState::Inactive => {
+                    self.render_preview_placeholder(ui, preview_size, "Click 'Start Preview' to test camera");
+                }
+            }
+
+            // Preview status indicator
+            ui.horizontal(|ui| {
+                let (color, text) = match controller.preview_state {
+                    PreviewState::Running => (egui::Color32::GREEN, "● Live"),
+                    PreviewState::Starting => (egui::Color32::YELLOW, "○ Starting"),
+                    PreviewState::Error => (egui::Color32::RED, "● Error"),
+                    PreviewState::NoCameraSelected | PreviewState::Inactive => {
+                        (egui::Color32::GRAY, "○ Inactive")
+                    }
+                };
+                ui.colored_label(color, text);
+            });
+        });
+    }
+
+    /// Render a placeholder for the preview area
+    fn render_preview_placeholder(&self, ui: &mut egui::Ui, size: egui::Vec2, text: &str) {
+        let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
+
+        // Dark background
+        ui.painter().rect_filled(rect, 4.0, egui::Color32::from_gray(30));
+
+        // Border
+        ui.painter().rect_stroke(
+            rect,
+            4.0,
+            egui::Stroke::new(1.0, egui::Color32::from_gray(60)),
+        );
+
+        // Centered text
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            text,
+            egui::FontId::proportional(14.0),
+            egui::Color32::GRAY,
+        );
     }
 
     fn render_camera_section(
@@ -771,5 +1054,106 @@ mod tests {
         assert_eq!(controller.camera_config.width, 1280);
         assert_eq!(controller.display_config.rotation, 180);
         assert!(controller.is_visible());
+    }
+
+    // ========================================================================
+    // Preview Tests (bd-37z)
+    // ========================================================================
+
+    #[test]
+    fn test_preview_initial_state() {
+        let controller = create_test_controller();
+        assert_eq!(controller.preview_state(), PreviewState::Inactive);
+        assert!(!controller.is_preview_active());
+        assert!(controller.preview_frame().is_none());
+    }
+
+    #[test]
+    fn test_preview_start_without_camera() {
+        let mut controller = create_test_controller();
+        controller.camera_config.device_id = None;
+
+        controller.start_preview();
+
+        assert_eq!(controller.preview_state(), PreviewState::NoCameraSelected);
+        assert!(controller.preview_error.is_some());
+    }
+
+    #[test]
+    fn test_preview_start_with_camera() {
+        let mut controller = create_test_controller();
+        controller.camera_config.device_id = Some(DeviceId("test_cam".to_string()));
+
+        controller.start_preview();
+
+        assert_eq!(controller.preview_state(), PreviewState::Starting);
+        assert!(controller.is_preview_active());
+        assert!(controller.preview_error.is_none());
+    }
+
+    #[test]
+    fn test_preview_stop() {
+        let mut controller = create_test_controller();
+        controller.camera_config.device_id = Some(DeviceId("test_cam".to_string()));
+
+        // Start then stop
+        controller.start_preview();
+        controller.stop_preview();
+
+        assert_eq!(controller.preview_state(), PreviewState::Inactive);
+        assert!(!controller.is_preview_active());
+        assert!(controller.preview_frame().is_none());
+    }
+
+    #[test]
+    fn test_preview_update_frame() {
+        let mut controller = create_test_controller();
+        controller.camera_config.device_id = Some(DeviceId("test_cam".to_string()));
+        controller.start_preview();
+
+        // Simulate receiving a frame
+        let frame = PreviewFrame {
+            data: vec![0u8; 320 * 180 * 4], // RGBA
+            width: 320,
+            height: 180,
+            sequence: 1,
+        };
+        controller.update_preview_frame(frame);
+
+        assert_eq!(controller.preview_state(), PreviewState::Running);
+        assert!(controller.preview_frame().is_some());
+        assert_eq!(controller.preview_frame().unwrap().sequence, 1);
+    }
+
+    #[test]
+    fn test_preview_error_state() {
+        let mut controller = create_test_controller();
+        controller.camera_config.device_id = Some(DeviceId("test_cam".to_string()));
+        controller.start_preview();
+
+        // Simulate an error
+        controller.set_preview_error("Camera disconnected".to_string());
+
+        assert_eq!(controller.preview_state(), PreviewState::Error);
+        assert!(controller.preview_error.is_some());
+        assert_eq!(controller.preview_error.as_deref(), Some("Camera disconnected"));
+    }
+
+    #[test]
+    fn test_preview_state_display() {
+        // Test Display impl for PreviewState
+        assert_eq!(PreviewState::Inactive.to_string(), "Preview inactive");
+        assert_eq!(PreviewState::Running.to_string(), "Preview running");
+        assert_eq!(PreviewState::Error.to_string(), "Preview error");
+        assert_eq!(PreviewState::NoCameraSelected.to_string(), "Select a camera");
+    }
+
+    #[test]
+    fn test_preview_frame_default() {
+        let frame = PreviewFrame::default();
+        assert!(frame.data.is_empty());
+        assert_eq!(frame.width, 0);
+        assert_eq!(frame.height, 0);
+        assert_eq!(frame.sequence, 0);
     }
 }

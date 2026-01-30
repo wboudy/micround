@@ -31,6 +31,7 @@ use std::process::Command;
 
 /// Information about a wallpaper configuration
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct WallpaperInfo {
     /// Path to the wallpaper image file (None if solid color)
     pub path: Option<String>,
@@ -44,17 +45,6 @@ pub struct WallpaperInfo {
     pub per_monitor: Vec<(String, String)>,
 }
 
-impl Default for WallpaperInfo {
-    fn default() -> Self {
-        Self {
-            path: None,
-            style: None,
-            color: None,
-            desktop_env: None,
-            per_monitor: Vec::new(),
-        }
-    }
-}
 
 impl WallpaperInfo {
     /// Create a new WallpaperInfo with just a path
@@ -220,13 +210,11 @@ fn capture_wallpaper_linux() -> Result<WallpaperInfo, PlatformError> {
         desktop_env = %de_str,
         "Unknown desktop environment, attempting gsettings fallback"
     );
-    capture_wallpaper_gnome().or_else(|_| {
-        Err(PlatformError::Unsupported(format!(
+    capture_wallpaper_gnome().map_err(|_| PlatformError::Unsupported(format!(
             "Wallpaper capture not supported for desktop environment: {}. \
              Supported: GNOME, KDE, XFCE, MATE, Cinnamon",
             de_str
         )))
-    })
 }
 
 #[cfg(target_os = "linux")]
@@ -395,7 +383,7 @@ fn restore_wallpaper_linux(info: &WallpaperInfo) -> Result<(), PlatformError> {
     let de = info
         .desktop_env
         .clone()
-        .or_else(|| detect_desktop_environment())
+        .or_else(detect_desktop_environment)
         .unwrap_or_else(|| "GNOME".into());
     let de_upper = de.to_uppercase();
 

@@ -71,7 +71,7 @@ impl GpuContext {
                 force_fallback_adapter: false,
             })
             .await
-            .ok_or_else(|| GpuError::NoAdapter)?;
+            .ok_or(GpuError::NoAdapter)?;
 
         let adapter_info = adapter.get_info();
 
@@ -167,7 +167,7 @@ impl GpuProcessor {
             None
         };
 
-        // Validate input
+        // Validate input dimensions
         if frame.width == 0 || frame.height == 0 {
             return Err(GpuError::InvalidInput(format!(
                 "Invalid frame dimensions: {}x{}",
@@ -179,6 +179,22 @@ impl GpuProcessor {
             return Err(GpuError::InvalidInput(format!(
                 "Invalid target dimensions: {}x{}",
                 config.target_width, config.target_height
+            )));
+        }
+
+        // Validate frame data size matches dimensions (RGBA = 4 bytes per pixel)
+        let expected_size = (frame.width as usize)
+            .checked_mul(frame.height as usize)
+            .and_then(|pixels| pixels.checked_mul(4))
+            .ok_or_else(|| GpuError::InvalidInput(format!(
+                "Frame dimensions overflow: {}x{}",
+                frame.width, frame.height
+            )))?;
+
+        if frame.data.len() != expected_size {
+            return Err(GpuError::InvalidInput(format!(
+                "Frame data size mismatch: expected {} bytes for {}x{} RGBA, got {}",
+                expected_size, frame.width, frame.height, frame.data.len()
             )));
         }
 
@@ -333,11 +349,12 @@ impl GpuProcessor {
         width: u32,
         height: u32,
     ) -> Result<Vec<u8>, GpuError> {
-        let bytes_per_row = width * 4;
+        // Use u64 arithmetic throughout to prevent overflow for large images (8K+)
+        let bytes_per_row = (width as u64) * 4;
         // wgpu requires alignment to 256 bytes
         let aligned_bytes_per_row = (bytes_per_row + 255) & !255;
 
-        let buffer_size = (aligned_bytes_per_row * height) as u64;
+        let buffer_size = aligned_bytes_per_row * (height as u64);
         let output_buffer = self.context.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Output Buffer"),
             size: buffer_size,
@@ -363,7 +380,7 @@ impl GpuProcessor {
                 buffer: &output_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(aligned_bytes_per_row),
+                    bytes_per_row: Some(aligned_bytes_per_row as u32),
                     rows_per_image: Some(height),
                 },
             },
@@ -393,13 +410,13 @@ impl GpuProcessor {
         let mapped = buffer_slice.get_mapped_range();
 
         // Remove row padding if needed
-        let mut result = Vec::with_capacity((width * height * 4) as usize);
+        let mut result = Vec::with_capacity((width as usize) * (height as usize) * 4);
         if aligned_bytes_per_row == bytes_per_row {
             result.extend_from_slice(&mapped);
         } else {
-            for y in 0..height {
+            for y in 0..(height as u64) {
                 let start = (y * aligned_bytes_per_row) as usize;
-                let end = start + bytes_per_row as usize;
+                let end = start + (bytes_per_row as usize);
                 result.extend_from_slice(&mapped[start..end]);
             }
         }
@@ -720,8 +737,8 @@ impl ScalePipeline {
             pass.set_bind_group(0, &bind_group, &[]);
 
             // Dispatch workgroups (8x8 threads per workgroup)
-            let workgroups_x = (dst_width + 7) / 8;
-            let workgroups_y = (dst_height + 7) / 8;
+            let workgroups_x = dst_width.div_ceil(8);
+            let workgroups_y = dst_height.div_ceil(8);
             pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
         }
 
@@ -965,8 +982,8 @@ impl TransformPipeline {
             pass.set_bind_group(0, &bind_group, &[]);
 
             // Dispatch workgroups (8x8 threads per workgroup)
-            let workgroups_x = (out_width + 7) / 8;
-            let workgroups_y = (out_height + 7) / 8;
+            let workgroups_x = out_width.div_ceil(8);
+            let workgroups_y = out_height.div_ceil(8);
             pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
         }
 
@@ -1197,6 +1214,60 @@ mod tests {
     fn test_transform_uniforms_size() {
         // Verify uniform struct is properly sized for GPU (must be 16-byte aligned)
         assert_eq!(std::mem::size_of::<TransformUniforms>(), 32);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires GPU"]
+    async fn test_frame_data_size_validation() {
+        let processor = match GpuProcessor::new_default().await {
+            Ok(p) => p,
+            Err(_) => return, // Skip if no GPU
+        };
+
+        // Create frame with mismatched data size (too small)
+        let frame = DecodedFrame {
+            data: vec![128u8; 50 * 50 * 4], // Only enough for 50x50
+            width: 100,
+            height: 100, // Claims to be 100x100
+        };
+
+        let config = GpuProcessConfig::new(200, 150);
+        let result = processor.process(&frame, &config);
+
+        assert!(result.is_err());
+        match result {
+            Err(GpuError::InvalidInput(msg)) => {
+                assert!(msg.contains("mismatch"), "Error should mention mismatch: {}", msg);
+            }
+            _ => panic!("Expected InvalidInput error for frame size mismatch"),
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires GPU"]
+    async fn test_frame_data_size_validation_too_large() {
+        let processor = match GpuProcessor::new_default().await {
+            Ok(p) => p,
+            Err(_) => return, // Skip if no GPU
+        };
+
+        // Create frame with mismatched data size (too large)
+        let frame = DecodedFrame {
+            data: vec![128u8; 200 * 200 * 4], // Enough for 200x200
+            width: 100,
+            height: 100, // Claims to be 100x100
+        };
+
+        let config = GpuProcessConfig::new(200, 150);
+        let result = processor.process(&frame, &config);
+
+        assert!(result.is_err());
+        match result {
+            Err(GpuError::InvalidInput(msg)) => {
+                assert!(msg.contains("mismatch"), "Error should mention mismatch: {}", msg);
+            }
+            _ => panic!("Expected InvalidInput error for frame size mismatch"),
+        }
     }
 
     // Note: GPU tests require a working GPU and are marked with #[ignore]

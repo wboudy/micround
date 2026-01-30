@@ -16,6 +16,10 @@ use crate::process::decode::DecodedFrame;
 
 use image::{ImageBuffer, Rgba, imageops::FilterType};
 
+/// Maximum supported dimension to prevent overflow and resource exhaustion
+/// Matches the limit in decode.rs for consistency
+const MAX_DIMENSION: u32 = 32768;
+
 /// Result of a scaling operation
 pub struct ScaledFrame {
     /// RGBA pixel data
@@ -102,11 +106,29 @@ pub enum ScaleError {
     #[error("Invalid target dimensions: {width}x{height}")]
     InvalidTargetDimensions { width: u32, height: u32 },
 
+    #[error("Dimensions too large: {width}x{height} exceeds maximum {MAX_DIMENSION}x{MAX_DIMENSION}")]
+    DimensionsTooLarge { width: u32, height: u32 },
+
     #[error("Buffer too small: need {needed}, got {actual}")]
     BufferTooSmall { needed: usize, actual: usize },
 
     #[error("Image processing error: {0}")]
     ImageError(String),
+}
+
+/// Safely calculate RGBA buffer size with overflow protection
+/// Uses u64 arithmetic to prevent overflow before casting to usize
+fn checked_buffer_size(width: u32, height: u32) -> Result<usize, ScaleError> {
+    if width > MAX_DIMENSION || height > MAX_DIMENSION {
+        return Err(ScaleError::DimensionsTooLarge { width, height });
+    }
+    // Use u64 arithmetic to prevent overflow
+    let size = (width as u64) * (height as u64) * 4;
+    // Check that it fits in usize (important for 32-bit platforms)
+    if size > usize::MAX as u64 {
+        return Err(ScaleError::DimensionsTooLarge { width, height });
+    }
+    Ok(size as usize)
 }
 
 /// Scale a frame to the target dimensions using the specified mode
@@ -135,6 +157,23 @@ pub fn scale_frame(
         return Err(ScaleError::InvalidTargetDimensions {
             width: dst_width,
             height: dst_height,
+        });
+    }
+
+    // Early validation of target dimensions to prevent resource exhaustion
+    // This check happens before any scaling calculations to fail fast
+    if dst_width > MAX_DIMENSION || dst_height > MAX_DIMENSION {
+        return Err(ScaleError::DimensionsTooLarge {
+            width: dst_width,
+            height: dst_height,
+        });
+    }
+
+    // Also validate source dimensions
+    if source.width > MAX_DIMENSION || source.height > MAX_DIMENSION {
+        return Err(ScaleError::DimensionsTooLarge {
+            width: source.width,
+            height: source.height,
         });
     }
 
@@ -176,8 +215,9 @@ fn scale_fit(
         config.filter.into(),
     );
 
-    // Create output with background
-    let mut output = vec![0u8; (dst_width * dst_height * 4) as usize];
+    // Create output with background (safe allocation with overflow check)
+    let buffer_size = checked_buffer_size(dst_width, dst_height)?;
+    let mut output = vec![0u8; buffer_size];
     fill_background(&mut output, dst_width, dst_height, config.background);
 
     // Calculate position to center the scaled image
@@ -238,8 +278,9 @@ fn scale_fill(
     let crop_x = scaled_width.saturating_sub(dst_width) / 2;
     let crop_y = scaled_height.saturating_sub(dst_height) / 2;
 
-    // Extract the center region
-    let mut output = vec![0u8; (dst_width * dst_height * 4) as usize];
+    // Extract the center region (safe allocation with overflow check)
+    let buffer_size = checked_buffer_size(dst_width, dst_height)?;
+    let mut output = vec![0u8; buffer_size];
     extract_region(
         scaled.as_raw(),
         scaled_width,
@@ -301,7 +342,9 @@ fn scale_center(
     dst_height: u32,
     config: &ScaleConfig,
 ) -> Result<ScaledFrame, ScaleError> {
-    let mut output = vec![0u8; (dst_width * dst_height * 4) as usize];
+    // Safe allocation with overflow check
+    let buffer_size = checked_buffer_size(dst_width, dst_height)?;
+    let mut output = vec![0u8; buffer_size];
     fill_background(&mut output, dst_width, dst_height, config.background);
 
     // Calculate positioning
@@ -433,12 +476,13 @@ mod tests {
     use super::*;
 
     fn make_test_frame(width: u32, height: u32) -> DecodedFrame {
-        let size = (width * height * 4) as usize;
-        let mut data = vec![0u8; size];
+        // Use u64 arithmetic to prevent overflow in test helper
+        let size = (width as u64) * (height as u64) * 4;
+        let mut data = vec![0u8; size as usize];
         // Fill with gradient pattern
         for y in 0..height {
             for x in 0..width {
-                let idx = ((y * width + x) * 4) as usize;
+                let idx = ((y as u64 * width as u64 + x as u64) * 4) as usize;
                 data[idx] = (x % 256) as u8;     // R
                 data[idx + 1] = (y % 256) as u8; // G
                 data[idx + 2] = 128;             // B
@@ -619,5 +663,32 @@ mod tests {
         assert!(matches!(FilterType::from(ScaleFilter::Nearest), FilterType::Nearest));
         assert!(matches!(FilterType::from(ScaleFilter::Bilinear), FilterType::Triangle));
         assert!(matches!(FilterType::from(ScaleFilter::Lanczos), FilterType::Lanczos3));
+    }
+
+    #[test]
+    fn test_dimensions_too_large() {
+        // Dimensions exceeding MAX_DIMENSION should fail
+        let source = make_test_frame(100, 100);
+        let config = ScaleConfig::default();
+
+        // Target dimensions larger than MAX_DIMENSION should fail
+        let result = scale_frame(&source, MAX_DIMENSION + 1, 100, &config);
+        assert!(matches!(result, Err(ScaleError::DimensionsTooLarge { .. })));
+
+        let result = scale_frame(&source, 100, MAX_DIMENSION + 1, &config);
+        assert!(matches!(result, Err(ScaleError::DimensionsTooLarge { .. })));
+    }
+
+    #[test]
+    fn test_max_valid_dimensions() {
+        // MAX_DIMENSION should be valid (though we don't allocate that much in tests)
+        // Just verify the checked_buffer_size calculation doesn't overflow
+        let result = checked_buffer_size(MAX_DIMENSION, 1);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), (MAX_DIMENSION as usize) * 4);
+
+        let result = checked_buffer_size(1, MAX_DIMENSION);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), (MAX_DIMENSION as usize) * 4);
     }
 }

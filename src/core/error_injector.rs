@@ -43,8 +43,10 @@ use std::time::{Duration, Instant};
 use crate::core::{CaptureError, ConfigError, MicroundError, PlatformError, RenderError};
 
 /// Trigger conditions for error injection
+#[derive(Default)]
 pub enum InjectionTrigger {
     /// Never inject errors
+    #[default]
     Never,
     /// Always inject errors
     Always,
@@ -77,14 +79,10 @@ impl std::fmt::Debug for InjectionTrigger {
     }
 }
 
-impl Default for InjectionTrigger {
-    fn default() -> Self {
-        Self::Never
-    }
-}
 
 /// Type of error to inject
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ErrorType {
     /// Camera/capture related errors
     Capture(CaptureErrorKind),
@@ -95,14 +93,10 @@ pub enum ErrorType {
     /// Platform-specific errors
     Platform(PlatformErrorKind),
     /// Generic application errors
+    #[default]
     Generic,
 }
 
-impl Default for ErrorType {
-    fn default() -> Self {
-        Self::Generic
-    }
-}
 
 /// Specific capture error types (maps to CaptureError variants)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -294,7 +288,7 @@ impl ErrorInjector {
         let should_inject = match &self.trigger {
             InjectionTrigger::Never => false,
             InjectionTrigger::Always => true,
-            InjectionTrigger::EveryN(n) => *n > 0 && operation % *n == 0,
+            InjectionTrigger::EveryN(n) => *n > 0 && operation.is_multiple_of(*n),
             InjectionTrigger::Probability(p) => {
                 let hash = self.deterministic_random(operation);
                 hash < *p

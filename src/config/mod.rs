@@ -158,6 +158,7 @@ impl Default for CameraConfig {
 /// Display-related configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct DisplayConfig {
     /// Target display ID (None = primary display)
     pub display_id: Option<DisplayId>,
@@ -171,17 +172,6 @@ pub struct DisplayConfig {
     pub flip_vertical: bool,
 }
 
-impl Default for DisplayConfig {
-    fn default() -> Self {
-        Self {
-            display_id: None,
-            scaling_mode: ScalingMode::default(),
-            rotation: 0,
-            flip_horizontal: false,
-            flip_vertical: false,
-        }
-    }
-}
 
 impl DisplayConfig {
     /// Convert rotation degrees to Rotation enum
@@ -208,6 +198,7 @@ impl DisplayConfig {
 /// Startup behavior configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct StartupConfig {
     /// Launch at system login
     pub launch_at_login: bool,
@@ -217,15 +208,6 @@ pub struct StartupConfig {
     pub minimize_on_start: bool,
 }
 
-impl Default for StartupConfig {
-    fn default() -> Self {
-        Self {
-            launch_at_login: false,
-            auto_start_feed: false,
-            minimize_on_start: false,
-        }
-    }
-}
 
 /// Internal state (managed by application, not user-editable)
 #[derive(Debug, Clone, Serialize, Deserialize)]

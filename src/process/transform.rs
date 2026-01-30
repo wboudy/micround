@@ -12,6 +12,10 @@
 use crate::core::{Rotation, Flip};
 use crate::process::decode::DecodedFrame;
 
+/// Maximum supported dimension to prevent overflow and resource exhaustion
+/// Matches the limit in decode.rs for consistency
+const MAX_DIMENSION: u32 = 32768;
+
 /// Result of a transform operation
 pub struct TransformedFrame {
     /// RGBA pixel data
@@ -27,6 +31,9 @@ pub struct TransformedFrame {
 pub enum TransformError {
     #[error("Invalid frame dimensions: {width}x{height}")]
     InvalidDimensions { width: u32, height: u32 },
+
+    #[error("Dimensions too large: {width}x{height} exceeds maximum {MAX_DIMENSION}x{MAX_DIMENSION}")]
+    DimensionsTooLarge { width: u32, height: u32 },
 }
 
 /// Apply geometric transforms to a frame
@@ -47,6 +54,14 @@ pub fn transform_frame(
 ) -> Result<TransformedFrame, TransformError> {
     if source.width == 0 || source.height == 0 {
         return Err(TransformError::InvalidDimensions {
+            width: source.width,
+            height: source.height,
+        });
+    }
+
+    // Validate dimensions don't exceed maximum to prevent overflow in calculations
+    if source.width > MAX_DIMENSION || source.height > MAX_DIMENSION {
+        return Err(TransformError::DimensionsTooLarge {
             width: source.width,
             height: source.height,
         });
@@ -197,11 +212,12 @@ mod tests {
     /// Create a simple test frame with a recognizable pattern
     /// Each pixel encodes its position: R=x, G=y, B=0, A=255
     fn make_test_frame(width: u32, height: u32) -> DecodedFrame {
-        let size = (width * height * 4) as usize;
-        let mut data = vec![0u8; size];
+        // Use u64 arithmetic to prevent overflow in test helper
+        let size = (width as u64) * (height as u64) * 4;
+        let mut data = vec![0u8; size as usize];
         for y in 0..height {
             for x in 0..width {
-                let idx = ((y * width + x) * 4) as usize;
+                let idx = ((y as u64 * width as u64 + x as u64) * 4) as usize;
                 data[idx] = x as u8;     // R = x position
                 data[idx + 1] = y as u8; // G = y position
                 data[idx + 2] = 0;       // B = 0
@@ -412,7 +428,7 @@ mod tests {
             for rotation in &rotations {
                 let result = transform_frame(&source, *flip, *rotation);
                 assert!(result.is_ok(), "Failed for flip={:?}, rotation={:?}", flip, rotation);
-                
+
                 let transformed = result.unwrap();
                 // Verify dimensions are correct
                 match rotation {
@@ -427,5 +443,28 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_dimensions_too_large() {
+        // Dimensions exceeding MAX_DIMENSION should fail
+        // We can't actually allocate such large frames, so we construct manually
+        let oversized_frame = DecodedFrame {
+            data: vec![0u8; 16], // Minimal data, dimensions are what matter
+            width: MAX_DIMENSION + 1,
+            height: 1,
+        };
+
+        let result = transform_frame(&oversized_frame, Flip::None, Rotation::None);
+        assert!(matches!(result, Err(TransformError::DimensionsTooLarge { .. })));
+
+        let oversized_frame2 = DecodedFrame {
+            data: vec![0u8; 16],
+            width: 1,
+            height: MAX_DIMENSION + 1,
+        };
+
+        let result = transform_frame(&oversized_frame2, Flip::None, Rotation::None);
+        assert!(matches!(result, Err(TransformError::DimensionsTooLarge { .. })));
     }
 }

@@ -148,8 +148,8 @@ fn decode_mjpeg(data: &[u8], expected_width: u32, expected_height: u32) -> Resul
 
     // Validate dimensions if expected values are provided (non-zero)
     // Don't error - some cameras report slightly different dimensions than they encode
-    if expected_width > 0 && expected_height > 0 {
-        if width != expected_width || height != expected_height {
+    if expected_width > 0 && expected_height > 0
+        && (width != expected_width || height != expected_height) {
             tracing::warn!(
                 expected_width = expected_width,
                 expected_height = expected_height,
@@ -158,7 +158,6 @@ fn decode_mjpeg(data: &[u8], expected_width: u32, expected_height: u32) -> Resul
                 "MJPEG frame dimensions don't match expected. Using actual dimensions."
             );
         }
-    }
 
     Ok(DecodedFrame {
         data: rgba.into_raw(),
@@ -241,7 +240,7 @@ fn decode_nv12(data: &[u8], width: u32, height: u32) -> Result<DecodedFrame, Dec
     validate_dimensions(width, height)?;
 
     // NV12 requires even dimensions for proper UV sampling
-    if width % 2 != 0 || height % 2 != 0 {
+    if !width.is_multiple_of(2) || !height.is_multiple_of(2) {
         return Err(DecodeError::InvalidDimensions { width, height });
     }
 

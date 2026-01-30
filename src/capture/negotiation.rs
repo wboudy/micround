@@ -42,7 +42,7 @@ impl MatchScore {
 
         Self {
             exact_resolution: cap.width == settings.width && cap.height == settings.height,
-            exact_format: settings.format.map_or(true, |f| f == cap.format),
+            exact_format: settings.format.is_none_or(|f| f == cap.format),
             pixel_diff: (actual_pixels - requested_pixels).abs(),
             format_priority: format_priority(cap.format),
             fps_diff: (cap.framerate - settings.framerate).abs(),
@@ -113,7 +113,7 @@ pub fn negotiate_format(
     // Determine if this is an exact match
     let is_exact = best_cap.width == settings.width
         && best_cap.height == settings.height
-        && settings.format.map_or(true, |f| f == best_cap.format)
+        && settings.format.is_none_or(|f| f == best_cap.format)
         && (best_cap.framerate - settings.framerate).abs() < 1.0;
 
     Some(NegotiatedFormat::from_capability(best_cap, is_exact))

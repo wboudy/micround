@@ -55,8 +55,10 @@ use crate::core::{CaptureError, DeviceId, NegotiatedFormat};
 
 /// State of an individual camera device
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub enum CameraState {
     /// Device is not connected or not detected
+    #[default]
     Disconnected,
     /// Device is enumerated and available but not open
     Available,
@@ -143,11 +145,6 @@ impl CameraState {
     }
 }
 
-impl Default for CameraState {
-    fn default() -> Self {
-        Self::Disconnected
-    }
-}
 
 impl fmt::Display for CameraState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

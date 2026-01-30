@@ -547,7 +547,7 @@ impl LatencySummaryReport {
         report.push_str(&format!("  Max:  {:.2}ms\n", self.max_ms));
         report.push_str("\nDistribution:\n");
         let labels = LatencyHistogram::bucket_labels();
-        for (_i, (label, pct)) in labels.iter().zip(self.bucket_percentages.iter()).enumerate() {
+        for (label, pct) in labels.iter().zip(self.bucket_percentages.iter()) {
             let bar_len = (*pct / 5.0).round() as usize;
             let bar: String = "█".repeat(bar_len);
             report.push_str(&format!("  {:>10}: {:>5.1}% {}\n", label, pct, bar));

@@ -465,7 +465,7 @@ impl CaptureBackend for V4l2Backend {
             format: fourcc_to_format(u32::from_le_bytes(actual_fmt.fourcc.repr)),
             exact_match: actual_fmt.width == settings.width
                 && actual_fmt.height == settings.height
-                && settings.format.map_or(true, |f| f == fourcc_to_format(u32::from_le_bytes(actual_fmt.fourcc.repr))),
+                && settings.format.is_none_or(|f| f == fourcc_to_format(u32::from_le_bytes(actual_fmt.fourcc.repr))),
         };
 
         self.device = Some(Box::new(device));
@@ -494,12 +494,21 @@ impl CaptureBackend for V4l2Backend {
         let stream = MmapStream::with_buffers(device.as_ref(), v4l::buffer::Type::VideoCapture, 4)
             .map_err(|e| CaptureError::Platform(format!("Failed to create stream: {}", e)))?;
 
-        // SAFETY: The stream borrows from device which is in a Box with stable address.
-        // We use ManuallyDrop and our Drop impl ensures stream is dropped before device.
-        // The 'static lifetime is a lie but safe because:
-        // 1. Device is boxed (stable address)
-        // 2. Drop order is enforced (stream dropped first)
-        // 3. All access to stream happens while device is valid
+        // SAFETY: Self-referential struct pattern using ManuallyDrop.
+        // The stream borrows from device which is stored in a Box with stable address.
+        // The 'static lifetime bound is a lie but safe because we enforce these invariants:
+        //
+        // 1. Device is boxed (Box<Device>) - memory address is stable, won't move
+        // 2. Drop order is enforced - Drop impl calls drop_stream() before device drops
+        // 3. All access to stream happens while device.is_some() - checked in next_frame()
+        // 4. No method moves the device while stream exists - only close() sets device=None
+        //    and close() calls stop() first which drops the stream
+        //
+        // WARNING: Adding any method that moves or drops self.device without first
+        // calling drop_stream() would cause use-after-free!
+        //
+        // Consider using the `ouroboros` or `self_cell` crate if this pattern needs to
+        // be extended, as they provide compile-time safety for self-referential structs.
         self.stream = Some(std::mem::ManuallyDrop::new(unsafe { std::mem::transmute(stream) }));
         self.capturing = true;
         self.sequence = 0;
@@ -543,6 +552,13 @@ impl CaptureBackend for V4l2Backend {
 
     #[cfg(feature = "linux")]
     fn next_frame(&mut self) -> Result<Frame, CaptureError> {
+        // INVARIANT: Stream should only exist when device exists (stream borrows from device)
+        // This debug_assert catches any violation of this invariant during development
+        debug_assert!(
+            self.stream.is_none() || self.device.is_some(),
+            "BUG: Stream exists but device is None - this would cause use-after-free!"
+        );
+
         let stream = self
             .stream
             .as_mut()

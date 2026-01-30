@@ -301,7 +301,7 @@ impl WallpaperRenderer for X11Renderer {
 
         #[cfg(feature = "linux")]
         {
-            return self.render_frame_to_window(frame);
+            self.render_frame_to_window(frame)
         }
 
         #[cfg(not(feature = "linux"))]

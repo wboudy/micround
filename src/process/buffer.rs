@@ -201,6 +201,7 @@ impl BufferSlot {
 
     /// Get mutable access to data
     /// SAFETY: Caller must ensure exclusive access (in_use flag set)
+    #[allow(clippy::mut_from_ref)]
     unsafe fn data_mut(&self) -> &mut [u8] {
         &mut *self.data.get()
     }

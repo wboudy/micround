@@ -594,19 +594,27 @@ impl WindowsRenderer {
 
             // BitBlt from memory DC to window
             let hdc = GetDC(window);
-            if hdc.0 != 0 {
-                BitBlt(
-                    hdc,
-                    0,
-                    0,
-                    self.width as i32,
-                    self.height as i32,
-                    mem_dc,
-                    0,
-                    0,
-                    SRCCOPY,
-                );
-                ReleaseDC(window, hdc);
+            if hdc.0 == 0 {
+                return Err(RenderError::Platform(
+                    "GetDC failed when presenting frame".into(),
+                ));
+            }
+
+            let blit_result = BitBlt(
+                hdc,
+                0,
+                0,
+                self.width as i32,
+                self.height as i32,
+                mem_dc,
+                0,
+                0,
+                SRCCOPY,
+            );
+            ReleaseDC(window, hdc);
+
+            if blit_result.0 == 0 {
+                return Err(RenderError::Platform("BitBlt failed".into()));
             }
 
             Ok(())

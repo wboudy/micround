@@ -38,10 +38,10 @@ use crate::render::WallpaperRenderer;
 
 #[cfg(target_os = "macos")]
 mod objc_impl {
-    use objc2::rc::Retained;
-    use objc2::runtime::{AnyClass, AnyObject, Bool, NSObject};
-    use objc2::{class, msg_send, msg_send_id, sel, ClassType};
-    use objc2::ffi::{NSInteger, NSUInteger};
+    use objc2::rc::autoreleasepool;
+    use objc2::runtime::{AnyObject, Bool};
+    use objc2::{class, msg_send};
+    use objc2::ffi::NSInteger;
     use std::ptr;
 
     /// NSWindowLevel for desktop level
@@ -151,9 +151,8 @@ mod objc_impl {
         // Make click-through (ignores mouse events)
         let _: () = msg_send![window, setIgnoresMouseEvents: Bool::YES];
 
-        // Cannot become key/main window
-        let _: () = msg_send![window, setCanBecomeKeyWindow: Bool::NO];
-        // Note: setCanBecomeMainWindow may not exist, using different approach
+        // Ensure we control lifetime explicitly
+        let _: () = msg_send![window, setReleasedWhenClosed: Bool::NO];
 
         Ok(window)
     }
@@ -171,6 +170,7 @@ mod objc_impl {
     /// Close the window
     pub unsafe fn close_window(window: *const AnyObject) {
         let _: () = msg_send![window, close];
+        let _: () = msg_send![window, release];
     }
 
     /// Render frame data to the window's content view
@@ -180,115 +180,112 @@ mod objc_impl {
         width: u32,
         height: u32,
     ) -> Result<(), String> {
-        // Get content view
-        let content_view: *const AnyObject = msg_send![window, contentView];
-        if content_view.is_null() {
-            return Err("No content view".to_string());
-        }
+        autoreleasepool(|| {
+            // Get content view
+            let content_view: *const AnyObject = msg_send![window, contentView];
+            if content_view.is_null() {
+                return Err("No content view".to_string());
+            }
 
-        // Create NSBitmapImageRep from raw RGBA data
-        let image_rep_cls = class!(NSBitmapImageRep);
+            // Create NSBitmapImageRep from raw RGBA data
+            let image_rep_cls = class!(NSBitmapImageRep);
 
-        // For RGBA data, bytes per row = width * 4
-        let bytes_per_row = width as i64 * 4;
-        let bits_per_sample: i64 = 8;
-        let samples_per_pixel: i64 = 4;
-        let has_alpha = Bool::YES;
-        let is_planar = Bool::NO;
+            // For RGBA data, bytes per row = width * 4
+            let bytes_per_row = width as i64 * 4;
+            let bits_per_sample: i64 = 8;
+            let samples_per_pixel: i64 = 4;
+            let has_alpha = Bool::YES;
+            let is_planar = Bool::NO;
 
-        // Get color space
-        let color_space_cls = class!(NSColorSpace);
-        let color_space: *const AnyObject = msg_send![color_space_cls, sRGBColorSpace];
+            // Create bitmap image rep
+            // Note: This creates a new buffer, we'll need to copy data into it
+            let image_rep: *const AnyObject = msg_send![
+                image_rep_cls,
+                alloc
+            ];
 
-        // Create bitmap image rep
-        // Note: This creates a new buffer, we'll need to copy data into it
-        let image_rep: *const AnyObject = msg_send![
-            image_rep_cls,
-            alloc
-        ];
+            let image_rep: *const AnyObject = msg_send![
+                image_rep,
+                initWithBitmapDataPlanes: ptr::null::<*const u8>()
+                pixelsWide: width as i64
+                pixelsHigh: height as i64
+                bitsPerSample: bits_per_sample
+                samplesPerPixel: samples_per_pixel
+                hasAlpha: has_alpha
+                isPlanar: is_planar
+                colorSpaceName: "NSCalibratedRGBColorSpace"
+                bytesPerRow: bytes_per_row
+                bitsPerPixel: 32i64
+            ];
 
-        let image_rep: *const AnyObject = msg_send![
-            image_rep,
-            initWithBitmapDataPlanes: ptr::null::<*const u8>()
-            pixelsWide: width as i64
-            pixelsHigh: height as i64
-            bitsPerSample: bits_per_sample
-            samplesPerPixel: samples_per_pixel
-            hasAlpha: has_alpha
-            isPlanar: is_planar
-            colorSpaceName: "NSCalibratedRGBColorSpace"
-            bytesPerRow: bytes_per_row
-            bitsPerPixel: 32i64
-        ];
+            if image_rep.is_null() {
+                return Err("Failed to create NSBitmapImageRep".to_string());
+            }
 
-        if image_rep.is_null() {
-            return Err("Failed to create NSBitmapImageRep".to_string());
-        }
+            // Get the bitmap data pointer and copy our data
+            let bitmap_data: *mut u8 = msg_send![image_rep, bitmapData];
+            if bitmap_data.is_null() {
+                let _: () = msg_send![image_rep, release];
+                return Err("Failed to get bitmap data pointer".to_string());
+            }
 
-        // Get the bitmap data pointer and copy our data
-        let bitmap_data: *mut u8 = msg_send![image_rep, bitmapData];
-        if bitmap_data.is_null() {
-            return Err("Failed to get bitmap data pointer".to_string());
-        }
+            // Copy frame data
+            let copy_len = (width * height * 4) as usize;
+            if data.len() >= copy_len {
+                std::ptr::copy_nonoverlapping(data.as_ptr(), bitmap_data, copy_len);
+            }
 
-        // Copy frame data
-        let copy_len = (width * height * 4) as usize;
-        if data.len() >= copy_len {
-            std::ptr::copy_nonoverlapping(data.as_ptr(), bitmap_data, copy_len);
-        }
+            // Create NSImage from bitmap rep
+            let image_cls = class!(NSImage);
+            let image: *const AnyObject = msg_send![image_cls, alloc];
+            let image: *const AnyObject =
+                msg_send![image, initWithSize: (width as f64, height as f64)];
+            if image.is_null() {
+                let _: () = msg_send![image_rep, release];
+                return Err("Failed to create NSImage".to_string());
+            }
 
-        // Create NSImage from bitmap rep
-        let image_cls = class!(NSImage);
-        let image: *const AnyObject = msg_send![image_cls, alloc];
-        let image: *const AnyObject = msg_send![image, initWithSize: (width as f64, height as f64)];
-        let _: () = msg_send![image, addRepresentation: image_rep];
+            let _: () = msg_send![image, addRepresentation: image_rep];
+            let _: () = msg_send![image_rep, release];
 
-        // Create NSImageView and set as content view
-        // Or update existing image view
+            // Create NSImageView and set as content view
+            // Or update existing image view
 
-        // For now, we'll update the layer's contents directly
-        // This requires CALayer support
+            // For now, we'll update the layer's contents directly
+            // This requires CALayer support
 
-        // Alternative: Draw directly using lockFocus/unlockFocus
-        let _: () = msg_send![content_view, lockFocus];
+            // Alternative: Draw directly using lockFocus/unlockFocus
+            let _: () = msg_send![content_view, lockFocus];
 
-        // Draw the image
-        #[repr(C)]
-        #[derive(Copy, Clone)]
-        struct NSRect {
-            x: f64,
-            y: f64,
-            width: f64,
-            height: f64,
-        }
+            // Draw the image
+            #[repr(C)]
+            #[derive(Copy, Clone)]
+            struct NSRect {
+                x: f64,
+                y: f64,
+                width: f64,
+                height: f64,
+            }
 
-        #[repr(C)]
-        #[derive(Copy, Clone)]
-        struct NSPoint {
-            x: f64,
-            y: f64,
-        }
+            let view_bounds: NSRect = msg_send![content_view, bounds];
+            let draw_rect = NSRect {
+                x: 0.0,
+                y: 0.0,
+                width: view_bounds.width,
+                height: view_bounds.height,
+            };
 
-        let view_bounds: NSRect = msg_send![content_view, bounds];
-        let draw_rect = NSRect {
-            x: 0.0,
-            y: 0.0,
-            width: view_bounds.width,
-            height: view_bounds.height,
-        };
+            // Draw image scaled to fill
+            let _: () = msg_send![image, drawInRect: draw_rect];
 
-        // Draw image scaled to fill
-        let _: () = msg_send![
-            image,
-            drawInRect: draw_rect
-        ];
+            let _: () = msg_send![content_view, unlockFocus];
+            let _: () = msg_send![image, release];
 
-        let _: () = msg_send![content_view, unlockFocus];
+            // Refresh the view
+            let _: () = msg_send![content_view, setNeedsDisplay: Bool::YES];
 
-        // Refresh the view
-        let _: () = msg_send![content_view, setNeedsDisplay: Bool::YES];
-
-        Ok(())
+            Ok(())
+        })
     }
 }
 

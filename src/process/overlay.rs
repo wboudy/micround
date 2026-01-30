@@ -501,6 +501,7 @@ fn render_text_overlay(
 }
 
 /// Render text at specific coordinates
+#[allow(clippy::too_many_arguments)]
 fn render_text_at(
     frame_data: &mut [u8],
     frame_width: u32,
@@ -533,6 +534,7 @@ fn render_text_at(
 }
 
 /// Render a single character using a simple bitmap font
+#[allow(clippy::too_many_arguments)]
 fn render_char(
     frame_data: &mut [u8],
     frame_width: u32,

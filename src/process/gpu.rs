@@ -899,6 +899,7 @@ impl TransformPipeline {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute(
         &self,
         context: &GpuContext,

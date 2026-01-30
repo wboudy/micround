@@ -6,8 +6,15 @@
 //! # Camera Preview
 //! The settings window includes a live camera preview (bd-37z) that allows users
 //! to verify camera selection and see the effect of transforms before applying.
+//!
+//! ## Preview Frame Delivery
+//! Preview frames are delivered via a channel created with `create_preview_channel()`.
+//! The sender can be used by the capture subsystem or simulator to deliver frames,
+//! while the receiver is polled by the settings UI.
 
 use std::sync::{Arc, RwLock};
+
+use tokio::sync::mpsc;
 
 use crate::config::{AppConfig, CameraConfig, DisplayConfig, StartupConfig};
 use crate::core::events::{AppHandle, Command};
@@ -62,6 +69,23 @@ pub struct PreviewFrame {
     pub sequence: u64,
 }
 
+/// Channel capacity for preview frames (small to avoid buffering lag)
+const PREVIEW_CHANNEL_CAPACITY: usize = 2;
+
+/// Sender for preview frames (given to capture subsystem)
+pub type PreviewFrameSender = mpsc::Sender<PreviewFrame>;
+
+/// Receiver for preview frames (used by settings UI)
+pub type PreviewFrameReceiver = mpsc::Receiver<PreviewFrame>;
+
+/// Create a channel for delivering preview frames
+///
+/// Returns (sender, receiver) pair. The sender is given to the capture subsystem
+/// or simulator, while the receiver is polled by the SettingsController.
+pub fn create_preview_channel() -> (PreviewFrameSender, PreviewFrameReceiver) {
+    mpsc::channel(PREVIEW_CHANNEL_CAPACITY)
+}
+
 // ============================================================================
 // Settings State
 // ============================================================================
@@ -114,6 +138,8 @@ pub struct SettingsController {
     preview_frame: Option<PreviewFrame>,
     /// Preview error message
     preview_error: Option<String>,
+    /// Receiver for preview frames from capture subsystem
+    preview_receiver: Option<PreviewFrameReceiver>,
 }
 
 /// Simple display info for the UI
@@ -150,6 +176,41 @@ impl SettingsController {
             preview_state: PreviewState::Inactive,
             preview_frame: None,
             preview_error: None,
+            preview_receiver: None,
+        }
+    }
+
+    /// Set the preview frame receiver
+    ///
+    /// The receiver is used to poll for new frames from the capture subsystem.
+    pub fn set_preview_receiver(&mut self, receiver: PreviewFrameReceiver) {
+        self.preview_receiver = Some(receiver);
+    }
+
+    /// Poll for new preview frames
+    ///
+    /// Call this periodically to check for new frames from the capture subsystem.
+    /// Returns true if a new frame was received.
+    pub fn poll_preview_frames(&mut self) -> bool {
+        if let Some(ref mut receiver) = self.preview_receiver {
+            // Try to receive without blocking
+            match receiver.try_recv() {
+                Ok(frame) => {
+                    self.preview_state = PreviewState::Running;
+                    self.preview_frame = Some(frame);
+                    self.preview_error = None;
+                    true
+                }
+                Err(mpsc::error::TryRecvError::Empty) => false,
+                Err(mpsc::error::TryRecvError::Disconnected) => {
+                    // Channel closed, preview stopped
+                    self.preview_state = PreviewState::Inactive;
+                    self.preview_receiver = None;
+                    false
+                }
+            }
+        } else {
+            false
         }
     }
 
@@ -827,12 +888,12 @@ impl SettingsUI {
     }
 
     fn render_overlay_section(&self, ui: &mut egui::Ui, _controller: &mut SettingsController) {
-        // Overlay settings placeholder
+        // Overlay settings placeholder - show disabled UI to indicate future functionality
         ui.label("Overlay options coming soon...");
-        ui.checkbox(&mut false, "Show timestamp");
+        ui.add_enabled(false, egui::Checkbox::new(&mut false, "Show timestamp"));
         ui.horizontal(|ui| {
             ui.label("Custom text:");
-            ui.text_edit_singleline(&mut String::new());
+            ui.add_enabled(false, egui::TextEdit::singleline(&mut String::new()));
         });
     }
 
@@ -1155,5 +1216,71 @@ mod tests {
         assert_eq!(frame.width, 0);
         assert_eq!(frame.height, 0);
         assert_eq!(frame.sequence, 0);
+    }
+
+    // ========================================================================
+    // Preview Channel Tests
+    // ========================================================================
+
+    #[test]
+    fn test_create_preview_channel() {
+        let (tx, _rx) = create_preview_channel();
+        // Channel should be created successfully
+        assert!(!tx.is_closed());
+    }
+
+    #[test]
+    fn test_preview_channel_send_receive() {
+        let (tx, rx) = create_preview_channel();
+        let mut controller = create_test_controller();
+        controller.set_preview_receiver(rx);
+
+        // Send a frame
+        let frame = PreviewFrame {
+            data: vec![255u8; 4],
+            width: 1,
+            height: 1,
+            sequence: 42,
+        };
+        tx.try_send(frame).unwrap();
+
+        // Poll should receive it
+        assert!(controller.poll_preview_frames());
+        assert_eq!(controller.preview_state(), PreviewState::Running);
+        assert!(controller.preview_frame().is_some());
+        assert_eq!(controller.preview_frame().unwrap().sequence, 42);
+    }
+
+    #[test]
+    fn test_preview_channel_empty_poll() {
+        let (_tx, rx) = create_preview_channel();
+        let mut controller = create_test_controller();
+        controller.set_preview_receiver(rx);
+
+        // No frames sent, poll should return false
+        assert!(!controller.poll_preview_frames());
+    }
+
+    #[test]
+    fn test_preview_channel_disconnected() {
+        let (tx, rx) = create_preview_channel();
+        let mut controller = create_test_controller();
+        controller.set_preview_receiver(rx);
+        controller.preview_state = PreviewState::Running;
+
+        // Drop sender to disconnect
+        drop(tx);
+
+        // Poll should detect disconnection
+        assert!(!controller.poll_preview_frames());
+        assert_eq!(controller.preview_state(), PreviewState::Inactive);
+        assert!(controller.preview_receiver.is_none());
+    }
+
+    #[test]
+    fn test_poll_without_receiver() {
+        let mut controller = create_test_controller();
+        // No receiver set
+        assert!(!controller.poll_preview_frames());
     }
 }

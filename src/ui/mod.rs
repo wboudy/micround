@@ -19,7 +19,11 @@ pub use first_run::{FirstRunState, FirstRunAction, FirstRunEvent, FirstRunContro
 
 // Re-exports for settings window
 #[allow(unused_imports)]
-pub use settings::{SettingsController, SettingsUI, SettingsWindowState, SettingsError, DisplayInfo};
+pub use settings::{
+    SettingsController, SettingsUI, SettingsWindowState, SettingsError, DisplayInfo,
+    // Preview types (bd-37z)
+    PreviewState, PreviewFrame, PreviewFrameSender, PreviewFrameReceiver, create_preview_channel,
+};
 
 #[cfg(feature = "tray")]
 #[allow(unused_imports)]

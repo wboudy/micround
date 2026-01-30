@@ -133,7 +133,7 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
                     Command::StartCapture { device_id } => {
                         info!(device = %device_id.0, "Start capture requested");
                         engine.start();
-                        current_state = AppState::Running;
+                        // State update handled by Event::StateChanged handler below
                         app_handle.publish_event(Event::StateChanged {
                             old_state: AppState::Idle,
                             new_state: AppState::Running,
@@ -142,7 +142,11 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
                     Command::StopCapture => {
                         info!("Stop capture requested");
                         engine.stop();
-                        current_state = AppState::Idle;
+                        // State update handled by Event::StateChanged handler below
+                        app_handle.publish_event(Event::StateChanged {
+                            old_state: AppState::Running,
+                            new_state: AppState::Idle,
+                        });
                     }
                     Command::TakeSnapshot { to_clipboard } => {
                         info!(to_clipboard = *to_clipboard, "Snapshot requested");

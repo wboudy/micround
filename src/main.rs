@@ -156,6 +156,15 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
                             to_clipboard: *to_clipboard
                         });
                     }
+                    Command::ShowSettings => {
+                        info!("Show settings requested");
+                        // TODO: Spawn egui settings window
+                        // For now, just log the request
+                    }
+                    Command::RefreshCameras => {
+                        info!("Refresh cameras requested");
+                        // TODO: Re-enumerate cameras and update settings window
+                    }
                     _ => {
                         // Other commands handled by specific subsystems
                         engine.handle_command(&cmd);

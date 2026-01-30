@@ -10,7 +10,7 @@
 //! - **Windows**: Registry HKCU\...\Run (TODO)
 //! - **macOS**: SMAppService / LaunchAgent (TODO)
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::io;
 
 
@@ -204,7 +204,7 @@ mod linux {
     }
 
     /// Generate the desktop entry content
-    pub(crate) fn desktop_entry_content(exe_path: &PathBuf) -> String {
+    pub(crate) fn desktop_entry_content(exe_path: &Path) -> String {
         format!(
             r#"[Desktop Entry]
 Type=Application

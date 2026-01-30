@@ -49,6 +49,9 @@ use std::time::Instant;
 
 use crate::core::{CaptureError, DeviceId, NegotiatedFormat};
 
+// Type alias to reduce complexity in struct definitions
+type StateChangeCallback = Arc<dyn Fn(&StateTransition) + Send + Sync>;
+
 // ============================================================================
 // Camera State Enum
 // ============================================================================
@@ -289,7 +292,7 @@ pub struct CameraStateManager {
     /// Callback for state changes
     /// Uses Arc to allow cloning the callback out of the lock before invoking,
     /// which prevents deadlock if the callback tries to modify state.
-    on_state_change: RwLock<Option<Arc<dyn Fn(&StateTransition) + Send + Sync>>>,
+    on_state_change: RwLock<Option<StateChangeCallback>>,
 }
 
 impl CameraStateManager {

@@ -172,6 +172,12 @@ pub trait SystemMonitor: Send {
     }
 }
 
+// Platform-specific implementations
+#[cfg(target_os = "windows")]
+mod system_windows;
+#[cfg(target_os = "windows")]
+pub use system_windows::WindowsSystemMonitor;
+
 /// Guard that prevents system sleep while held
 ///
 /// When dropped, releases the sleep prevention assertion.

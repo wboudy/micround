@@ -64,6 +64,50 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
     // Create display engine
     let engine = Arc::new(DisplayEngine::new(ctx.events.clone()));
 
+    // Windows system event monitoring (sleep/wake, session lock)
+    #[cfg(target_os = "windows")]
+    let mut _system_monitor = {
+        use crate::platform::{SystemEvent, SystemEventHandler, SleepEvent, SessionEvent, WindowsSystemMonitor};
+
+        struct SystemEventBridge {
+            app_handle: core::events::AppHandle,
+        }
+
+        impl SystemEventHandler for SystemEventBridge {
+            fn on_system_event(&mut self, event: SystemEvent) {
+                let command = match event {
+                    SystemEvent::Sleep(SleepEvent::WillSleep)
+                    | SystemEvent::Session(SessionEvent::ScreenLocking) => Some(Command::PauseDisplay),
+                    SystemEvent::Sleep(SleepEvent::DidWake)
+                    | SystemEvent::Session(SessionEvent::ScreenUnlocked) => Some(Command::ResumeDisplay),
+                    SystemEvent::Session(SessionEvent::LoggingOut) => Some(Command::StopCapture),
+                    _ => None,
+                };
+
+                if let Some(cmd) = command {
+                    if let Err(err) = self.app_handle.try_send_command(cmd) {
+                        tracing::warn!(error = %err, "Failed to enqueue system command");
+                    }
+                }
+            }
+        }
+
+        let handler = Box::new(SystemEventBridge {
+            app_handle: app_handle.clone(),
+        });
+        let mut monitor = WindowsSystemMonitor::new(handler);
+        match monitor.start() {
+            Ok(()) => {
+                info!("Windows system monitor started");
+                Some(monitor)
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to start Windows system monitor");
+                None
+            }
+        }
+    };
+
     // Initialize capture backend
     let _capture_backend = capture::create_backend();
 
@@ -110,6 +154,15 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
             }
         }
     };
+
+    // Initialize settings controller for settings window (bd-2k5)
+    let settings_controller = std::sync::Arc::new(std::sync::RwLock::new(
+        ui::SettingsController::new(app_handle.clone(), &config)
+    ));
+
+    // Preview frame channel for camera preview (bd-37z)
+    // The sender is held here to pass to capture when preview starts
+    let mut _preview_sender: Option<ui::PreviewFrameSender> = None;
 
     info!("Micround ready - entering event loop");
 
@@ -167,12 +220,23 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
                     }
                     Command::StartPreview { width, height } => {
                         info!(width, height, "Start preview requested");
-                        // Preview capture would be handled by the capture subsystem
-                        // For now, just log - actual frame delivery requires capture integration
+
+                        // Create preview channel and wire to settings controller
+                        let (sender, receiver) = ui::create_preview_channel();
+                        _preview_sender = Some(sender);
+                        settings_controller.write().unwrap().set_preview_receiver(receiver);
+
+                        // TODO: Pass _preview_sender to capture subsystem to deliver frames
+                        // For now, the channel is set up but no frames will be delivered
+                        // until capture integration is complete
+                        info!("Preview channel created - awaiting capture integration");
                     }
                     Command::StopPreview => {
                         info!("Stop preview requested");
-                        // Stop preview capture
+
+                        // Drop the sender to close the channel
+                        // The controller will detect disconnection on next poll
+                        _preview_sender = None;
                     }
                     _ => {
                         // Other commands handled by specific subsystems
@@ -228,6 +292,10 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
                 if let Some(ref hotkeys) = _hotkeys {
                     hotkeys.process_events();
                 }
+
+                // Poll for preview frames (bd-37z)
+                // This allows the settings UI to receive frames from the capture subsystem
+                settings_controller.write().unwrap().poll_preview_frames();
             }
         }
     }

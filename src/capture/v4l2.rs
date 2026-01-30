@@ -509,7 +509,12 @@ impl CaptureBackend for V4l2Backend {
         //
         // Consider using the `ouroboros` or `self_cell` crate if this pattern needs to
         // be extended, as they provide compile-time safety for self-referential structs.
-        self.stream = Some(std::mem::ManuallyDrop::new(unsafe { std::mem::transmute(stream) }));
+        // SAFETY: This transmute extends the lifetime of the stream to 'static.
+        // The stream is valid for as long as self.device is valid, and we ensure
+        // drop_stream() is always called before device is moved or dropped.
+        self.stream = Some(std::mem::ManuallyDrop::new(unsafe {
+            std::mem::transmute::<v4l::prelude::MmapStream<'_>, v4l::prelude::MmapStream<'static>>(stream)
+        }));
         self.capturing = true;
         self.sequence = 0;
         Ok(())

@@ -7,8 +7,12 @@
 //!
 //! - `tray`: Enable system tray integration (requires GTK3 on Linux)
 
+pub mod first_run;
+
 #[cfg(feature = "tray")]
 pub mod tray;
+
+pub use first_run::{FirstRunState, FirstRunAction, FirstRunEvent, FirstRunController, StateContent};
 
 #[cfg(feature = "tray")]
 pub use tray::{TrayController, TrayError, TrayState, TrayMenuId, IconState, process_events};

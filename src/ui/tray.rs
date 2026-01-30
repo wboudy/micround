@@ -366,7 +366,9 @@ impl TrayController {
                 }
                 TrayMenuId::Settings => {
                     info!("Settings requested from tray");
-                    // TODO: Open settings window
+                    if let Err(e) = self.app_handle.try_send_command(Command::ShowSettings) {
+                        error!(error = %e, "Failed to send ShowSettings command");
+                    }
                 }
                 TrayMenuId::Quit => {
                     info!("Quit requested from tray");

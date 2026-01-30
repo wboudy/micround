@@ -2,6 +2,7 @@
 //!
 //! This module defines the error taxonomy, representation, and handling patterns.
 #![allow(dead_code)] // Complete error taxonomy
+#![allow(clippy::result_large_err)] // Rich error context is intentional design choice
 //!
 //! # Error Categories
 //!

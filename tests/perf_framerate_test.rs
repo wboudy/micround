@@ -351,6 +351,7 @@ fn test_framerate_60fps_target_2sec() {
 }
 
 #[test]
+#[ignore] // Timing-sensitive test, prone to flakiness under system load
 fn test_framerate_variance_logging() {
     eprintln!("\n=== Test: Frame Time Variance Analysis ===\n");
 

@@ -12,6 +12,8 @@ pub mod first_run;
 #[cfg(feature = "tray")]
 pub mod tray;
 
+// Re-exports for first-run wizard (will be used by settings window integration)
+#[allow(unused_imports)]
 pub use first_run::{FirstRunState, FirstRunAction, FirstRunEvent, FirstRunController, StateContent};
 
 #[cfg(feature = "tray")]

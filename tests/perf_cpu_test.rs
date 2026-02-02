@@ -502,7 +502,7 @@ fn test_cpu_usage_sustained_load() {
 }
 
 #[test]
-#[ignore = "flaky test: CPU usage varies in CI environments"]
+#[ignore] // Flaky test: CPU usage varies in CI environments
 fn test_cpu_usage_detailed_report() {
     eprintln!("\n=== Test: Detailed CPU Report ===\n");
 

@@ -83,6 +83,11 @@ impl CameraEnumerator for AVFoundationEnumerator {
     fn is_available(&self, id: &DeviceId) -> bool {
         self.devices.contains_key(&id.0)
     }
+
+    fn refresh(&mut self) -> Result<(), CaptureError> {
+        // Placeholder: Nothing to refresh
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -118,18 +123,19 @@ impl Default for AVFoundationBackend {
 }
 
 impl CaptureBackend for AVFoundationBackend {
-    fn open(&mut self, device_id: &DeviceId) -> Result<(), CaptureError> {
-        // Placeholder: Pretend to open the device
-        self.current_device = Some(device_id.clone());
-        debug!(
-            device = %device_id.0,
-            "AVFoundation device opened (placeholder mode)"
-        );
-        Ok(())
+    fn enumerate_devices(&self) -> Vec<CameraDevice> {
+        // Placeholder: Return empty list
+        Vec::new()
     }
 
-    fn configure(&mut self, settings: &CaptureSettings) -> Result<NegotiatedFormat, CaptureError> {
-        // Placeholder: Return a mock negotiated format
+    fn open(
+        &mut self,
+        device_id: &DeviceId,
+        settings: CaptureSettings,
+    ) -> Result<NegotiatedFormat, CaptureError> {
+        // Placeholder: Pretend to open the device and configure
+        self.current_device = Some(device_id.clone());
+
         let negotiated = NegotiatedFormat {
             width: settings.width.min(1920),
             height: settings.height.min(1080),
@@ -138,11 +144,13 @@ impl CaptureBackend for AVFoundationBackend {
             exact_match: false,
         };
         self.current_format = Some(negotiated.clone());
+
         debug!(
+            device = %device_id.0,
             width = negotiated.width,
             height = negotiated.height,
             fps = negotiated.framerate,
-            "AVFoundation configured (placeholder mode)"
+            "AVFoundation device opened (placeholder mode)"
         );
         Ok(negotiated)
     }
@@ -163,7 +171,22 @@ impl CaptureBackend for AVFoundationBackend {
         Ok(())
     }
 
-    fn read_frame(&mut self) -> Result<Frame, CaptureError> {
+    fn close(&mut self) {
+        self.is_capturing = false;
+        self.current_device = None;
+        self.current_format = None;
+        debug!("AVFoundation device closed (placeholder mode)");
+    }
+
+    fn is_capturing(&self) -> bool {
+        self.is_capturing
+    }
+
+    fn current_format(&self) -> Option<NegotiatedFormat> {
+        self.current_format.clone()
+    }
+
+    fn next_frame(&mut self) -> Result<Frame, CaptureError> {
         if !self.is_capturing {
             return Err(CaptureError::NotCapturing);
         }
@@ -189,13 +212,6 @@ impl CaptureBackend for AVFoundationBackend {
         self.frame_sequence += 1;
 
         Ok(frame)
-    }
-
-    fn close(&mut self) {
-        self.is_capturing = false;
-        self.current_device = None;
-        self.current_format = None;
-        debug!("AVFoundation device closed (placeholder mode)");
     }
 }
 
@@ -235,44 +251,41 @@ mod tests {
     fn test_backend_lifecycle() {
         let mut backend = AVFoundationBackend::new();
 
-        // Open
+        // Open with settings
         let device_id = DeviceId("test-device".to_string());
-        assert!(backend.open(&device_id).is_ok());
-
-        // Configure
         let settings = CaptureSettings {
             width: 1920,
             height: 1080,
             framerate: 30.0,
             format: None,
         };
-        let format = backend.configure(&settings).unwrap();
+        let format = backend.open(&device_id, settings).unwrap();
         assert_eq!(format.width, 1920);
         assert_eq!(format.height, 1080);
 
         // Start
         assert!(backend.start().is_ok());
-        assert!(backend.is_capturing);
+        assert!(backend.is_capturing());
 
         // Read frame (placeholder returns black frame)
-        let frame = backend.read_frame().unwrap();
+        let frame = backend.next_frame().unwrap();
         assert_eq!(frame.width, 1920);
         assert_eq!(frame.height, 1080);
         assert_eq!(frame.sequence, 0);
 
         // Stop
         assert!(backend.stop().is_ok());
-        assert!(!backend.is_capturing);
+        assert!(!backend.is_capturing());
 
         // Close
         backend.close();
-        assert!(backend.current_device.is_none());
+        assert!(backend.current_format().is_none());
     }
 
     #[test]
-    fn test_read_frame_without_start() {
+    fn test_next_frame_without_start() {
         let mut backend = AVFoundationBackend::new();
-        let result = backend.read_frame();
+        let result = backend.next_frame();
         assert!(result.is_err());
     }
 }

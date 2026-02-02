@@ -157,7 +157,7 @@ impl CaptureBackend for AVFoundationBackend {
 
     fn start(&mut self) -> Result<(), CaptureError> {
         if self.current_device.is_none() {
-            return Err(CaptureError::NotOpen);
+            return Err(CaptureError::Platform("No device opened".to_string()));
         }
         self.is_capturing = true;
         self.frame_sequence = 0;
@@ -188,14 +188,14 @@ impl CaptureBackend for AVFoundationBackend {
 
     fn next_frame(&mut self) -> Result<Frame, CaptureError> {
         if !self.is_capturing {
-            return Err(CaptureError::NotCapturing);
+            return Err(CaptureError::Platform("Not capturing".to_string()));
         }
 
         // Placeholder: Return a black frame
         let format = self
             .current_format
             .as_ref()
-            .ok_or(CaptureError::NotConfigured)?;
+            .ok_or(CaptureError::Platform("Not configured".to_string()))?;
 
         let data_len = (format.width * format.height * 3 / 2) as usize; // NV12 format
         let frame = Frame {
@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn test_backend_creation() {
         let backend = AVFoundationBackend::new();
-        assert!(!backend.is_capturing);
+        assert!(!backend.is_capturing());
         assert!(backend.current_device.is_none());
     }
 

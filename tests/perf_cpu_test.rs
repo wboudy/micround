@@ -3,6 +3,8 @@
 //! Monitors CPU usage during active capture and render cycles.
 //! Target: Average CPU usage under 10% of a single core.
 //!
+//! Note: Most tests are ignored by default due to CI environment variability.
+//!
 //! Run with: cargo test --test perf_cpu_test -- --nocapture
 
 #[allow(dead_code)]

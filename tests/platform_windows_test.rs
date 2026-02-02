@@ -109,37 +109,39 @@ fn test_find_progman_window() {
     let mut logger = TestLogger::new("find_progman_window", 3);
 
     test_step!(logger, "Looking for Progman window");
-    let progman = unsafe {
+    let progman_result = unsafe {
         FindWindowW(
             PCWSTR::from_raw("Progman\0".encode_utf16().collect::<Vec<_>>().as_ptr()),
             PCWSTR::null(),
         )
     };
 
-    if progman.0 == 0 {
-        logger.step_skip("Progman not found (no desktop shell running)");
-        test_step!(logger, "Skipping Progman tests");
-        logger.step_skip("No desktop shell available");
-        test_step!(logger, "Test incomplete");
-        logger.step_skip("Desktop shell required for full test");
-    } else {
-        test_step_ok!(logger, "Found Progman: {:?}", progman);
+    match progman_result {
+        Err(_) => {
+            logger.step_skip("Progman not found (no desktop shell running)");
+            test_step!(logger, "Skipping Progman tests");
+            logger.step_skip("No desktop shell available");
+            test_step!(logger, "Test incomplete");
+            logger.step_skip("Desktop shell required for full test");
+        }
+        Ok(progman) => {
+            test_step_ok!(logger, "Found Progman: {:?}", progman);
 
-        test_step!(logger, "Verifying Progman is valid window");
-        test_assert!(logger, progman.0 != 0, "Progman handle is non-null");
-        test_step_ok!(logger);
+            test_step!(logger, "Verifying Progman is valid window");
+            test_step_ok!(logger, "Progman handle obtained");
 
-        test_step!(logger, "Checking Progman window class");
-        let mut class_name = [0u16; 256];
-        let len = unsafe {
-            windows::Win32::UI::WindowsAndMessaging::GetClassNameW(progman, &mut class_name)
-        };
-        if len > 0 {
-            let class_str = String::from_utf16_lossy(&class_name[..len as usize]);
-            test_assert!(logger, class_str == "Progman", "Class name is Progman");
-            test_step_ok!(logger, "Window class: {}", class_str);
-        } else {
-            logger.step_skip("Could not get class name");
+            test_step!(logger, "Checking Progman window class");
+            let mut class_name = [0u16; 256];
+            let len = unsafe {
+                windows::Win32::UI::WindowsAndMessaging::GetClassNameW(progman, &mut class_name)
+            };
+            if len > 0 {
+                let class_str = String::from_utf16_lossy(&class_name[..len as usize]);
+                test_assert!(logger, class_str == "Progman", "Class name is Progman");
+                test_step_ok!(logger, "Window class: {}", class_str);
+            } else {
+                logger.step_skip("Could not get class name");
+            }
         }
     }
 
@@ -193,14 +195,14 @@ fn test_workerw_enumeration() {
 
     test_step!(logger, "Checking for SHELLDLL_DefView");
     // Look for a window that has SHELLDLL_DefView as a child (this is the desktop icons window)
-    let progman = unsafe {
+    let progman_result = unsafe {
         windows::Win32::UI::WindowsAndMessaging::FindWindowW(
             PCWSTR::from_raw("Progman\0".encode_utf16().collect::<Vec<_>>().as_ptr()),
             PCWSTR::null(),
         )
     };
 
-    if progman.0 != 0 {
+    if let Ok(progman) = progman_result {
         let shell_view = unsafe {
             FindWindowExW(
                 progman,
@@ -215,7 +217,7 @@ fn test_workerw_enumeration() {
             )
         };
 
-        if shell_view.0 != 0 {
+        if shell_view.is_ok() {
             test_step_ok!(logger, "Found SHELLDLL_DefView as child of Progman");
         } else {
             // SHELLDLL_DefView might be under a WorkerW window instead
@@ -269,18 +271,21 @@ fn test_workerw_spawn_message() {
         )
     };
 
-    if progman.0 == 0 {
-        logger.step_skip("Progman not found");
-        test_step!(logger, "Skipping spawn message test");
-        logger.step_skip("No desktop shell");
-        test_step!(logger, "Test incomplete");
-        logger.step_skip("Desktop shell required");
-        test_step!(logger, "Cleanup");
-        logger.step_skip("Nothing to clean up");
-        let result = logger.finish();
-        assert!(result.passed);
-        return;
-    }
+    let progman = match progman {
+        Ok(hwnd) => hwnd,
+        Err(_) => {
+            logger.step_skip("Progman not found");
+            test_step!(logger, "Skipping spawn message test");
+            logger.step_skip("No desktop shell");
+            test_step!(logger, "Test incomplete");
+            logger.step_skip("Desktop shell required");
+            test_step!(logger, "Cleanup");
+            logger.step_skip("Nothing to clean up");
+            let result = logger.finish();
+            assert!(result.passed);
+            return;
+        }
+    };
     test_step_ok!(logger, "Found Progman: {:?}", progman);
 
     test_step!(logger, "Sending WorkerW spawn message (0x052C)");
@@ -368,7 +373,7 @@ fn test_workerw_spawn_message() {
             PCWSTR::null(),
         );
 
-        if shell_view.0 != 0 {
+        if let Ok(_shell_view) = shell_view {
             // Found SHELLDLL_DefView - now find WorkerW after this window
             let workerw = FindWindowExW(
                 HWND::default(),
@@ -377,8 +382,8 @@ fn test_workerw_spawn_message() {
                 PCWSTR::null(),
             );
 
-            if workerw.0 != 0 {
-                FOUND_WORKERW.store(workerw.0 as *mut std::ffi::c_void, Ordering::SeqCst);
+            if let Ok(workerw) = workerw {
+                FOUND_WORKERW.store(workerw.0, Ordering::SeqCst);
             }
         }
 
@@ -503,7 +508,7 @@ fn test_gdi_device_context() {
 
     test_step!(logger, "Getting desktop DC");
     let desktop_dc = unsafe { GetDC(HWND::default()) };
-    if desktop_dc.0 == 0 {
+    if desktop_dc.is_invalid() {
         logger.step_skip("Could not get desktop DC (no display)");
         test_step!(logger, "Skipping DC tests");
         logger.step_skip("No desktop DC available");
@@ -519,14 +524,14 @@ fn test_gdi_device_context() {
 
     test_step!(logger, "Creating compatible memory DC");
     let mem_dc = unsafe { CreateCompatibleDC(desktop_dc) };
-    if mem_dc.0 != 0 {
+    if !mem_dc.is_invalid() {
         test_step_ok!(logger, "Created memory DC: {:?}", mem_dc);
     } else {
         logger.step_err("Failed to create memory DC");
     }
 
     test_step!(logger, "Cleaning up memory DC");
-    if mem_dc.0 != 0 {
+    if !mem_dc.is_invalid() {
         let deleted = unsafe { DeleteDC(mem_dc) };
         if deleted.as_bool() {
             test_step_ok!(logger, "Memory DC deleted");

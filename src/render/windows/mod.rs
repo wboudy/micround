@@ -217,13 +217,8 @@ impl WindowsRenderer {
             let progman = FindWindowW(
                 PCWSTR::from_raw("Progman\0".encode_utf16().collect::<Vec<_>>().as_ptr()),
                 PCWSTR::null(),
-            );
-
-            if progman.0 == 0 {
-                return Err(RenderError::Platform(
-                    "Failed to find Progman window".into(),
-                ));
-            }
+            )
+            .map_err(|e| RenderError::Platform(format!("Failed to find Progman window: {}", e)))?;
 
             Ok(progman)
         }
@@ -247,7 +242,7 @@ impl WindowsRenderer {
                 Some(&mut result),
             );
 
-            if send_result.0 == 0 {
+            if send_result == LRESULT(0) {
                 return Err(RenderError::Platform(
                     "Failed to send WorkerW spawn message".into(),
                 ));
@@ -280,7 +275,7 @@ impl WindowsRenderer {
                 ));
             }
 
-            let workerw = HWND(workerw_ptr as isize);
+            let workerw = HWND(workerw_ptr);
             tracing::debug!("Found WorkerW window: {:?}", workerw);
             Ok(workerw)
         }
@@ -292,11 +287,9 @@ impl WindowsRenderer {
         unsafe {
             // Get the WorkerW window dimensions
             let mut rect = RECT::default();
-            if !GetClientRect(workerw, &mut rect).as_bool() {
-                return Err(RenderError::Platform(
-                    "Failed to get WorkerW client rect".into(),
-                ));
-            }
+            GetClientRect(workerw, &mut rect).map_err(|e| {
+                RenderError::Platform(format!("Failed to get WorkerW client rect: {}", e))
+            })?;
 
             self.width = (rect.right - rect.left) as u32;
             self.height = (rect.bottom - rect.top) as u32;
@@ -348,13 +341,8 @@ impl WindowsRenderer {
                 None,
                 hinstance,
                 None,
-            );
-
-            if window.0 == 0 {
-                return Err(RenderError::Platform(
-                    "Failed to create render window".into(),
-                ));
-            }
+            )
+            .map_err(|e| RenderError::Platform(format!("Failed to create render window: {}", e)))?;
 
             // Show the window
             ShowWindow(window, SW_SHOW);
@@ -375,21 +363,21 @@ impl WindowsRenderer {
     fn create_back_buffer(&mut self, window: HWND) -> Result<(), RenderError> {
         unsafe {
             let hdc = GetDC(window);
-            if hdc.0 == 0 {
+            if hdc.is_invalid() {
                 return Err(RenderError::Platform("Failed to get window DC".into()));
             }
 
             // Create compatible DC for double buffering
             let mem_dc = CreateCompatibleDC(hdc);
-            if mem_dc.0 == 0 {
+            if mem_dc.is_invalid() {
                 ReleaseDC(window, hdc);
                 return Err(RenderError::Platform("Failed to create memory DC".into()));
             }
 
             // Create compatible bitmap
             let bitmap = CreateCompatibleBitmap(hdc, self.width as i32, self.height as i32);
-            if bitmap.0 == 0 {
-                DeleteDC(mem_dc);
+            if bitmap.is_invalid() {
+                let _ = DeleteDC(mem_dc);
                 ReleaseDC(window, hdc);
                 return Err(RenderError::Platform(
                     "Failed to create back buffer bitmap".into(),
@@ -414,8 +402,8 @@ impl WindowsRenderer {
     fn poll_events(&self) {
         unsafe {
             let mut msg = MSG::default();
-            while PeekMessageW(&mut msg, HWND(0), 0, 0, PM_REMOVE).as_bool() {
-                TranslateMessage(&msg);
+            while PeekMessageW(&mut msg, HWND::default(), 0, 0, PM_REMOVE).as_bool() {
+                let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
         }
@@ -474,9 +462,8 @@ impl WindowsRenderer {
 
         unsafe {
             let mut rect = RECT::default();
-            if !GetClientRect(workerw, &mut rect).as_bool() {
-                return Err(RenderError::Platform("Failed to get WorkerW rect".into()));
-            }
+            GetClientRect(workerw, &mut rect)
+                .map_err(|_| RenderError::Platform("Failed to get WorkerW rect".into()))?;
             let width = (rect.right - rect.left) as u32;
             let height = (rect.bottom - rect.top) as u32;
             Ok((width, height))
@@ -597,7 +584,7 @@ impl WindowsRenderer {
 
             // BitBlt from memory DC to window
             let hdc = GetDC(window);
-            if hdc.0 == 0 {
+            if hdc.is_invalid() {
                 return Err(RenderError::Platform(
                     "GetDC failed when presenting frame".into(),
                 ));
@@ -616,9 +603,7 @@ impl WindowsRenderer {
             );
             ReleaseDC(window, hdc);
 
-            if blit_result.0 == 0 {
-                return Err(RenderError::Platform("BitBlt failed".into()));
-            }
+            blit_result.map_err(|_| RenderError::Platform("BitBlt failed".into()))?;
 
             Ok(())
         }
@@ -775,7 +760,7 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, _lparam: LPARAM) -> 
         PCWSTR::null(),
     );
 
-    if shell_view.0 != 0 {
+    if let Ok(shell_view) = shell_view {
         // Found SHELLDLL_DefView - now find the WorkerW that comes after this window
         // in the Z-order. This is our target WorkerW.
         let workerw = FindWindowExW(
@@ -785,8 +770,8 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, _lparam: LPARAM) -> 
             PCWSTR::null(),
         );
 
-        if workerw.0 != 0 {
-            FOUND_WORKERW.store(workerw.0 as *mut std::ffi::c_void, Ordering::SeqCst);
+        if let Ok(workerw) = workerw {
+            FOUND_WORKERW.store(workerw.0, Ordering::SeqCst);
         }
     }
 

@@ -336,8 +336,7 @@ impl WallpaperRenderer for MacOSRenderer {
         }
 
         // Create new desktop window
-        let window =
-            unsafe { create_desktop_window().map_err(|e| RenderError::InitializationFailed(e))? };
+        let window = unsafe { create_desktop_window().map_err(RenderError::Platform)? };
 
         // Show the window
         unsafe {
@@ -348,14 +347,14 @@ impl WallpaperRenderer for MacOSRenderer {
         self.display_id = Some(display.clone());
         self.initialized = true;
 
-        info!(display = %display, "macOS desktop window created");
+        info!(target_display = %display, "macOS desktop window created");
 
         Ok(())
     }
 
     #[cfg(not(target_os = "macos"))]
-    fn init(&mut self, display: &DisplayId) -> Result<(), RenderError> {
-        Err(RenderError::InitializationFailed(
+    fn init(&mut self, _display: &DisplayId) -> Result<(), RenderError> {
+        Err(RenderError::Platform(
             "macOS renderer not available on this platform".to_string(),
         ))
     }
@@ -366,11 +365,11 @@ impl WallpaperRenderer for MacOSRenderer {
 
         let window = self
             .window
-            .ok_or_else(|| RenderError::RenderFailed("Window not initialized".to_string()))?;
+            .ok_or_else(|| RenderError::Platform("Window not initialized".to_string()))?;
 
         unsafe {
             render_to_window(window, &frame.data, frame.width, frame.height)
-                .map_err(|e| RenderError::RenderFailed(e))?;
+                .map_err(RenderError::Platform)?;
         }
 
         Ok(())
@@ -378,7 +377,7 @@ impl WallpaperRenderer for MacOSRenderer {
 
     #[cfg(not(target_os = "macos"))]
     fn render(&mut self, _frame: &ProcessedFrame) -> Result<(), RenderError> {
-        Err(RenderError::RenderFailed(
+        Err(RenderError::Platform(
             "macOS renderer not available on this platform".to_string(),
         ))
     }

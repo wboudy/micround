@@ -161,13 +161,8 @@ fn create_message_window(handler: Box<dyn SystemEventHandler>) -> Result<HWND, S
             None,
             hinstance.into(),
             ptr::null_mut(),
-        );
-
-        if hwnd.0 == 0 {
-            return Err(SystemError::RegistrationFailed(
-                "CreateWindowExW failed".into(),
-            ));
-        }
+        )
+        .map_err(|e| SystemError::RegistrationFailed(format!("CreateWindowExW failed: {:?}", e)))?;
 
         let state = Box::new(HandlerState { handler });
         let state_ptr = Box::into_raw(state);
@@ -227,7 +222,7 @@ impl WindowsSystemMonitor {
                     if stop_signal.load(Ordering::Acquire) {
                         break;
                     }
-                    let result = GetMessageW(&mut msg, HWND(0), 0, 0);
+                    let result = GetMessageW(&mut msg, HWND::default(), 0, 0);
                     if result.0 == -1 {
                         break;
                     }

@@ -569,7 +569,7 @@ fn test_gdi_bitmap_creation() {
 
     test_step!(logger, "Getting desktop DC");
     let desktop_dc = unsafe { GetDC(HWND::default()) };
-    if desktop_dc.0 == 0 {
+    if desktop_dc.is_invalid() {
         logger.step_skip("Could not get desktop DC");
         let result = logger.finish();
         assert!(result.passed);
@@ -581,7 +581,7 @@ fn test_gdi_bitmap_creation() {
     let width = 1920;
     let height = 1080;
     let bitmap = unsafe { CreateCompatibleBitmap(desktop_dc, width, height) };
-    if bitmap.0 == 0 {
+    if bitmap.is_invalid() {
         logger.step_err("Failed to create bitmap");
         unsafe { ReleaseDC(HWND::default(), desktop_dc) };
         let result = logger.finish();
@@ -592,7 +592,7 @@ fn test_gdi_bitmap_creation() {
 
     test_step!(logger, "Creating memory DC and selecting bitmap");
     let mem_dc = unsafe { CreateCompatibleDC(desktop_dc) };
-    if mem_dc.0 != 0 {
+    if !mem_dc.is_invalid() {
         let _old_bitmap = unsafe { SelectObject(mem_dc, bitmap) };
         test_step_ok!(logger, "Bitmap selected into memory DC");
     } else {
@@ -600,7 +600,7 @@ fn test_gdi_bitmap_creation() {
     }
 
     test_step!(logger, "Cleaning up bitmap");
-    if mem_dc.0 != 0 {
+    if !mem_dc.is_invalid() {
         unsafe { DeleteDC(mem_dc) };
     }
     let deleted = unsafe { DeleteObject(bitmap) };

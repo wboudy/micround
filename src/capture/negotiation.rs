@@ -10,11 +10,11 @@ use crate::core::{CameraCapability, CaptureSettings, NegotiatedFormat, PixelForm
 /// MJPEG is preferred for hardware decode efficiency
 fn format_priority(format: PixelFormat) -> u32 {
     match format {
-        PixelFormat::Mjpeg => 0,  // Best: hardware decode possible
-        PixelFormat::Yuyv => 1,   // Good: common, efficient
-        PixelFormat::Nv12 => 2,   // Good: common on some hardware
-        PixelFormat::Rgb24 => 3,  // OK: no conversion needed for display
-        PixelFormat::Rgba32 => 4, // OK: larger but display-ready
+        PixelFormat::Mjpeg => 0,    // Best: hardware decode possible
+        PixelFormat::Yuyv => 1,     // Good: common, efficient
+        PixelFormat::Nv12 => 2,     // Good: common on some hardware
+        PixelFormat::Rgb24 => 3,    // OK: no conversion needed for display
+        PixelFormat::Rgba32 => 4,   // OK: larger but display-ready
         PixelFormat::Unknown => 99, // Avoid if possible
     }
 }

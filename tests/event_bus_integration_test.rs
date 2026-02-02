@@ -40,9 +40,8 @@ mod common;
 use std::time::Duration;
 
 use micround::core::{
-    AppContext, AppState, Command, Event, EventBus,
-    CameraDevice, CaptureSettings, DeviceId, DisplayId, FrameDropReason,
-    Flip, Rotation, ScalingMode, MicroundError, ErrorContext,
+    AppContext, AppState, CameraDevice, CaptureSettings, Command, DeviceId, DisplayId,
+    ErrorContext, Event, EventBus, Flip, FrameDropReason, MicroundError, Rotation, ScalingMode,
 };
 
 use common::test_logger::TestLogger;

@@ -14,13 +14,13 @@
 //! - `IMFMediaType` for format negotiation
 
 use std::collections::HashMap;
-use std::ptr;
 use std::mem::MaybeUninit;
+use std::ptr;
 
 use tracing::{debug, error, info, trace, warn};
 
 use crate::capture::enumerator::CameraEnumerator;
-use crate::capture::{CaptureBackend, negotiate_format};
+use crate::capture::{negotiate_format, CaptureBackend};
 use crate::core::{
     CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame,
     NegotiatedFormat, PixelFormat,
@@ -490,10 +490,8 @@ impl MediaFoundationBackend {
             let mut type_index = 0u32;
 
             loop {
-                let media_type = reader.GetNativeMediaType(
-                    MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32,
-                    type_index,
-                );
+                let media_type = reader
+                    .GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32, type_index);
 
                 match media_type {
                     Ok(mt) => {
@@ -548,19 +546,30 @@ impl MediaFoundationBackend {
                     None,
                     &selected_type,
                 )
-                .map_err(|e| CaptureError::Platform(format!("Failed to set media type: {:?}", e)))?;
+                .map_err(|e| {
+                    CaptureError::Platform(format!("Failed to set media type: {:?}", e))
+                })?;
 
             // Extract the negotiated format
             let mut frame_size: u64 = 0;
-            selected_type.GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size).ok();
+            selected_type
+                .GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size)
+                .ok();
             let width = (frame_size >> 32) as u32;
             let height = (frame_size & 0xFFFFFFFF) as u32;
 
             let mut frame_rate: u64 = 0;
-            let framerate = if selected_type.GetUINT64(&MF_MT_FRAME_RATE, &mut frame_rate).is_ok() {
+            let framerate = if selected_type
+                .GetUINT64(&MF_MT_FRAME_RATE, &mut frame_rate)
+                .is_ok()
+            {
                 let num = (frame_rate >> 32) as f32;
                 let den = (frame_rate & 0xFFFFFFFF) as f32;
-                if den > 0.0 { num / den } else { 30.0 }
+                if den > 0.0 {
+                    num / den
+                } else {
+                    30.0
+                }
             } else {
                 30.0
             };
@@ -581,13 +590,15 @@ impl MediaFoundationBackend {
     /// Read a single frame from the source reader
     #[cfg(target_os = "windows")]
     fn read_frame_internal(&mut self) -> Result<Frame, CaptureError> {
-        let reader = self.source_reader.as_ref().ok_or_else(|| {
-            CaptureError::Platform("No source reader available".to_string())
-        })?;
+        let reader = self
+            .source_reader
+            .as_ref()
+            .ok_or_else(|| CaptureError::Platform("No source reader available".to_string()))?;
 
-        let format = self.current_format.as_ref().ok_or_else(|| {
-            CaptureError::Platform("No format negotiated".to_string())
-        })?;
+        let format = self
+            .current_format
+            .as_ref()
+            .ok_or_else(|| CaptureError::Platform("No format negotiated".to_string()))?;
 
         unsafe {
             let mut flags: u32 = 0;
@@ -618,18 +629,18 @@ impl MediaFoundationBackend {
             let sample = sample.ok_or_else(|| CaptureError::Timeout(100))?;
 
             // Get the buffer from the sample
-            let buffer: IMFMediaBuffer = sample.ConvertToContiguousBuffer().map_err(|e| {
-                CaptureError::Platform(format!("Failed to get buffer: {:?}", e))
-            })?;
+            let buffer: IMFMediaBuffer = sample
+                .ConvertToContiguousBuffer()
+                .map_err(|e| CaptureError::Platform(format!("Failed to get buffer: {:?}", e)))?;
 
             // Lock and copy data
             let mut data_ptr: *mut u8 = ptr::null_mut();
             let mut length: u32 = 0;
             let mut max_length: u32 = 0;
 
-            buffer.Lock(&mut data_ptr, Some(&mut max_length), Some(&mut length)).map_err(|e| {
-                CaptureError::Platform(format!("Failed to lock buffer: {:?}", e))
-            })?;
+            buffer
+                .Lock(&mut data_ptr, Some(&mut max_length), Some(&mut length))
+                .map_err(|e| CaptureError::Platform(format!("Failed to lock buffer: {:?}", e)))?;
 
             let data = std::slice::from_raw_parts(data_ptr, length as usize).to_vec();
             buffer.Unlock().ok();

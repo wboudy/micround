@@ -103,8 +103,8 @@ fn test_com_mta_initialization() {
 #[test]
 #[cfg(feature = "windows")]
 fn test_find_progman_window() {
-    use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
     use windows::core::PCWSTR;
+    use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
 
     let mut logger = TestLogger::new("find_progman_window", 3);
 
@@ -132,10 +132,7 @@ fn test_find_progman_window() {
         test_step!(logger, "Checking Progman window class");
         let mut class_name = [0u16; 256];
         let len = unsafe {
-            windows::Win32::UI::WindowsAndMessaging::GetClassNameW(
-                progman,
-                &mut class_name,
-            )
+            windows::Win32::UI::WindowsAndMessaging::GetClassNameW(progman, &mut class_name)
         };
         if len > 0 {
             let class_str = String::from_utf16_lossy(&class_name[..len as usize]);
@@ -155,10 +152,10 @@ fn test_find_progman_window() {
 #[ignore = "requires Windows desktop session"]
 #[cfg(feature = "windows")]
 fn test_workerw_enumeration() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use windows::core::PCWSTR;
     use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, FindWindowExW, GetClassNameW};
-    use windows::core::PCWSTR;
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     let mut logger = TestLogger::new("workerw_enumeration", 4);
 
@@ -185,7 +182,11 @@ fn test_workerw_enumeration() {
     let result = unsafe { EnumWindows(Some(count_workerw), LPARAM(0)) };
     if result.as_bool() {
         let count = WORKERW_COUNT.load(Ordering::SeqCst);
-        test_step_ok!(logger, "Enumeration complete, found {} WorkerW window(s)", count);
+        test_step_ok!(
+            logger,
+            "Enumeration complete, found {} WorkerW window(s)",
+            count
+        );
     } else {
         logger.step_err("Window enumeration failed");
     }
@@ -204,7 +205,12 @@ fn test_workerw_enumeration() {
             FindWindowExW(
                 progman,
                 HWND::default(),
-                PCWSTR::from_raw("SHELLDLL_DefView\0".encode_utf16().collect::<Vec<_>>().as_ptr()),
+                PCWSTR::from_raw(
+                    "SHELLDLL_DefView\0"
+                        .encode_utf16()
+                        .collect::<Vec<_>>()
+                        .as_ptr(),
+                ),
                 PCWSTR::null(),
             )
         };
@@ -213,7 +219,10 @@ fn test_workerw_enumeration() {
             test_step_ok!(logger, "Found SHELLDLL_DefView as child of Progman");
         } else {
             // SHELLDLL_DefView might be under a WorkerW window instead
-            test_step_ok!(logger, "SHELLDLL_DefView not direct child of Progman (may be under WorkerW)");
+            test_step_ok!(
+                logger,
+                "SHELLDLL_DefView not direct child of Progman (may be under WorkerW)"
+            );
         }
     } else {
         logger.step_skip("Progman not found");
@@ -222,9 +231,16 @@ fn test_workerw_enumeration() {
     test_step!(logger, "Verifying desktop window hierarchy");
     let workerw_count = WORKERW_COUNT.load(Ordering::SeqCst);
     if workerw_count > 0 {
-        test_step_ok!(logger, "Desktop has {} WorkerW window(s) - hierarchy is typical", workerw_count);
+        test_step_ok!(
+            logger,
+            "Desktop has {} WorkerW window(s) - hierarchy is typical",
+            workerw_count
+        );
     } else {
-        test_step_ok!(logger, "No WorkerW windows found (normal before spawn message)");
+        test_step_ok!(
+            logger,
+            "No WorkerW windows found (normal before spawn message)"
+        );
     }
 
     let result = logger.finish();
@@ -236,9 +252,9 @@ fn test_workerw_enumeration() {
 #[ignore = "requires Windows desktop session and may modify desktop state"]
 #[cfg(feature = "windows")]
 fn test_workerw_spawn_message() {
+    use windows::core::PCWSTR;
     use windows::Win32::Foundation::{LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, SendMessageTimeoutW, SMTO_NORMAL};
-    use windows::core::PCWSTR;
 
     let mut logger = TestLogger::new("workerw_spawn_message", 4);
 
@@ -282,16 +298,20 @@ fn test_workerw_spawn_message() {
     };
 
     if send_result.0 != 0 {
-        test_step_ok!(logger, "Message sent successfully, result: {}", result_value);
+        test_step_ok!(
+            logger,
+            "Message sent successfully, result: {}",
+            result_value
+        );
     } else {
         logger.step_err("Failed to send spawn message");
     }
 
     test_step!(logger, "Verifying WorkerW was created");
     // After sending the message, enumerate to find WorkerW windows
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use windows::Win32::Foundation::{BOOL, HWND};
     use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, FindWindowExW, GetClassNameW};
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     static WORKERW_AFTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -312,16 +332,26 @@ fn test_workerw_spawn_message() {
     let after_count = WORKERW_AFTER.load(Ordering::SeqCst);
 
     if after_count > 0 {
-        test_step_ok!(logger, "Found {} WorkerW window(s) after spawn", after_count);
+        test_step_ok!(
+            logger,
+            "Found {} WorkerW window(s) after spawn",
+            after_count
+        );
     } else {
         // This might be okay - WorkerW might already exist or spawn differently
-        test_step_ok!(logger, "No WorkerW found (may already exist under different parent)");
+        test_step_ok!(
+            logger,
+            "No WorkerW found (may already exist under different parent)"
+        );
     }
 
-    test_step!(logger, "Looking for correct WorkerW (after SHELLDLL_DefView)");
+    test_step!(
+        logger,
+        "Looking for correct WorkerW (after SHELLDLL_DefView)"
+    );
     // The correct WorkerW is the one that comes after a window containing SHELLDLL_DefView
-    use std::sync::atomic::AtomicPtr;
     use std::ptr;
+    use std::sync::atomic::AtomicPtr;
 
     static FOUND_WORKERW: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(ptr::null_mut());
 
@@ -329,7 +359,12 @@ fn test_workerw_spawn_message() {
         let shell_view = FindWindowExW(
             hwnd,
             HWND::default(),
-            PCWSTR::from_raw("SHELLDLL_DefView\0".encode_utf16().collect::<Vec<_>>().as_ptr()),
+            PCWSTR::from_raw(
+                "SHELLDLL_DefView\0"
+                    .encode_utf16()
+                    .collect::<Vec<_>>()
+                    .as_ptr(),
+            ),
             PCWSTR::null(),
         );
 
@@ -357,7 +392,10 @@ fn test_workerw_spawn_message() {
     if !target_workerw.is_null() {
         test_step_ok!(logger, "Found target WorkerW: {:?}", target_workerw);
     } else {
-        test_step_ok!(logger, "Target WorkerW not found (SHELLDLL_DefView may be under WorkerW)");
+        test_step_ok!(
+            logger,
+            "Target WorkerW not found (SHELLDLL_DefView may be under WorkerW)"
+        );
     }
 
     let result = logger.finish();
@@ -372,14 +410,13 @@ fn test_workerw_spawn_message() {
 #[test]
 #[cfg(feature = "windows")]
 fn test_window_class_registration() {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::UI::WindowsAndMessaging::{
-        RegisterClassExW, UnregisterClassW, WNDCLASSEXW, CS_HREDRAW, CS_VREDRAW,
-        DefWindowProcW,
+        DefWindowProcW, RegisterClassExW, UnregisterClassW, CS_HREDRAW, CS_VREDRAW, WNDCLASSEXW,
     };
-    use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-    use windows::core::PCWSTR;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     let mut logger = TestLogger::new("window_class_registration", 3);
 
@@ -427,9 +464,8 @@ fn test_window_class_registration() {
                 test_step_ok!(logger, "Registered with atom: {}", atom);
 
                 test_step!(logger, "Unregistering window class");
-                let unregister_result = unsafe {
-                    UnregisterClassW(PCWSTR::from_raw(class_name.as_ptr()), h)
-                };
+                let unregister_result =
+                    unsafe { UnregisterClassW(PCWSTR::from_raw(class_name.as_ptr()), h) };
                 if unregister_result.as_bool() {
                     test_step_ok!(logger, "Class unregistered successfully");
                 } else {
@@ -460,10 +496,8 @@ fn test_window_class_registration() {
 #[ignore = "requires Windows desktop session"]
 #[cfg(feature = "windows")]
 fn test_gdi_device_context() {
-    use windows::Win32::Graphics::Gdi::{
-        CreateCompatibleDC, DeleteDC, GetDC, ReleaseDC,
-    };
     use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Gdi::{CreateCompatibleDC, DeleteDC, GetDC, ReleaseDC};
 
     let mut logger = TestLogger::new("gdi_device_context", 4);
 
@@ -520,11 +554,11 @@ fn test_gdi_device_context() {
 #[ignore = "requires Windows desktop session"]
 #[cfg(feature = "windows")]
 fn test_gdi_bitmap_creation() {
-    use windows::Win32::Graphics::Gdi::{
-        CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject,
-        GetDC, ReleaseDC, SelectObject,
-    };
     use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Gdi::{
+        CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, ReleaseDC,
+        SelectObject,
+    };
 
     let mut logger = TestLogger::new("gdi_bitmap_creation", 5);
 
@@ -598,7 +632,11 @@ fn test_windows_renderer_creation() {
 
     test_step!(logger, "Verifying initial state");
     let renderer = renderer.unwrap();
-    test_assert!(logger, !renderer.initialized, "Renderer starts uninitialized");
+    test_assert!(
+        logger,
+        !renderer.initialized,
+        "Renderer starts uninitialized"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -610,9 +648,9 @@ fn test_windows_renderer_creation() {
 #[ignore = "requires Windows desktop session"]
 #[cfg(feature = "windows")]
 fn test_windows_renderer_init_shutdown() {
+    use micround::core::DisplayId;
     use micround::render::windows::WindowsRenderer;
     use micround::render::WallpaperRenderer;
-    use micround::core::DisplayId;
 
     let mut logger = TestLogger::new("windows_renderer_init_shutdown", 4);
 
@@ -625,7 +663,11 @@ fn test_windows_renderer_init_shutdown() {
     match renderer.init(&display_id) {
         Ok(()) => {
             test_step_ok!(logger, "Renderer initialized successfully");
-            test_assert!(logger, renderer.initialized, "Renderer marked as initialized");
+            test_assert!(
+                logger,
+                renderer.initialized,
+                "Renderer marked as initialized"
+            );
 
             test_step!(logger, "Verifying dimensions");
             test_assert!(logger, renderer.width > 0, "Width is positive");
@@ -634,7 +676,11 @@ fn test_windows_renderer_init_shutdown() {
 
             test_step!(logger, "Shutting down renderer");
             renderer.shutdown();
-            test_assert!(logger, !renderer.initialized, "Renderer marked as uninitialized");
+            test_assert!(
+                logger,
+                !renderer.initialized,
+                "Renderer marked as uninitialized"
+            );
             test_step_ok!(logger);
         }
         Err(e) => {
@@ -655,10 +701,10 @@ fn test_windows_renderer_init_shutdown() {
 #[ignore = "requires Windows desktop session"]
 #[cfg(feature = "windows")]
 fn test_windows_renderer_render_frame() {
-    use micround::render::windows::WindowsRenderer;
-    use micround::render::WallpaperRenderer;
     use micround::core::DisplayId;
     use micround::process::ProcessedFrame;
+    use micround::render::windows::WindowsRenderer;
+    use micround::render::WallpaperRenderer;
 
     let mut logger = TestLogger::new("windows_renderer_render_frame", 5);
 
@@ -684,10 +730,10 @@ fn test_windows_renderer_render_frame() {
     for y in 0..height {
         for x in 0..width {
             let idx = (y * width + x) * 4;
-            data[idx] = (x * 255 / width) as u8;     // R
+            data[idx] = (x * 255 / width) as u8; // R
             data[idx + 1] = (y * 255 / height) as u8; // G
-            data[idx + 2] = 128;                      // B
-            data[idx + 3] = 255;                      // A
+            data[idx + 2] = 128; // B
+            data[idx + 3] = 255; // A
         }
     }
     let frame = ProcessedFrame::new(data, width as u32, height as u32);

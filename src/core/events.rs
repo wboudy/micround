@@ -14,7 +14,9 @@
 use tokio::sync::{broadcast, mpsc};
 
 use super::error::MicroundError;
-use super::types::{CameraDevice, CaptureSettings, DeviceId, DisplayId, Flip, Rotation, ScalingMode};
+use super::types::{
+    CameraDevice, CaptureSettings, DeviceId, DisplayId, Flip, Rotation, ScalingMode,
+};
 
 // ============================================================================
 // Commands (UI → Components)
@@ -111,7 +113,10 @@ pub enum Event {
     /// Settings were changed
     SettingsChanged,
     /// Application state changed
-    StateChanged { old_state: AppState, new_state: AppState },
+    StateChanged {
+        old_state: AppState,
+        new_state: AppState,
+    },
     /// Camera was reconnected after disconnection
     CameraReconnected { device_id: DeviceId },
     /// Camera reconnection failed
@@ -188,12 +193,18 @@ impl AppState {
 
     /// Returns true if the application is in an active capture state
     pub fn is_capturing(&self) -> bool {
-        matches!(self, AppState::Running | AppState::Paused | AppState::Reconnecting)
+        matches!(
+            self,
+            AppState::Running | AppState::Paused | AppState::Reconnecting
+        )
     }
 
     /// Returns true if the application can accept user commands
     pub fn can_accept_commands(&self) -> bool {
-        matches!(self, AppState::Idle | AppState::Running | AppState::Paused | AppState::Error)
+        matches!(
+            self,
+            AppState::Idle | AppState::Running | AppState::Paused | AppState::Error
+        )
     }
 }
 
@@ -386,12 +397,18 @@ pub struct AppHandle {
 
 impl AppHandle {
     /// Send a command to the engine
-    pub async fn send_command(&self, command: Command) -> Result<(), mpsc::error::SendError<Command>> {
+    pub async fn send_command(
+        &self,
+        command: Command,
+    ) -> Result<(), mpsc::error::SendError<Command>> {
         self.commands.send(command).await
     }
 
     /// Try to send a command without blocking
-    pub fn try_send_command(&self, command: Command) -> Result<(), mpsc::error::TrySendError<Command>> {
+    pub fn try_send_command(
+        &self,
+        command: Command,
+    ) -> Result<(), mpsc::error::TrySendError<Command>> {
         self.commands.try_send(command)
     }
 
@@ -455,10 +472,7 @@ mod tests {
         let mut sub = handle.subscribe_events();
 
         // Send command
-        handle
-            .send_command(Command::PauseDisplay)
-            .await
-            .unwrap();
+        handle.send_command(Command::PauseDisplay).await.unwrap();
 
         // Publish event
         handle.publish_event(Event::DisplayPaused);

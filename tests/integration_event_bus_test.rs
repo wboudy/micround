@@ -6,9 +6,8 @@
 //! Run with: cargo test --test integration_event_bus_test
 
 use micround::core::{
-    AppContext, AppHandle, AppState, Command, DeviceId, DisplayId, Event,
-    EventBus, CaptureSettings, FrameDropReason, MicroundError, CaptureError,
-    Flip, Rotation, ScalingMode, ErrorContext,
+    AppContext, AppHandle, AppState, CaptureError, CaptureSettings, Command, DeviceId, DisplayId,
+    ErrorContext, Event, EventBus, Flip, FrameDropReason, MicroundError, Rotation, ScalingMode,
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -49,7 +48,11 @@ async fn test_basic_event_publish_subscribe() {
     assert!(event2.is_some());
 
     match event1.unwrap() {
-        Event::CaptureStarted { device_id: id, resolution, fps } => {
+        Event::CaptureStarted {
+            device_id: id,
+            resolution,
+            fps,
+        } => {
             assert_eq!(id, device_id);
             assert_eq!(resolution, (640, 480));
             assert_eq!(fps, 30.0);
@@ -116,7 +119,9 @@ async fn test_command_channel_basic() {
     // Send a command
     let device_id = DeviceId("test:0".into());
     handle
-        .send_command(Command::StartCapture { device_id: device_id.clone() })
+        .send_command(Command::StartCapture {
+            device_id: device_id.clone(),
+        })
         .await
         .expect("Send should succeed");
 
@@ -142,15 +147,28 @@ async fn test_multiple_commands_sequence() {
 
     // Send multiple commands
     let commands = [
-        Command::SelectCamera { device_id: DeviceId("cam:1".into()) },
-        Command::SetScaling { mode: ScalingMode::Fit },
-        Command::SetRotation { rotation: Rotation::Clockwise90 },
-        Command::SetFlip { flip: Flip::Horizontal },
-        Command::StartCapture { device_id: DeviceId("cam:1".into()) },
+        Command::SelectCamera {
+            device_id: DeviceId("cam:1".into()),
+        },
+        Command::SetScaling {
+            mode: ScalingMode::Fit,
+        },
+        Command::SetRotation {
+            rotation: Rotation::Clockwise90,
+        },
+        Command::SetFlip {
+            flip: Flip::Horizontal,
+        },
+        Command::StartCapture {
+            device_id: DeviceId("cam:1".into()),
+        },
     ];
 
     for cmd in &commands {
-        handle.send_command(cmd.clone()).await.expect("Send should succeed");
+        handle
+            .send_command(cmd.clone())
+            .await
+            .expect("Send should succeed");
     }
 
     // Verify all received in order
@@ -210,28 +228,40 @@ async fn test_app_context_integration() {
     let device_id = DeviceId("test:0".into());
 
     // Start capture
-    handle.send_command(Command::StartCapture { device_id: device_id.clone() })
-        .await.unwrap();
+    handle
+        .send_command(Command::StartCapture {
+            device_id: device_id.clone(),
+        })
+        .await
+        .unwrap();
     let event = timeout(Duration::from_millis(100), subscriber.recv())
-        .await.expect("Timeout").expect("Event");
+        .await
+        .expect("Timeout")
+        .expect("Event");
     assert!(matches!(event, Event::CaptureStarted { .. }));
 
     // Pause display
     handle.send_command(Command::PauseDisplay).await.unwrap();
     let event = timeout(Duration::from_millis(100), subscriber.recv())
-        .await.expect("Timeout").expect("Event");
+        .await
+        .expect("Timeout")
+        .expect("Event");
     assert!(matches!(event, Event::DisplayPaused));
 
     // Resume display
     handle.send_command(Command::ResumeDisplay).await.unwrap();
     let event = timeout(Duration::from_millis(100), subscriber.recv())
-        .await.expect("Timeout").expect("Event");
+        .await
+        .expect("Timeout")
+        .expect("Event");
     assert!(matches!(event, Event::DisplayResumed));
 
     // Stop capture
     handle.send_command(Command::StopCapture).await.unwrap();
     let event = timeout(Duration::from_millis(100), subscriber.recv())
-        .await.expect("Timeout").expect("Event");
+        .await
+        .expect("Timeout")
+        .expect("Event");
     assert!(matches!(event, Event::CaptureStopped { .. }));
 
     engine.await.expect("Engine should complete");
@@ -322,7 +352,12 @@ async fn test_state_change_events() {
     ];
 
     for (old, new) in &transitions {
-        assert!(old.can_transition_to(*new), "{} -> {} should be valid", old, new);
+        assert!(
+            old.can_transition_to(*new),
+            "{} -> {} should be valid",
+            old,
+            new
+        );
         bus.publish(Event::StateChanged {
             old_state: *old,
             new_state: *new,
@@ -333,7 +368,10 @@ async fn test_state_change_events() {
     for (expected_old, expected_new) in &transitions {
         let event = subscriber.try_recv().expect("Should receive state change");
         match event {
-            Event::StateChanged { old_state, new_state } => {
+            Event::StateChanged {
+                old_state,
+                new_state,
+            } => {
                 assert_eq!(old_state, *expected_old);
                 assert_eq!(new_state, *expected_new);
             }
@@ -385,13 +423,24 @@ async fn test_error_event_propagation() {
 
     // Publish various error events
     let errors = [
-        MicroundError::Capture { source: CaptureError::DeviceNotFound("cam:1".into()), context: ErrorContext::new() },
-        MicroundError::Capture { source: CaptureError::Disconnected, context: ErrorContext::new() },
-        MicroundError::Capture { source: CaptureError::Timeout(5000), context: ErrorContext::new() },
+        MicroundError::Capture {
+            source: CaptureError::DeviceNotFound("cam:1".into()),
+            context: ErrorContext::new(),
+        },
+        MicroundError::Capture {
+            source: CaptureError::Disconnected,
+            context: ErrorContext::new(),
+        },
+        MicroundError::Capture {
+            source: CaptureError::Timeout(5000),
+            context: ErrorContext::new(),
+        },
     ];
 
     for error in &errors {
-        bus.publish(Event::Error { error: error.clone() });
+        bus.publish(Event::Error {
+            error: error.clone(),
+        });
     }
 
     // Verify errors received
@@ -401,7 +450,10 @@ async fn test_error_event_propagation() {
             Event::Error { error } => {
                 // Check error type matches
                 match (&error, expected) {
-                    (MicroundError::Capture { source: a, .. }, MicroundError::Capture { source: b, .. }) => {
+                    (
+                        MicroundError::Capture { source: a, .. },
+                        MicroundError::Capture { source: b, .. },
+                    ) => {
                         // Basic type check
                         let _ = (a, b);
                     }
@@ -501,7 +553,9 @@ async fn test_handle_cloning() {
     // Verify commands received
     for _ in 0..3 {
         let cmd = timeout(Duration::from_millis(100), cmd_rx.recv())
-            .await.expect("Timeout").expect("Command");
+            .await
+            .expect("Timeout")
+            .expect("Command");
         let _ = cmd;
     }
 
@@ -532,7 +586,9 @@ async fn test_try_send_command() {
 
     // Verify received
     let cmd = timeout(Duration::from_millis(100), cmd_rx.recv())
-        .await.expect("Timeout").expect("Command");
+        .await
+        .expect("Timeout")
+        .expect("Command");
     assert!(matches!(cmd, Command::PauseDisplay));
 }
 
@@ -555,24 +611,49 @@ async fn test_all_event_types() {
     };
 
     let events: Vec<Event> = vec![
-        Event::CameraConnected { device: device.clone() },
-        Event::CameraDisconnected { device_id: DeviceId("cam:0".into()) },
+        Event::CameraConnected {
+            device: device.clone(),
+        },
+        Event::CameraDisconnected {
+            device_id: DeviceId("cam:0".into()),
+        },
         Event::CaptureStarted {
             device_id: DeviceId("cam:0".into()),
             resolution: (1920, 1080),
             fps: 60.0,
         },
-        Event::CaptureStopped { device_id: DeviceId("cam:0".into()) },
-        Event::FrameDropped { sequence: 100, reason: FrameDropReason::QueueFull },
-        Event::FrameDropped { sequence: 101, reason: FrameDropReason::ProcessingTimeout },
-        Event::FrameDropped { sequence: 102, reason: FrameDropReason::RenderQueueFull },
+        Event::CaptureStopped {
+            device_id: DeviceId("cam:0".into()),
+        },
+        Event::FrameDropped {
+            sequence: 100,
+            reason: FrameDropReason::QueueFull,
+        },
+        Event::FrameDropped {
+            sequence: 101,
+            reason: FrameDropReason::ProcessingTimeout,
+        },
+        Event::FrameDropped {
+            sequence: 102,
+            reason: FrameDropReason::RenderQueueFull,
+        },
         Event::DisplayPaused,
         Event::DisplayResumed,
         Event::SnapshotTaken { to_clipboard: true },
-        Event::SnapshotTaken { to_clipboard: false },
-        Event::Error { error: MicroundError::Capture { source: CaptureError::Disconnected, context: ErrorContext::new() } },
+        Event::SnapshotTaken {
+            to_clipboard: false,
+        },
+        Event::Error {
+            error: MicroundError::Capture {
+                source: CaptureError::Disconnected,
+                context: ErrorContext::new(),
+            },
+        },
         Event::SettingsChanged,
-        Event::StateChanged { old_state: AppState::Idle, new_state: AppState::Starting },
+        Event::StateChanged {
+            old_state: AppState::Idle,
+            new_state: AppState::Starting,
+        },
     ];
 
     for event in &events {
@@ -599,7 +680,9 @@ async fn test_all_command_types() {
     let handle = ctx.handle();
 
     let commands: Vec<Command> = vec![
-        Command::StartCapture { device_id: DeviceId("cam:0".into()) },
+        Command::StartCapture {
+            device_id: DeviceId("cam:0".into()),
+        },
         Command::StopCapture,
         Command::PauseDisplay,
         Command::ResumeDisplay,
@@ -612,20 +695,46 @@ async fn test_all_command_types() {
             },
         },
         Command::TakeSnapshot { to_clipboard: true },
-        Command::TakeSnapshot { to_clipboard: false },
-        Command::SelectCamera { device_id: DeviceId("cam:1".into()) },
-        Command::SelectDisplay { display_id: DisplayId("display:0".into()) },
-        Command::SetScaling { mode: ScalingMode::Fill },
-        Command::SetScaling { mode: ScalingMode::Fit },
-        Command::SetScaling { mode: ScalingMode::Stretch },
-        Command::SetScaling { mode: ScalingMode::Center },
-        Command::SetRotation { rotation: Rotation::None },
-        Command::SetRotation { rotation: Rotation::Clockwise90 },
-        Command::SetRotation { rotation: Rotation::Clockwise180 },
-        Command::SetRotation { rotation: Rotation::Clockwise270 },
+        Command::TakeSnapshot {
+            to_clipboard: false,
+        },
+        Command::SelectCamera {
+            device_id: DeviceId("cam:1".into()),
+        },
+        Command::SelectDisplay {
+            display_id: DisplayId("display:0".into()),
+        },
+        Command::SetScaling {
+            mode: ScalingMode::Fill,
+        },
+        Command::SetScaling {
+            mode: ScalingMode::Fit,
+        },
+        Command::SetScaling {
+            mode: ScalingMode::Stretch,
+        },
+        Command::SetScaling {
+            mode: ScalingMode::Center,
+        },
+        Command::SetRotation {
+            rotation: Rotation::None,
+        },
+        Command::SetRotation {
+            rotation: Rotation::Clockwise90,
+        },
+        Command::SetRotation {
+            rotation: Rotation::Clockwise180,
+        },
+        Command::SetRotation {
+            rotation: Rotation::Clockwise270,
+        },
         Command::SetFlip { flip: Flip::None },
-        Command::SetFlip { flip: Flip::Horizontal },
-        Command::SetFlip { flip: Flip::Vertical },
+        Command::SetFlip {
+            flip: Flip::Horizontal,
+        },
+        Command::SetFlip {
+            flip: Flip::Vertical,
+        },
         Command::SetFlip { flip: Flip::Both },
         Command::Quit,
     ];

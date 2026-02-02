@@ -130,10 +130,10 @@ pub fn fourcc_to_format(fourcc: u32) -> PixelFormat {
 /// Convert a PixelFormat to a V4L2 fourcc code
 pub fn format_to_fourcc(format: PixelFormat) -> Option<u32> {
     match format {
-        PixelFormat::Mjpeg => Some(0x47504A4D), // "MJPG"
-        PixelFormat::Yuyv => Some(0x56595559),  // "YUYV"
-        PixelFormat::Nv12 => Some(0x3231564E),  // "NV12"
-        PixelFormat::Rgb24 => Some(0x33424752), // "RGB3"
+        PixelFormat::Mjpeg => Some(0x47504A4D),  // "MJPG"
+        PixelFormat::Yuyv => Some(0x56595559),   // "YUYV"
+        PixelFormat::Nv12 => Some(0x3231564E),   // "NV12"
+        PixelFormat::Rgb24 => Some(0x33424752),  // "RGB3"
         PixelFormat::Rgba32 => Some(0x34424752), // "RGB4"
         PixelFormat::Unknown => None,
     }

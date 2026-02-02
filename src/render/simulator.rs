@@ -182,12 +182,7 @@ impl CapturedFrame {
         if self.data.len() < 4 {
             return None;
         }
-        let reference = (
-            self.data[0],
-            self.data[1],
-            self.data[2],
-            self.data[3],
-        );
+        let reference = (self.data[0], self.data[1], self.data[2], self.data[3]);
         for chunk in self.data.chunks_exact(4) {
             if chunk[0] != reference.0
                 || chunk[1] != reference.1
@@ -205,7 +200,9 @@ impl CapturedFrame {
         if self.data.is_empty() {
             return 0;
         }
-        let total: u64 = self.data.chunks_exact(4)
+        let total: u64 = self
+            .data
+            .chunks_exact(4)
             .map(|c| (c[0] as u64 + c[1] as u64 + c[2] as u64) / 3)
             .sum();
         let pixel_count = (self.data.len() / 4) as u64;
@@ -361,12 +358,13 @@ impl WallpaperRenderer for DisplaySimulator {
 
         // Validate dimensions if strict mode
         if self.config.strict_dimensions
-            && (frame.width != self.config.width || frame.height != self.config.height) {
-                return Err(RenderError::Platform(format!(
-                    "Frame dimensions {}x{} don't match display {}x{}",
-                    frame.width, frame.height, self.config.width, self.config.height
-                )));
-            }
+            && (frame.width != self.config.width || frame.height != self.config.height)
+        {
+            return Err(RenderError::Platform(format!(
+                "Frame dimensions {}x{} don't match display {}x{}",
+                frame.width, frame.height, self.config.width, self.config.height
+            )));
+        }
 
         // Simulate render latency
         if self.config.latency_ms > 0 {
@@ -394,7 +392,9 @@ impl WallpaperRenderer for DisplaySimulator {
         }
 
         // Update statistics
-        let prev_total = self.total_render_time_us.fetch_add(render_time_us, Ordering::SeqCst);
+        let prev_total = self
+            .total_render_time_us
+            .fetch_add(render_time_us, Ordering::SeqCst);
         if let Ok(mut stats) = self.stats.lock() {
             stats.frames_rendered += 1;
             stats.last_render_time = Some(Instant::now());
@@ -537,10 +537,10 @@ mod tests {
         let mut data = Vec::new();
         for y in 0..height {
             for x in 0..width {
-                data.push((x * 25) as u8);  // R
-                data.push((y * 25) as u8);  // G
-                data.push(128);              // B
-                data.push(255);              // A
+                data.push((x * 25) as u8); // R
+                data.push((y * 25) as u8); // G
+                data.push(128); // B
+                data.push(255); // A
             }
         }
         let frame = ProcessedFrame::new(data, width, height);
@@ -642,7 +642,11 @@ mod tests {
 
         // With 50% error rate, we should have roughly half errors
         // Allow some variance
-        assert!(errors > 30 && errors < 70, "Expected ~50 errors, got {}", errors);
+        assert!(
+            errors > 30 && errors < 70,
+            "Expected ~50 errors, got {}",
+            errors
+        );
         assert!(successes > 30 && successes < 70);
     }
 

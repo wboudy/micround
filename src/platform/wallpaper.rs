@@ -31,8 +31,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Information about a wallpaper configuration
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct WallpaperInfo {
     /// Path to the wallpaper image file (None if solid color)
     pub path: Option<String>,
@@ -45,7 +44,6 @@ pub struct WallpaperInfo {
     /// Per-monitor settings (display ID -> path)
     pub per_monitor: Vec<(String, String)>,
 }
-
 
 impl WallpaperInfo {
     /// Create a new WallpaperInfo with just a path
@@ -211,11 +209,13 @@ fn capture_wallpaper_linux() -> Result<WallpaperInfo, PlatformError> {
         desktop_env = %de_str,
         "Unknown desktop environment, attempting gsettings fallback"
     );
-    capture_wallpaper_gnome().map_err(|_| PlatformError::Unsupported(format!(
+    capture_wallpaper_gnome().map_err(|_| {
+        PlatformError::Unsupported(format!(
             "Wallpaper capture not supported for desktop environment: {}. \
              Supported: GNOME, KDE, XFCE, MATE, Cinnamon",
             de_str
-        )))
+        ))
+    })
 }
 
 #[cfg(target_os = "linux")]
@@ -247,14 +247,12 @@ fn capture_wallpaper_gnome() -> Result<WallpaperInfo, PlatformError> {
         .output()
         .ok();
 
-    let style = style_output
-        .filter(|o| o.status.success())
-        .map(|o| {
-            String::from_utf8_lossy(&o.stdout)
-                .trim()
-                .trim_matches('\'')
-                .to_string()
-        });
+    let style = style_output.filter(|o| o.status.success()).map(|o| {
+        String::from_utf8_lossy(&o.stdout)
+            .trim()
+            .trim_matches('\'')
+            .to_string()
+    });
 
     // Get primary color
     let color_output = Command::new("gsettings")
@@ -262,14 +260,12 @@ fn capture_wallpaper_gnome() -> Result<WallpaperInfo, PlatformError> {
         .output()
         .ok();
 
-    let color = color_output
-        .filter(|o| o.status.success())
-        .map(|o| {
-            String::from_utf8_lossy(&o.stdout)
-                .trim()
-                .trim_matches('\'')
-                .to_string()
-        });
+    let color = color_output.filter(|o| o.status.success()).map(|o| {
+        String::from_utf8_lossy(&o.stdout)
+            .trim()
+            .trim_matches('\'')
+            .to_string()
+    });
 
     Ok(WallpaperInfo {
         path: if path.is_empty() { None } else { Some(path) },
@@ -395,10 +391,7 @@ fn restore_wallpaper_linux(info: &WallpaperInfo) -> Result<(), PlatformError> {
         "Restoring wallpaper on Linux"
     );
 
-    if de_upper.contains("GNOME")
-        || de_upper.contains("UNITY")
-        || de_upper.contains("UBUNTU")
-    {
+    if de_upper.contains("GNOME") || de_upper.contains("UNITY") || de_upper.contains("UBUNTU") {
         return restore_wallpaper_gnome(info);
     }
 
@@ -417,10 +410,7 @@ fn restore_wallpaper_linux(info: &WallpaperInfo) -> Result<(), PlatformError> {
     // Fallback: try common tools
     if let Some(ref path) = info.path {
         // Try feh (common lightweight tool)
-        if let Ok(status) = Command::new("feh")
-            .args(["--bg-fill", path])
-            .status()
-        {
+        if let Ok(status) = Command::new("feh").args(["--bg-fill", path]).status() {
             if status.success() {
                 tracing::info!("Restored wallpaper using feh");
                 return Ok(());
@@ -447,9 +437,10 @@ fn restore_wallpaper_linux(info: &WallpaperInfo) -> Result<(), PlatformError> {
 
 #[cfg(target_os = "linux")]
 fn restore_wallpaper_gnome(info: &WallpaperInfo) -> Result<(), PlatformError> {
-    let path = info.path.as_ref().ok_or_else(|| {
-        PlatformError::InvalidState("No wallpaper path to restore".into())
-    })?;
+    let path = info
+        .path
+        .as_ref()
+        .ok_or_else(|| PlatformError::InvalidState("No wallpaper path to restore".into()))?;
 
     let uri = format!("file://{}", path);
 
@@ -505,9 +496,10 @@ fn restore_wallpaper_gnome(info: &WallpaperInfo) -> Result<(), PlatformError> {
 
 #[cfg(target_os = "linux")]
 fn restore_wallpaper_xfce(info: &WallpaperInfo) -> Result<(), PlatformError> {
-    let path = info.path.as_ref().ok_or_else(|| {
-        PlatformError::InvalidState("No wallpaper path to restore".into())
-    })?;
+    let path = info
+        .path
+        .as_ref()
+        .ok_or_else(|| PlatformError::InvalidState("No wallpaper path to restore".into()))?;
 
     let status = Command::new("xfconf-query")
         .args([
@@ -533,17 +525,13 @@ fn restore_wallpaper_xfce(info: &WallpaperInfo) -> Result<(), PlatformError> {
 
 #[cfg(target_os = "linux")]
 fn restore_wallpaper_mate(info: &WallpaperInfo) -> Result<(), PlatformError> {
-    let path = info.path.as_ref().ok_or_else(|| {
-        PlatformError::InvalidState("No wallpaper path to restore".into())
-    })?;
+    let path = info
+        .path
+        .as_ref()
+        .ok_or_else(|| PlatformError::InvalidState("No wallpaper path to restore".into()))?;
 
     let status = Command::new("gsettings")
-        .args([
-            "set",
-            "org.mate.background",
-            "picture-filename",
-            path,
-        ])
+        .args(["set", "org.mate.background", "picture-filename", path])
         .status()
         .map_err(|e| PlatformError::CommandFailed(format!("gsettings: {}", e)))?;
 
@@ -559,9 +547,10 @@ fn restore_wallpaper_mate(info: &WallpaperInfo) -> Result<(), PlatformError> {
 
 #[cfg(target_os = "linux")]
 fn restore_wallpaper_cinnamon(info: &WallpaperInfo) -> Result<(), PlatformError> {
-    let path = info.path.as_ref().ok_or_else(|| {
-        PlatformError::InvalidState("No wallpaper path to restore".into())
-    })?;
+    let path = info
+        .path
+        .as_ref()
+        .ok_or_else(|| PlatformError::InvalidState("No wallpaper path to restore".into()))?;
 
     let uri = format!("file://{}", path);
 

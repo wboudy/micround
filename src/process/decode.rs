@@ -75,7 +75,11 @@ fn validate_dimensions(width: u32, height: u32) -> Result<(), DecodeError> {
 }
 
 /// Calculate buffer size for a given bytes-per-pixel format with overflow checking
-fn checked_buffer_size_bpp(width: u32, height: u32, bytes_per_pixel: u32) -> Result<usize, DecodeError> {
+fn checked_buffer_size_bpp(
+    width: u32,
+    height: u32,
+    bytes_per_pixel: u32,
+) -> Result<usize, DecodeError> {
     validate_dimensions(width, height)?;
     let size = (width as u64) * (height as u64) * (bytes_per_pixel as u64);
     // Check that it fits in usize (important for 32-bit platforms)
@@ -131,7 +135,11 @@ pub fn decode_frame(frame: &Frame) -> Result<DecodedFrame, DecodeError> {
 /// Decoded RGBA frame. If expected dimensions are provided and don't match,
 /// logs a warning but still returns the decoded frame (camera firmware may
 /// encode at slightly different dimensions than reported).
-fn decode_mjpeg(data: &[u8], expected_width: u32, expected_height: u32) -> Result<DecodedFrame, DecodeError> {
+fn decode_mjpeg(
+    data: &[u8],
+    expected_width: u32,
+    expected_height: u32,
+) -> Result<DecodedFrame, DecodeError> {
     use image::ImageReader;
     use std::io::Cursor;
 
@@ -148,16 +156,18 @@ fn decode_mjpeg(data: &[u8], expected_width: u32, expected_height: u32) -> Resul
 
     // Validate dimensions if expected values are provided (non-zero)
     // Don't error - some cameras report slightly different dimensions than they encode
-    if expected_width > 0 && expected_height > 0
-        && (width != expected_width || height != expected_height) {
-            tracing::warn!(
-                expected_width = expected_width,
-                expected_height = expected_height,
-                actual_width = width,
-                actual_height = height,
-                "MJPEG frame dimensions don't match expected. Using actual dimensions."
-            );
-        }
+    if expected_width > 0
+        && expected_height > 0
+        && (width != expected_width || height != expected_height)
+    {
+        tracing::warn!(
+            expected_width = expected_width,
+            expected_height = expected_height,
+            actual_width = width,
+            actual_height = height,
+            "MJPEG frame dimensions don't match expected. Using actual dimensions."
+        );
+    }
 
     Ok(DecodedFrame {
         data: rgba.into_raw(),
@@ -422,15 +432,18 @@ mod tests {
     fn test_yuyv_buffer_too_small() {
         let small_data = vec![0u8; 4]; // Too small for 4x2 image
         let result = decode_yuyv(&small_data, 4, 2);
-        assert!(matches!(result, Err(DecodeError::BufferSizeMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(DecodeError::BufferSizeMismatch { .. })
+        ));
     }
 
     #[test]
     fn test_rgb24_decode() {
         // 2x1 RGB image: red, green
         let rgb_data = vec![
-            255, 0, 0,   // Red
-            0, 255, 0,   // Green
+            255, 0, 0, // Red
+            0, 255, 0, // Green
         ];
 
         let result = decode_rgb24(&rgb_data, 2, 1);
@@ -449,8 +462,8 @@ mod tests {
     fn test_rgba32_decode() {
         // 2x1 RGBA image: red with half alpha, blue with full alpha
         let rgba_data = vec![
-            255, 0, 0, 128,   // Red, half alpha
-            0, 0, 255, 255,   // Blue, full alpha
+            255, 0, 0, 128, // Red, half alpha
+            0, 0, 255, 255, // Blue, full alpha
         ];
 
         let result = decode_rgba32(&rgba_data, 2, 1);
@@ -467,7 +480,7 @@ mod tests {
         // UV plane: 2 bytes (one U, one V shared by all 4 pixels)
         let nv12_data = vec![
             235, 235, 235, 235, // Y plane: 4 white pixels
-            128, 128,           // UV plane: neutral color
+            128, 128, // UV plane: neutral color
         ];
 
         let result = decode_nv12(&nv12_data, 2, 2);

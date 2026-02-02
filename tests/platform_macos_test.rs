@@ -43,7 +43,8 @@ fn test_display_enumeration() {
                 test_step_ok!(logger);
 
                 test_step!(logger, "Checking for resolution information");
-                let has_resolution = stdout.contains("Resolution") || stdout.contains("spdisplays_resolution");
+                let has_resolution =
+                    stdout.contains("Resolution") || stdout.contains("spdisplays_resolution");
                 if has_resolution {
                     test_step_ok!(logger, "Resolution data found");
                 } else {
@@ -176,13 +177,21 @@ fn test_avfoundation_device_list() {
             test_step!(logger, "Validating device information");
             for device in &devices {
                 test_assert!(logger, !device.id.0.is_empty(), "Device has ID");
-                test_assert!(logger, !device.name.is_empty(), "Device has name: {}", device.name);
+                test_assert!(
+                    logger,
+                    !device.name.is_empty(),
+                    "Device has name: {}",
+                    device.name
+                );
             }
             test_step_ok!(logger, "All devices validated");
         }
         Err(e) => {
             // Permission denied is expected without user consent
-            logger.step_skip(&format!("Enumeration failed (may need permission): {:?}", e));
+            logger.step_skip(&format!(
+                "Enumeration failed (may need permission): {:?}",
+                e
+            ));
             test_step!(logger, "Camera permission likely not granted");
             logger.step_skip("AVFoundation requires camera permission");
         }
@@ -221,7 +230,11 @@ fn test_wallpaper_directory_access() {
 
     test_step!(logger, "Checking Application Support directory");
     let app_support = format!("{}/Library/Application Support", home);
-    test_assert!(logger, Path::new(&app_support).exists(), "Application Support exists");
+    test_assert!(
+        logger,
+        Path::new(&app_support).exists(),
+        "Application Support exists"
+    );
     test_step_ok!(logger, "Application Support accessible");
 
     let result = logger.finish();
@@ -235,7 +248,10 @@ fn test_current_wallpaper_query() {
 
     test_step!(logger, "Querying current desktop picture via defaults");
     let output = Command::new("osascript")
-        .args(["-e", "tell application \"System Events\" to get picture of desktop 1"])
+        .args([
+            "-e",
+            "tell application \"System Events\" to get picture of desktop 1",
+        ])
         .output();
 
     match output {
@@ -294,18 +310,26 @@ fn test_accessibility_permission() {
     // AXIsProcessTrusted() would be the proper way, but requires objc2
     // For now, check if we can interact with System Events
     let output = Command::new("osascript")
-        .args(["-e", "tell application \"System Events\" to return name of first process"])
+        .args([
+            "-e",
+            "tell application \"System Events\" to return name of first process",
+        ])
         .output();
 
     match output {
         Ok(result) => {
             if result.status.success() {
-                test_step_ok!(logger, "System Events accessible (accessibility may be enabled)");
+                test_step_ok!(
+                    logger,
+                    "System Events accessible (accessibility may be enabled)"
+                );
             } else {
                 // Permission denied is normal for sandboxed/unsigned apps
                 let stderr = String::from_utf8_lossy(&result.stderr);
                 if stderr.contains("not allowed") || stderr.contains("permission") {
-                    logger.step_skip("Accessibility permission not granted (normal for unsigned apps)");
+                    logger.step_skip(
+                        "Accessibility permission not granted (normal for unsigned apps)",
+                    );
                 } else {
                     logger.step_skip(&format!("System Events query failed: {}", stderr));
                 }
@@ -319,7 +343,10 @@ fn test_accessibility_permission() {
     test_step!(logger, "Documenting accessibility requirement");
     // Global hotkeys on macOS require accessibility permission
     // The app should request this when hotkeys feature is enabled
-    test_step_ok!(logger, "Note: Global hotkeys require accessibility permission in System Preferences");
+    test_step_ok!(
+        logger,
+        "Note: Global hotkeys require accessibility permission in System Preferences"
+    );
 
     let result = logger.finish();
     assert!(result.passed);
@@ -353,9 +380,13 @@ fn test_macos_version() {
 
                 test_step!(logger, "Checking minimum version requirements");
                 // Micround requires macOS 10.15+ (Catalina) for modern AVFoundation
-                if stdout.contains("10.15") || stdout.contains("11.") ||
-                   stdout.contains("12.") || stdout.contains("13.") ||
-                   stdout.contains("14.") || stdout.contains("15.") {
+                if stdout.contains("10.15")
+                    || stdout.contains("11.")
+                    || stdout.contains("12.")
+                    || stdout.contains("13.")
+                    || stdout.contains("14.")
+                    || stdout.contains("15.")
+                {
                     test_step_ok!(logger, "macOS version supported");
                 } else {
                     logger.warn("macOS version may be too old (need 10.15+)");
@@ -448,7 +479,11 @@ fn test_macos_renderer_creation() {
 
     test_step!(logger, "Verifying initial state");
     let renderer = renderer.unwrap();
-    test_assert!(logger, !renderer.initialized, "Renderer starts uninitialized");
+    test_assert!(
+        logger,
+        !renderer.initialized,
+        "Renderer starts uninitialized"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -460,9 +495,9 @@ fn test_macos_renderer_creation() {
 #[ignore = "requires macOS desktop session"]
 #[cfg(feature = "macos")]
 fn test_macos_renderer_init() {
+    use micround::core::DisplayId;
     use micround::render::macos::MacOSRenderer;
     use micround::render::WallpaperRenderer;
-    use micround::core::DisplayId;
 
     let mut logger = TestLogger::new("macos_renderer_init", 3);
 
@@ -537,16 +572,23 @@ fn test_entitlements_documentation() {
     for entitlement in &required_entitlements {
         logger.info(entitlement);
     }
-    test_step_ok!(logger, "Listed {} entitlements", required_entitlements.len());
+    test_step_ok!(
+        logger,
+        "Listed {} entitlements",
+        required_entitlements.len()
+    );
 
     test_step!(logger, "Documenting optional entitlements");
-    let optional_entitlements = [
-        "com.apple.security.cs.allow-unsigned-executable-memory - For some codec support",
-    ];
+    let optional_entitlements =
+        ["com.apple.security.cs.allow-unsigned-executable-memory - For some codec support"];
     for entitlement in &optional_entitlements {
         logger.info(entitlement);
     }
-    test_step_ok!(logger, "Listed {} optional entitlements", optional_entitlements.len());
+    test_step_ok!(
+        logger,
+        "Listed {} optional entitlements",
+        optional_entitlements.len()
+    );
 
     let result = logger.finish();
     assert!(result.passed);
@@ -562,9 +604,7 @@ fn test_power_event_detection() {
     let mut logger = TestLogger::new("power_event_detection", 2);
 
     test_step!(logger, "Checking power management settings");
-    let output = Command::new("pmset")
-        .args(["-g", "live"])
-        .output();
+    let output = Command::new("pmset").args(["-g", "live"]).output();
 
     match output {
         Ok(result) => {
@@ -573,7 +613,8 @@ fn test_power_event_detection() {
                 test_step_ok!(logger, "Power management settings retrieved");
 
                 test_step!(logger, "Checking sleep-related settings");
-                let has_sleep_settings = stdout.contains("sleep") || stdout.contains("displaysleep");
+                let has_sleep_settings =
+                    stdout.contains("sleep") || stdout.contains("displaysleep");
                 if has_sleep_settings {
                     // Check for display sleep time
                     for line in stdout.lines() {

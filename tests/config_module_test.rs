@@ -11,8 +11,8 @@ use tempfile::TempDir;
 // ============================================================================
 
 use micround::config::{
-    AppConfig, CameraConfig, ConfigValidationError, DisplayConfig, InternalConfig,
-    StartupConfig, CONFIG_VERSION, config_backup_path, config_dir, config_path,
+    config_backup_path, config_dir, config_path, AppConfig, CameraConfig, ConfigValidationError,
+    DisplayConfig, InternalConfig, StartupConfig, CONFIG_VERSION,
 };
 use micround::core::{DeviceId, DisplayId, Flip, Rotation, ScalingMode};
 
@@ -277,7 +277,10 @@ fn test_camera_config_with_device_id() {
     let mut config = CameraConfig::default();
     config.device_id = Some(DeviceId("USB\\VID_1234".to_string()));
 
-    assert_eq!(config.device_id, Some(DeviceId("USB\\VID_1234".to_string())));
+    assert_eq!(
+        config.device_id,
+        Some(DeviceId("USB\\VID_1234".to_string()))
+    );
 }
 
 // ============================================================================
@@ -443,7 +446,10 @@ fn test_internal_config_clone() {
 
     let cloned = config.clone();
 
-    assert_eq!(cloned.original_wallpaper_path, Some("/path/to/wallpaper.jpg".to_string()));
+    assert_eq!(
+        cloned.original_wallpaper_path,
+        Some("/path/to/wallpaper.jpg".to_string())
+    );
     assert!(!cloned.last_clean_shutdown);
 }
 
@@ -459,7 +465,10 @@ fn test_internal_config_with_camera_id() {
     let mut config = InternalConfig::default();
     config.last_camera_id = Some(DeviceId("camera-1".to_string()));
 
-    assert_eq!(config.last_camera_id, Some(DeviceId("camera-1".to_string())));
+    assert_eq!(
+        config.last_camera_id,
+        Some(DeviceId("camera-1".to_string()))
+    );
 }
 
 // ============================================================================
@@ -637,15 +646,22 @@ fn test_deserialization_all_scaling_modes() {
         ("Stretch", ScalingMode::Stretch),
         ("Center", ScalingMode::Center),
     ] {
-        let toml_str = format!(r#"
+        let toml_str = format!(
+            r#"
             version = 1
 
             [display]
             scaling_mode = "{}"
-        "#, mode_str);
+        "#,
+            mode_str
+        );
 
         let config: AppConfig = toml::from_str(&toml_str).expect("deserialize");
-        assert_eq!(config.display.scaling_mode, expected_mode, "mode: {}", mode_str);
+        assert_eq!(
+            config.display.scaling_mode, expected_mode,
+            "mode: {}",
+            mode_str
+        );
     }
 }
 
@@ -745,7 +761,10 @@ fn test_roundtrip_all_settings() {
     assert!(loaded.startup.auto_start_feed);
     assert!(loaded.startup.minimize_on_start);
     assert!(!loaded.internal.last_clean_shutdown);
-    assert_eq!(loaded.internal.original_wallpaper_path, Some("/test/path.jpg".to_string()));
+    assert_eq!(
+        loaded.internal.original_wallpaper_path,
+        Some("/test/path.jpg".to_string())
+    );
 }
 
 // ============================================================================
@@ -813,7 +832,10 @@ fn test_file_with_utf8_content() {
     let read_str = fs::read_to_string(&config_file).expect("read");
     let loaded: AppConfig = toml::from_str(&read_str).expect("deserialize");
 
-    assert_eq!(loaded.internal.original_wallpaper_path, Some("/Users/日本語/壁紙.jpg".to_string()));
+    assert_eq!(
+        loaded.internal.original_wallpaper_path,
+        Some("/Users/日本語/壁紙.jpg".to_string())
+    );
 }
 
 // ============================================================================

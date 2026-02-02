@@ -16,20 +16,22 @@
 
 pub mod autostart;
 pub mod display;
-pub mod window;
-pub mod system;
 pub mod paths;
+pub mod system;
 pub mod wallpaper;
+pub mod window;
 
 #[cfg(test)]
 pub mod mock;
 
-pub use display::*;
-pub use window::*;
-pub use system::*;
-pub use paths::*;
-pub use wallpaper::{capture_wallpaper, restore_wallpaper, restore_wallpaper_from_path, WallpaperInfo};
 pub use autostart::{
-    is_autostart_enabled, enable_autostart, disable_autostart, set_autostart,
-    AutostartError, AutostartResult,
+    disable_autostart, enable_autostart, is_autostart_enabled, set_autostart, AutostartError,
+    AutostartResult,
 };
+pub use display::*;
+pub use paths::*;
+pub use system::*;
+pub use wallpaper::{
+    capture_wallpaper, restore_wallpaper, restore_wallpaper_from_path, WallpaperInfo,
+};
+pub use window::*;

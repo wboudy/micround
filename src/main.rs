@@ -8,16 +8,16 @@ use std::time::Duration;
 use anyhow::Result;
 use tracing::{info, warn, Level};
 
-mod core;
-mod platform;
 mod capture;
+mod config;
+mod core;
+mod engine;
+mod platform;
 mod process;
 mod render;
 mod ui;
-mod config;
-mod engine;
 
-use core::events::{AppContext, Command, Event, AppState};
+use core::events::{AppContext, AppState, Command, Event};
 use engine::DisplayEngine;
 
 fn main() -> Result<()> {
@@ -67,7 +67,9 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
     // Windows system event monitoring (sleep/wake, session lock)
     #[cfg(target_os = "windows")]
     let mut _system_monitor = {
-        use crate::platform::{SystemEvent, SystemEventHandler, SleepEvent, SessionEvent, WindowsSystemMonitor};
+        use crate::platform::{
+            SessionEvent, SleepEvent, SystemEvent, SystemEventHandler, WindowsSystemMonitor,
+        };
 
         struct SystemEventBridge {
             app_handle: core::events::AppHandle,
@@ -77,9 +79,13 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
             fn on_system_event(&mut self, event: SystemEvent) {
                 let command = match event {
                     SystemEvent::Sleep(SleepEvent::WillSleep)
-                    | SystemEvent::Session(SessionEvent::ScreenLocking) => Some(Command::PauseDisplay),
+                    | SystemEvent::Session(SessionEvent::ScreenLocking) => {
+                        Some(Command::PauseDisplay)
+                    }
                     SystemEvent::Sleep(SleepEvent::DidWake)
-                    | SystemEvent::Session(SessionEvent::ScreenUnlocked) => Some(Command::ResumeDisplay),
+                    | SystemEvent::Session(SessionEvent::ScreenUnlocked) => {
+                        Some(Command::ResumeDisplay)
+                    }
                     SystemEvent::Session(SessionEvent::LoggingOut) => Some(Command::StopCapture),
                     _ => None,
                 };
@@ -157,7 +163,7 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
 
     // Initialize settings controller for settings window (bd-2k5)
     let settings_controller = std::sync::Arc::new(std::sync::RwLock::new(
-        ui::SettingsController::new(app_handle.clone(), &config)
+        ui::SettingsController::new(app_handle.clone(), &config),
     ));
 
     // Preview frame channel for camera preview (bd-37z)

@@ -79,15 +79,39 @@ impl LatencyStats {
         eprintln!("\n╔════════════════════════════════════════════════════════════╗");
         eprintln!("║ LATENCY REPORT: {:42} ║", test_name);
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Samples:     {:10}                                     ║", self.samples);
-        eprintln!("║ Frame drops: {:10}                                     ║", self.frame_drops);
+        eprintln!(
+            "║ Samples:     {:10}                                     ║",
+            self.samples
+        );
+        eprintln!(
+            "║ Frame drops: {:10}                                     ║",
+            self.frame_drops
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Min:    {:>12.2?}                                      ║", self.min);
-        eprintln!("║ Max:    {:>12.2?}                                      ║", self.max);
-        eprintln!("║ Mean:   {:>12.2?}                                      ║", self.mean);
-        eprintln!("║ P50:    {:>12.2?}                                      ║", self.p50);
-        eprintln!("║ P95:    {:>12.2?}                                      ║", self.p95);
-        eprintln!("║ P99:    {:>12.2?}                                      ║", self.p99);
+        eprintln!(
+            "║ Min:    {:>12.2?}                                      ║",
+            self.min
+        );
+        eprintln!(
+            "║ Max:    {:>12.2?}                                      ║",
+            self.max
+        );
+        eprintln!(
+            "║ Mean:   {:>12.2?}                                      ║",
+            self.mean
+        );
+        eprintln!(
+            "║ P50:    {:>12.2?}                                      ║",
+            self.p50
+        );
+        eprintln!(
+            "║ P95:    {:>12.2?}                                      ║",
+            self.p95
+        );
+        eprintln!(
+            "║ P99:    {:>12.2?}                                      ║",
+            self.p99
+        );
         eprintln!("╚════════════════════════════════════════════════════════════╝\n");
     }
 }
@@ -122,11 +146,15 @@ fn measure_latency(
         format: Some(micround::core::PixelFormat::Rgba32),
     };
 
-    capture.open(&devices[0].id, settings).expect("Failed to open capture device");
+    capture
+        .open(&devices[0].id, settings)
+        .expect("Failed to open capture device");
 
     // Initialize display simulator
     let mut display = DisplaySimulator::new(display_config);
-    display.init(&DisplayId("test-display".into())).expect("Failed to init display");
+    display
+        .init(&DisplayId("test-display".into()))
+        .expect("Failed to init display");
 
     capture.start().expect("Failed to start capture");
 
@@ -195,7 +223,11 @@ fn test_latency_baseline_320x240() {
         width: 320,
         height: 240,
         fps: 1000, // High FPS - no artificial timing delay
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 }, // Fast pattern
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        }, // Fast pattern
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -223,7 +255,10 @@ fn test_latency_baseline_320x240() {
     );
 
     // Sanity checks
-    assert!(stats.frame_drops == 0, "No frame drops expected in baseline");
+    assert!(
+        stats.frame_drops == 0,
+        "No frame drops expected in baseline"
+    );
     assert_eq!(stats.samples, 200, "All frames should be captured");
 }
 
@@ -238,7 +273,11 @@ fn test_latency_640x480_throughput() {
         width: 640,
         height: 480,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 0, g: 128, b: 255 }, // Fast pattern
+        pattern: FramePattern::SolidColor {
+            r: 0,
+            g: 128,
+            b: 255,
+        }, // Fast pattern
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -478,22 +517,36 @@ fn test_latency_breakdown_logging() {
     }
 
     // Calculate stats for each stage
-    let capture_mean: Duration = capture_times.iter().sum::<Duration>() / capture_times.len() as u32;
-    let process_mean: Duration = process_times.iter().sum::<Duration>() / process_times.len() as u32;
+    let capture_mean: Duration =
+        capture_times.iter().sum::<Duration>() / capture_times.len() as u32;
+    let process_mean: Duration =
+        process_times.iter().sum::<Duration>() / process_times.len() as u32;
     let render_mean: Duration = render_times.iter().sum::<Duration>() / render_times.len() as u32;
     let total_mean = capture_mean + process_mean + render_mean;
 
     eprintln!("╔════════════════════════════════════════════════════════════╗");
     eprintln!("║ LATENCY BREAKDOWN (mean of 50 frames)                      ║");
     eprintln!("╠════════════════════════════════════════════════════════════╣");
-    eprintln!("║ Capture:    {:>12.2?}  ({:>5.1}%)                          ║",
-        capture_mean, capture_mean.as_nanos() as f64 / total_mean.as_nanos() as f64 * 100.0);
-    eprintln!("║ Process:    {:>12.2?}  ({:>5.1}%)                          ║",
-        process_mean, process_mean.as_nanos() as f64 / total_mean.as_nanos() as f64 * 100.0);
-    eprintln!("║ Render:     {:>12.2?}  ({:>5.1}%)                          ║",
-        render_mean, render_mean.as_nanos() as f64 / total_mean.as_nanos() as f64 * 100.0);
+    eprintln!(
+        "║ Capture:    {:>12.2?}  ({:>5.1}%)                          ║",
+        capture_mean,
+        capture_mean.as_nanos() as f64 / total_mean.as_nanos() as f64 * 100.0
+    );
+    eprintln!(
+        "║ Process:    {:>12.2?}  ({:>5.1}%)                          ║",
+        process_mean,
+        process_mean.as_nanos() as f64 / total_mean.as_nanos() as f64 * 100.0
+    );
+    eprintln!(
+        "║ Render:     {:>12.2?}  ({:>5.1}%)                          ║",
+        render_mean,
+        render_mean.as_nanos() as f64 / total_mean.as_nanos() as f64 * 100.0
+    );
     eprintln!("╠════════════════════════════════════════════════════════════╣");
-    eprintln!("║ TOTAL:      {:>12.2?}                                   ║", total_mean);
+    eprintln!(
+        "║ TOTAL:      {:>12.2?}                                   ║",
+        total_mean
+    );
     eprintln!("╚════════════════════════════════════════════════════════════╝\n");
 
     // Assert total is under 100ms

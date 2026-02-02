@@ -15,19 +15,29 @@ pub mod tray;
 
 // Re-exports for first-run wizard (will be used by settings window integration)
 #[allow(unused_imports)]
-pub use first_run::{FirstRunState, FirstRunAction, FirstRunEvent, FirstRunController, StateContent};
+pub use first_run::{
+    FirstRunAction, FirstRunController, FirstRunEvent, FirstRunState, StateContent,
+};
 
 // Re-exports for settings window
 #[allow(unused_imports)]
 pub use settings::{
-    SettingsController, SettingsUI, SettingsWindowState, SettingsError, DisplayInfo,
+    create_preview_channel,
+    DisplayInfo,
+    PreviewFrame,
+    PreviewFrameReceiver,
+    PreviewFrameSender,
     // Preview types (bd-37z)
-    PreviewState, PreviewFrame, PreviewFrameSender, PreviewFrameReceiver, create_preview_channel,
+    PreviewState,
+    SettingsController,
+    SettingsError,
+    SettingsUI,
+    SettingsWindowState,
 };
 
 #[cfg(feature = "tray")]
 #[allow(unused_imports)]
-pub use tray::{TrayController, TrayError, TrayState, TrayMenuId, IconState, process_events};
+pub use tray::{process_events, IconState, TrayController, TrayError, TrayMenuId, TrayState};
 
 /// System tray state (stub for when tray feature is disabled)
 #[cfg(not(feature = "tray"))]

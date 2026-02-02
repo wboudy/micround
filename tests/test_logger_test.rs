@@ -136,7 +136,10 @@ fn test_logger_finish_failed() {
     let result = logger.finish_failed("Critical error occurred");
 
     assert!(!result.passed);
-    assert_eq!(result.failure_reason, Some("Critical error occurred".to_string()));
+    assert_eq!(
+        result.failure_reason,
+        Some("Critical error occurred".to_string())
+    );
 }
 
 #[test]
@@ -173,7 +176,11 @@ fn test_logger_multiple_assertions_per_step() {
     test_assert_eq!(logger, frame_height, 480, "Height matches");
     test_assert_eq!(logger, pixel_format, "RGBA32", "Format matches");
     test_assert_eq!(logger, data_size, 1228800, "Data size correct");
-    test_assert!(logger, data_size == frame_width * frame_height * 4, "Size formula correct");
+    test_assert!(
+        logger,
+        data_size == frame_width * frame_height * 4,
+        "Size formula correct"
+    );
 
     test_step_ok!(logger, "All {} assertions passed", 5);
 

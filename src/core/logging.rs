@@ -145,8 +145,8 @@ pub fn init(default_level: Option<Level>) -> Result<(), LoggingError> {
         None => "micround=info,warn",
     };
 
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(default_directive));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_directive));
 
     // Console layer - human-readable format
     let console_layer = fmt::layer()
@@ -174,7 +174,9 @@ pub fn init(default_level: Option<Level>) -> Result<(), LoggingError> {
         .with(console_layer)
         .with(file_layer)
         .try_init()
-        .map_err(|e: tracing_subscriber::util::TryInitError| LoggingError::InitError(e.to_string()))?;
+        .map_err(|e: tracing_subscriber::util::TryInitError| {
+            LoggingError::InitError(e.to_string())
+        })?;
 
     tracing::info!(
         level = %default_level.unwrap_or(Level::INFO),
@@ -201,7 +203,8 @@ fn rotate_logs(log_dir: &Path) -> Result<(), LoggingError> {
         return Ok(());
     }
 
-    let metadata = std::fs::metadata(&log_file).map_err(|e| LoggingError::IoError(e.to_string()))?;
+    let metadata =
+        std::fs::metadata(&log_file).map_err(|e| LoggingError::IoError(e.to_string()))?;
 
     if metadata.len() < MAX_LOG_SIZE {
         return Ok(());

@@ -228,7 +228,10 @@ impl SettingsController {
 
     /// Check if the window is visible
     pub fn is_visible(&self) -> bool {
-        matches!(self.state, SettingsWindowState::Visible | SettingsWindowState::Modified)
+        matches!(
+            self.state,
+            SettingsWindowState::Visible | SettingsWindowState::Modified
+        )
     }
 
     /// Check if there are unsaved changes
@@ -241,7 +244,8 @@ impl SettingsController {
         self.available_cameras = cameras;
         // Update selected index based on current config
         if let Some(ref device_id) = self.camera_config.device_id {
-            self.selected_camera_idx = self.available_cameras
+            self.selected_camera_idx = self
+                .available_cameras
                 .iter()
                 .position(|c| &c.id == device_id)
                 .unwrap_or(0);
@@ -268,14 +272,16 @@ impl SettingsController {
         self.validate()?;
 
         // Send command to update settings (ignore channel full errors for now)
-        let _ = self.app_handle.try_send_command(Command::UpdateCaptureSettings {
-            settings: crate::core::CaptureSettings {
-                width: self.camera_config.width,
-                height: self.camera_config.height,
-                framerate: self.camera_config.framerate,
-                format: None,
-            },
-        });
+        let _ = self
+            .app_handle
+            .try_send_command(Command::UpdateCaptureSettings {
+                settings: crate::core::CaptureSettings {
+                    width: self.camera_config.width,
+                    height: self.camera_config.height,
+                    framerate: self.camera_config.framerate,
+                    format: None,
+                },
+            });
 
         // Update scaling mode
         let _ = self.app_handle.try_send_command(Command::SetScaling {
@@ -295,7 +301,10 @@ impl SettingsController {
 
         // Update flip
         let _ = self.app_handle.try_send_command(Command::SetFlip {
-            flip: match (self.display_config.flip_horizontal, self.display_config.flip_vertical) {
+            flip: match (
+                self.display_config.flip_horizontal,
+                self.display_config.flip_vertical,
+            ) {
                 (true, true) => Flip::Both,
                 (true, false) => Flip::Horizontal,
                 (false, true) => Flip::Vertical,
@@ -311,13 +320,19 @@ impl SettingsController {
     /// Validate current settings
     fn validate(&self) -> Result<(), SettingsError> {
         if self.camera_config.width == 0 || self.camera_config.height == 0 {
-            return Err(SettingsError::InvalidValue("Resolution must be non-zero".to_string()));
+            return Err(SettingsError::InvalidValue(
+                "Resolution must be non-zero".to_string(),
+            ));
         }
         if self.camera_config.framerate <= 0.0 || self.camera_config.framerate > 240.0 {
-            return Err(SettingsError::InvalidValue("Framerate must be between 0 and 240".to_string()));
+            return Err(SettingsError::InvalidValue(
+                "Framerate must be between 0 and 240".to_string(),
+            ));
         }
         if !matches!(self.display_config.rotation, 0 | 90 | 180 | 270) {
-            return Err(SettingsError::InvalidValue("Rotation must be 0, 90, 180, or 270".to_string()));
+            return Err(SettingsError::InvalidValue(
+                "Rotation must be 0, 90, 180, or 270".to_string(),
+            ));
         }
         Ok(())
     }
@@ -544,7 +559,9 @@ impl SettingsUI {
         if should_refresh_cameras {
             // Signal to refresh camera list
             let controller = self.controller.read().unwrap();
-            let _ = controller.app_handle.try_send_command(Command::RefreshCameras);
+            let _ = controller
+                .app_handle
+                .try_send_command(Command::RefreshCameras);
         }
         if should_start_preview {
             self.controller.write().unwrap().start_preview();
@@ -640,14 +657,21 @@ impl SettingsUI {
                     self.render_preview_placeholder(ui, preview_size, "Starting camera...");
                 }
                 PreviewState::Error => {
-                    let msg = controller.preview_error.as_deref().unwrap_or("Preview error");
+                    let msg = controller
+                        .preview_error
+                        .as_deref()
+                        .unwrap_or("Preview error");
                     self.render_preview_placeholder(ui, preview_size, msg);
                 }
                 PreviewState::NoCameraSelected => {
                     self.render_preview_placeholder(ui, preview_size, "Select a camera above");
                 }
                 PreviewState::Inactive => {
-                    self.render_preview_placeholder(ui, preview_size, "Click 'Start Preview' to test camera");
+                    self.render_preview_placeholder(
+                        ui,
+                        preview_size,
+                        "Click 'Start Preview' to test camera",
+                    );
                 }
             }
 
@@ -671,7 +695,8 @@ impl SettingsUI {
         let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
 
         // Dark background
-        ui.painter().rect_filled(rect, 4.0, egui::Color32::from_gray(30));
+        ui.painter()
+            .rect_filled(rect, 4.0, egui::Color32::from_gray(30));
 
         // Border
         ui.painter().rect_stroke(
@@ -699,7 +724,8 @@ impl SettingsUI {
         ui.horizontal(|ui| {
             ui.label("Camera:");
 
-            let camera_names: Vec<String> = controller.available_cameras
+            let camera_names: Vec<String> = controller
+                .available_cameras
                 .iter()
                 .map(|c| c.name.clone())
                 .collect();
@@ -707,7 +733,8 @@ impl SettingsUI {
             if camera_names.is_empty() {
                 ui.label("No cameras detected");
             } else {
-                let selected_name = camera_names.get(controller.selected_camera_idx)
+                let selected_name = camera_names
+                    .get(controller.selected_camera_idx)
                     .cloned()
                     .unwrap_or_else(|| "Select camera".to_string());
 
@@ -715,11 +742,10 @@ impl SettingsUI {
                     .selected_text(selected_name)
                     .show_ui(ui, |ui| {
                         for (idx, name) in camera_names.iter().enumerate() {
-                            if ui.selectable_value(
-                                &mut controller.selected_camera_idx,
-                                idx,
-                                name
-                            ).changed() {
+                            if ui
+                                .selectable_value(&mut controller.selected_camera_idx, idx, name)
+                                .changed()
+                            {
                                 if let Some(camera) = controller.available_cameras.get(idx) {
                                     controller.camera_config.device_id = Some(camera.id.clone());
                                     controller.mark_modified();
@@ -738,10 +764,12 @@ impl SettingsUI {
             ui.label("Resolution:");
 
             // Get resolutions from selected camera's capabilities
-            let resolutions: Vec<String> = if let Some(camera) =
-                controller.available_cameras.get(controller.selected_camera_idx)
+            let resolutions: Vec<String> = if let Some(camera) = controller
+                .available_cameras
+                .get(controller.selected_camera_idx)
             {
-                camera.capabilities
+                camera
+                    .capabilities
                     .iter()
                     .map(|c| format!("{}x{} @ {}fps", c.width, c.height, c.framerate as u32))
                     .collect()
@@ -765,14 +793,15 @@ impl SettingsUI {
                 .selected_text(&current_res)
                 .show_ui(ui, |ui| {
                     for (idx, res) in resolutions.iter().enumerate() {
-                        if ui.selectable_label(
-                            controller.selected_resolution_idx == idx,
-                            res
-                        ).clicked() {
+                        if ui
+                            .selectable_label(controller.selected_resolution_idx == idx, res)
+                            .clicked()
+                        {
                             controller.selected_resolution_idx = idx;
                             // Parse resolution from string
-                            if let Some(camera) =
-                                controller.available_cameras.get(controller.selected_camera_idx)
+                            if let Some(camera) = controller
+                                .available_cameras
+                                .get(controller.selected_camera_idx)
                             {
                                 if let Some(cap) = camera.capabilities.get(idx) {
                                     controller.camera_config.width = cap.width;
@@ -791,7 +820,8 @@ impl SettingsUI {
         ui.horizontal(|ui| {
             ui.label("Target Display:");
 
-            let display_names: Vec<String> = controller.available_displays
+            let display_names: Vec<String> = controller
+                .available_displays
                 .iter()
                 .map(|d| {
                     if d.is_primary {
@@ -802,7 +832,8 @@ impl SettingsUI {
                 })
                 .collect();
 
-            let selected_name = display_names.get(controller.selected_display_idx)
+            let selected_name = display_names
+                .get(controller.selected_display_idx)
                 .cloned()
                 .unwrap_or_else(|| "Primary Display".to_string());
 
@@ -810,11 +841,10 @@ impl SettingsUI {
                 .selected_text(selected_name)
                 .show_ui(ui, |ui| {
                     for (idx, name) in display_names.iter().enumerate() {
-                        if ui.selectable_value(
-                            &mut controller.selected_display_idx,
-                            idx,
-                            name
-                        ).changed() {
+                        if ui
+                            .selectable_value(&mut controller.selected_display_idx, idx, name)
+                            .changed()
+                        {
                             if let Some(display) = controller.available_displays.get(idx) {
                                 controller.display_config.display_id = Some(display.id.clone());
                                 controller.mark_modified();
@@ -834,7 +864,8 @@ impl SettingsUI {
                 (ScalingMode::Center, "Center (no scaling)"),
             ];
 
-            let current_label = scaling_modes.iter()
+            let current_label = scaling_modes
+                .iter()
                 .find(|(m, _)| *m == controller.display_config.scaling_mode)
                 .map(|(_, l)| *l)
                 .unwrap_or("Fill");
@@ -843,11 +874,14 @@ impl SettingsUI {
                 .selected_text(current_label)
                 .show_ui(ui, |ui| {
                     for (mode, label) in scaling_modes {
-                        if ui.selectable_value(
-                            &mut controller.display_config.scaling_mode,
-                            mode,
-                            label
-                        ).changed() {
+                        if ui
+                            .selectable_value(
+                                &mut controller.display_config.scaling_mode,
+                                mode,
+                                label,
+                            )
+                            .changed()
+                        {
                             controller.mark_modified();
                         }
                     }
@@ -857,19 +891,13 @@ impl SettingsUI {
         ui.horizontal(|ui| {
             ui.label("Rotation:");
 
-            let rotations = [
-                (0, "0°"),
-                (90, "90°"),
-                (180, "180°"),
-                (270, "270°"),
-            ];
+            let rotations = [(0, "0°"), (90, "90°"), (180, "180°"), (270, "270°")];
 
             for (angle, label) in rotations {
-                if ui.selectable_value(
-                    &mut controller.display_config.rotation,
-                    angle,
-                    label
-                ).changed() {
+                if ui
+                    .selectable_value(&mut controller.display_config.rotation, angle, label)
+                    .changed()
+                {
                     controller.mark_modified();
                 }
             }
@@ -878,10 +906,16 @@ impl SettingsUI {
         ui.horizontal(|ui| {
             ui.label("Flip:");
 
-            if ui.checkbox(&mut controller.display_config.flip_horizontal, "Horizontal").changed() {
+            if ui
+                .checkbox(&mut controller.display_config.flip_horizontal, "Horizontal")
+                .changed()
+            {
                 controller.mark_modified();
             }
-            if ui.checkbox(&mut controller.display_config.flip_vertical, "Vertical").changed() {
+            if ui
+                .checkbox(&mut controller.display_config.flip_vertical, "Vertical")
+                .changed()
+            {
                 controller.mark_modified();
             }
         });
@@ -898,15 +932,33 @@ impl SettingsUI {
     }
 
     fn render_startup_section(&self, ui: &mut egui::Ui, controller: &mut SettingsController) {
-        if ui.checkbox(&mut controller.startup_config.launch_at_login, "Launch at login").changed() {
+        if ui
+            .checkbox(
+                &mut controller.startup_config.launch_at_login,
+                "Launch at login",
+            )
+            .changed()
+        {
             controller.mark_modified();
         }
 
-        if ui.checkbox(&mut controller.startup_config.auto_start_feed, "Start feed automatically").changed() {
+        if ui
+            .checkbox(
+                &mut controller.startup_config.auto_start_feed,
+                "Start feed automatically",
+            )
+            .changed()
+        {
             controller.mark_modified();
         }
 
-        if ui.checkbox(&mut controller.startup_config.minimize_on_start, "Minimize to tray on startup").changed() {
+        if ui
+            .checkbox(
+                &mut controller.startup_config.minimize_on_start,
+                "Minimize to tray on startup",
+            )
+            .changed()
+        {
             controller.mark_modified();
         }
     }
@@ -1197,7 +1249,10 @@ mod tests {
 
         assert_eq!(controller.preview_state(), PreviewState::Error);
         assert!(controller.preview_error.is_some());
-        assert_eq!(controller.preview_error.as_deref(), Some("Camera disconnected"));
+        assert_eq!(
+            controller.preview_error.as_deref(),
+            Some("Camera disconnected")
+        );
     }
 
     #[test]
@@ -1206,7 +1261,10 @@ mod tests {
         assert_eq!(PreviewState::Inactive.to_string(), "Preview inactive");
         assert_eq!(PreviewState::Running.to_string(), "Preview running");
         assert_eq!(PreviewState::Error.to_string(), "Preview error");
-        assert_eq!(PreviewState::NoCameraSelected.to_string(), "Select a camera");
+        assert_eq!(
+            PreviewState::NoCameraSelected.to_string(),
+            "Select a camera"
+        );
     }
 
     #[test]

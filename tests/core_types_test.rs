@@ -460,7 +460,7 @@ fn test_frame_data_access() {
     let mut data = vec![0u8; 640 * 480 * 3]; // RGB data
     data[0] = 255; // Red channel first pixel
     data[1] = 128; // Green channel first pixel
-    data[2] = 64;  // Blue channel first pixel
+    data[2] = 64; // Blue channel first pixel
 
     let frame = Frame {
         data,
@@ -625,12 +625,7 @@ fn test_flip_default() {
 
 #[test]
 fn test_flip_variants() {
-    let flips = [
-        Flip::None,
-        Flip::Horizontal,
-        Flip::Vertical,
-        Flip::Both,
-    ];
+    let flips = [Flip::None, Flip::Horizontal, Flip::Vertical, Flip::Both];
 
     for (i, f1) in flips.iter().enumerate() {
         for (j, f2) in flips.iter().enumerate() {
@@ -667,12 +662,7 @@ fn test_flip_debug() {
 
 #[test]
 fn test_flip_serialize() {
-    let flips = [
-        Flip::None,
-        Flip::Horizontal,
-        Flip::Vertical,
-        Flip::Both,
-    ];
+    let flips = [Flip::None, Flip::Horizontal, Flip::Vertical, Flip::Both];
 
     for flip in flips {
         let json = serde_json::to_string(&flip).unwrap();

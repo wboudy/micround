@@ -12,18 +12,18 @@ use tokio::time::sleep;
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern},
 };
 use micround::config::{AppConfig, DisplayConfig};
 use micround::core::{
-    AppContext, AppState, Command, DisplayId, Event,
-    CaptureSettings, Flip, PixelFormat, Rotation, ScalingMode,
+    AppContext, AppState, CaptureSettings, Command, DisplayId, Event, Flip, PixelFormat, Rotation,
+    ScalingMode,
 };
 use micround::process::{process_frame, ProcessorConfig};
 use micround::render::{
-    WallpaperRenderer,
     simulator::{DisplaySimulator, DisplaySimulatorConfig},
+    WallpaperRenderer,
 };
 
 // ============================================================================
@@ -39,33 +39,48 @@ fn test_scaling_mode_change_during_capture() {
         width: 640,
         height: 480,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).unwrap();
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .unwrap();
     capture.start().unwrap();
     test_step_ok!(logger);
 
     test_step!(logger, "Process frames with initial scaling mode (Fill)");
-    let config = ProcessorConfig::new(800, 600)
-        .with_scaling(ScalingMode::Fill);
+    let config = ProcessorConfig::new(800, 600).with_scaling(ScalingMode::Fill);
     let frame = capture.next_frame().unwrap();
     let processed = process_frame(&frame, &config).unwrap();
-    test_assert!(logger, processed.width == 800, "Initial frame width correct");
+    test_assert!(
+        logger,
+        processed.width == 800,
+        "Initial frame width correct"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Change scaling mode to Fit and process frame");
-    let config2 = ProcessorConfig::new(800, 600)
-        .with_scaling(ScalingMode::Fit);
+    let config2 = ProcessorConfig::new(800, 600).with_scaling(ScalingMode::Fit);
     let frame2 = capture.next_frame().unwrap();
     let processed2 = process_frame(&frame2, &config2).unwrap();
-    test_assert!(logger, processed2.width > 0, "Frame processed with Fit mode");
+    test_assert!(
+        logger,
+        processed2.width > 0,
+        "Frame processed with Fit mode"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -90,12 +105,17 @@ fn test_all_scaling_modes() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).unwrap();
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .unwrap();
     capture.start().unwrap();
     let frame = capture.next_frame().unwrap();
     test_step_ok!(logger);
@@ -147,12 +167,17 @@ fn test_rotation_change_during_capture() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).unwrap();
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .unwrap();
     capture.start().unwrap();
     test_step_ok!(logger);
 
@@ -202,12 +227,17 @@ fn test_flip_change_during_capture() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 320,
-        height: 240,
-        framerate: 1000.0,
-        format: None,
-    }).unwrap();
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 320,
+                height: 240,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .unwrap();
     capture.start().unwrap();
     let frame = capture.next_frame().unwrap();
     test_step_ok!(logger);
@@ -228,8 +258,16 @@ fn test_flip_change_during_capture() {
     test_step!(logger, "Apply vertical flip");
     let config = ProcessorConfig::new(320, 240).with_flip(Flip::Vertical);
     let v_flip = process_frame(&frame, &config).unwrap();
-    test_assert!(logger, v_flip.width == no_flip.width, "Width unchanged after v flip");
-    test_assert!(logger, v_flip.height == no_flip.height, "Height unchanged after v flip");
+    test_assert!(
+        logger,
+        v_flip.width == no_flip.width,
+        "Width unchanged after v flip"
+    );
+    test_assert!(
+        logger,
+        v_flip.height == no_flip.height,
+        "Height unchanged after v flip"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -258,12 +296,17 @@ fn test_combined_transform_changes() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).unwrap();
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .unwrap();
     capture.start().unwrap();
     let frame = capture.next_frame().unwrap();
     test_step_ok!(logger);
@@ -281,7 +324,11 @@ fn test_combined_transform_changes() {
         .with_rotation(Rotation::Clockwise90)
         .with_flip(Flip::Horizontal);
     let rot_and_flip = process_frame(&frame, &config).unwrap();
-    test_assert!(logger, rot_and_flip.width == rot_only.width, "Adding flip keeps dimensions");
+    test_assert!(
+        logger,
+        rot_and_flip.width == rot_only.width,
+        "Adding flip keeps dimensions"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Change scaling mode with transforms");
@@ -327,30 +374,56 @@ async fn test_config_commands_dispatch() {
     test_step_ok!(logger);
 
     test_step!(logger, "Send SetScaling command");
-    handle.send_command(Command::SetScaling { mode: ScalingMode::Fit })
+    handle
+        .send_command(Command::SetScaling {
+            mode: ScalingMode::Fit,
+        })
         .await
         .expect("send scaling command");
     let cmd = cmd_rx.recv().await.expect("receive command");
-    test_assert!(logger, matches!(cmd, Command::SetScaling { mode: ScalingMode::Fit }),
-                 "SetScaling command received");
+    test_assert!(
+        logger,
+        matches!(
+            cmd,
+            Command::SetScaling {
+                mode: ScalingMode::Fit
+            }
+        ),
+        "SetScaling command received"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Send SetRotation command");
-    handle.send_command(Command::SetRotation { rotation: Rotation::Clockwise90 })
+    handle
+        .send_command(Command::SetRotation {
+            rotation: Rotation::Clockwise90,
+        })
         .await
         .expect("send rotation command");
     let cmd = cmd_rx.recv().await.expect("receive command");
-    test_assert!(logger, matches!(cmd, Command::SetRotation { rotation: Rotation::Clockwise90 }),
-                 "SetRotation command received");
+    test_assert!(
+        logger,
+        matches!(
+            cmd,
+            Command::SetRotation {
+                rotation: Rotation::Clockwise90
+            }
+        ),
+        "SetRotation command received"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Send SetFlip command");
-    handle.send_command(Command::SetFlip { flip: Flip::Both })
+    handle
+        .send_command(Command::SetFlip { flip: Flip::Both })
         .await
         .expect("send flip command");
     let cmd = cmd_rx.recv().await.expect("receive command");
-    test_assert!(logger, matches!(cmd, Command::SetFlip { flip: Flip::Both }),
-                 "SetFlip command received");
+    test_assert!(
+        logger,
+        matches!(cmd, Command::SetFlip { flip: Flip::Both }),
+        "SetFlip command received"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Send UpdateCaptureSettings command");
@@ -360,7 +433,10 @@ async fn test_config_commands_dispatch() {
         framerate: 60.0,
         format: Some(PixelFormat::Rgb24),
     };
-    handle.send_command(Command::UpdateCaptureSettings { settings: settings.clone() })
+    handle
+        .send_command(Command::UpdateCaptureSettings {
+            settings: settings.clone(),
+        })
         .await
         .expect("send settings command");
     let cmd = cmd_rx.recv().await.expect("receive command");
@@ -408,7 +484,11 @@ fn test_config_validation() {
     config.sanitize();
     let errors = config.validate();
     test_assert!(logger, errors.is_empty(), "Sanitized config is valid");
-    test_assert!(logger, config.camera.framerate == 30.0, "Framerate sanitized to default");
+    test_assert!(
+        logger,
+        config.camera.framerate == 30.0,
+        "Framerate sanitized to default"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -432,12 +512,17 @@ fn test_rapid_config_changes() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 320,
-        height: 240,
-        framerate: 1000.0,
-        format: None,
-    }).unwrap();
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 320,
+                height: 240,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .unwrap();
     capture.start().unwrap();
     test_step_ok!(logger);
 
@@ -446,7 +531,12 @@ fn test_rapid_config_changes() {
     test_step_ok!(logger);
 
     test_step!(logger, "Apply rapid config changes");
-    let rotations = [Rotation::None, Rotation::Clockwise90, Rotation::Clockwise180, Rotation::Clockwise270];
+    let rotations = [
+        Rotation::None,
+        Rotation::Clockwise90,
+        Rotation::Clockwise180,
+        Rotation::Clockwise270,
+    ];
     let flips = [Flip::None, Flip::Horizontal, Flip::Vertical, Flip::Both];
     let scaling = [ScalingMode::Fill, ScalingMode::Fit, ScalingMode::Stretch];
 
@@ -471,7 +561,11 @@ fn test_rapid_config_changes() {
     }
 
     let expected = rotations.len() * flips.len() * scaling.len();
-    test_assert!(logger, processed_count == expected, "All config combinations processed");
+    test_assert!(
+        logger,
+        processed_count == expected,
+        "All config combinations processed"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -500,12 +594,17 @@ fn test_full_pipeline_config_change() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).unwrap();
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .unwrap();
     capture.start().unwrap();
 
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
@@ -530,7 +629,11 @@ fn test_full_pipeline_config_change() {
     let config = ProcessorConfig::new(1080, 1920).with_rotation(Rotation::Clockwise90);
     let processed2 = process_frame(&frame2, &config).unwrap();
     display.render(&processed2).unwrap();
-    test_assert!(logger, display.frame_count() == 2, "Second frame with new rotation");
+    test_assert!(
+        logger,
+        display.frame_count() == 2,
+        "Second frame with new rotation"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Change scaling and flip");
@@ -540,12 +643,20 @@ fn test_full_pipeline_config_change() {
         .with_flip(Flip::Horizontal);
     let processed3 = process_frame(&frame3, &config).unwrap();
     display.render(&processed3).unwrap();
-    test_assert!(logger, display.frame_count() == 3, "Third frame with new settings");
+    test_assert!(
+        logger,
+        display.frame_count() == 3,
+        "Third frame with new settings"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verify all frames in history");
     let history = display.frame_history();
-    test_assert!(logger, history.len() == 3, "All 3 frames in display history");
+    test_assert!(
+        logger,
+        history.len() == 3,
+        "All 3 frames in display history"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -584,11 +695,18 @@ async fn test_state_consistency_after_config_change() {
     } else {
         panic!("Expected StateChanged event");
     };
-    test_assert!(logger, current_state == AppState::Running, "Initial state is Running");
+    test_assert!(
+        logger,
+        current_state == AppState::Running,
+        "Initial state is Running"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Send config change command");
-    handle.send_command(Command::SetScaling { mode: ScalingMode::Fit })
+    handle
+        .send_command(Command::SetScaling {
+            mode: ScalingMode::Fit,
+        })
         .await
         .expect("send command");
     handle.publish_event(Event::SettingsChanged);
@@ -596,13 +714,24 @@ async fn test_state_consistency_after_config_change() {
 
     test_step!(logger, "Verify state unchanged after config change");
     let event = subscriber.recv().await.expect("receive settings event");
-    test_assert!(logger, matches!(event, Event::SettingsChanged), "Settings event received");
-    test_assert!(logger, current_state == AppState::Running, "State unchanged after config change");
+    test_assert!(
+        logger,
+        matches!(event, Event::SettingsChanged),
+        "Settings event received"
+    );
+    test_assert!(
+        logger,
+        current_state == AppState::Running,
+        "State unchanged after config change"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Multiple rapid config changes maintain state");
     for _ in 0..5 {
-        handle.send_command(Command::SetRotation { rotation: Rotation::Clockwise90 })
+        handle
+            .send_command(Command::SetRotation {
+                rotation: Rotation::Clockwise90,
+            })
             .await
             .expect("send rotation");
         handle.publish_event(Event::SettingsChanged);
@@ -613,8 +742,16 @@ async fn test_state_consistency_after_config_change() {
             settings_count += 1;
         }
     }
-    test_assert!(logger, settings_count == 5, "All 5 settings events received");
-    test_assert!(logger, current_state == AppState::Running, "State still Running after changes");
+    test_assert!(
+        logger,
+        settings_count == 5,
+        "All 5 settings events received"
+    );
+    test_assert!(
+        logger,
+        current_state == AppState::Running,
+        "State still Running after changes"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -633,43 +770,83 @@ fn test_display_config_conversion() {
     let mut display_cfg = DisplayConfig::default();
 
     display_cfg.rotation = 0;
-    test_assert!(logger, display_cfg.rotation_enum() == Rotation::None, "0 deg maps to None");
+    test_assert!(
+        logger,
+        display_cfg.rotation_enum() == Rotation::None,
+        "0 deg maps to None"
+    );
 
     display_cfg.rotation = 90;
-    test_assert!(logger, display_cfg.rotation_enum() == Rotation::Clockwise90, "90 deg maps correctly");
+    test_assert!(
+        logger,
+        display_cfg.rotation_enum() == Rotation::Clockwise90,
+        "90 deg maps correctly"
+    );
 
     display_cfg.rotation = 180;
-    test_assert!(logger, display_cfg.rotation_enum() == Rotation::Clockwise180, "180 deg maps correctly");
+    test_assert!(
+        logger,
+        display_cfg.rotation_enum() == Rotation::Clockwise180,
+        "180 deg maps correctly"
+    );
 
     display_cfg.rotation = 270;
-    test_assert!(logger, display_cfg.rotation_enum() == Rotation::Clockwise270, "270 deg maps correctly");
+    test_assert!(
+        logger,
+        display_cfg.rotation_enum() == Rotation::Clockwise270,
+        "270 deg maps correctly"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Test flip conversion");
     display_cfg.flip_horizontal = false;
     display_cfg.flip_vertical = false;
-    test_assert!(logger, display_cfg.flip_enum() == Flip::None, "No flip maps to None");
+    test_assert!(
+        logger,
+        display_cfg.flip_enum() == Flip::None,
+        "No flip maps to None"
+    );
 
     display_cfg.flip_horizontal = true;
     display_cfg.flip_vertical = false;
-    test_assert!(logger, display_cfg.flip_enum() == Flip::Horizontal, "H flip maps correctly");
+    test_assert!(
+        logger,
+        display_cfg.flip_enum() == Flip::Horizontal,
+        "H flip maps correctly"
+    );
 
     display_cfg.flip_horizontal = false;
     display_cfg.flip_vertical = true;
-    test_assert!(logger, display_cfg.flip_enum() == Flip::Vertical, "V flip maps correctly");
+    test_assert!(
+        logger,
+        display_cfg.flip_enum() == Flip::Vertical,
+        "V flip maps correctly"
+    );
 
     display_cfg.flip_horizontal = true;
     display_cfg.flip_vertical = true;
-    test_assert!(logger, display_cfg.flip_enum() == Flip::Both, "Both flips map correctly");
+    test_assert!(
+        logger,
+        display_cfg.flip_enum() == Flip::Both,
+        "Both flips map correctly"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Test invalid rotation fallback");
     display_cfg.rotation = 45;
-    test_assert!(logger, display_cfg.rotation_enum() == Rotation::None, "Invalid rotation defaults to None");
+    test_assert!(
+        logger,
+        display_cfg.rotation_enum() == Rotation::None,
+        "Invalid rotation defaults to None"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Test scaling mode default");
-    test_assert!(logger, display_cfg.scaling_mode == ScalingMode::default(), "Scaling mode has default");
+    test_assert!(
+        logger,
+        display_cfg.scaling_mode == ScalingMode::default(),
+        "Scaling mode has default"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -696,19 +873,34 @@ async fn test_concurrent_config_commands() {
 
     let sender1 = tokio::spawn(async move {
         for _ in 0..10 {
-            handle1.send_command(Command::SetScaling { mode: ScalingMode::Fit }).await.ok();
+            handle1
+                .send_command(Command::SetScaling {
+                    mode: ScalingMode::Fit,
+                })
+                .await
+                .ok();
         }
     });
 
     let sender2 = tokio::spawn(async move {
         for _ in 0..10 {
-            handle2.send_command(Command::SetRotation { rotation: Rotation::Clockwise90 }).await.ok();
+            handle2
+                .send_command(Command::SetRotation {
+                    rotation: Rotation::Clockwise90,
+                })
+                .await
+                .ok();
         }
     });
 
     let sender3 = tokio::spawn(async move {
         for _ in 0..10 {
-            handle3.send_command(Command::SetFlip { flip: Flip::Horizontal }).await.ok();
+            handle3
+                .send_command(Command::SetFlip {
+                    flip: Flip::Horizontal,
+                })
+                .await
+                .ok();
         }
     });
     test_step_ok!(logger);
@@ -734,7 +926,11 @@ async fn test_concurrent_config_commands() {
     }
 
     test_assert!(logger, scaling_count == 10, "All scaling commands received");
-    test_assert!(logger, rotation_count == 10, "All rotation commands received");
+    test_assert!(
+        logger,
+        rotation_count == 10,
+        "All rotation commands received"
+    );
     test_assert!(logger, flip_count == 10, "All flip commands received");
     test_step_ok!(logger);
 
@@ -755,16 +951,25 @@ fn test_target_resolution_change() {
         width: 640,
         height: 480,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 200, g: 100, b: 50 },
+        pattern: FramePattern::SolidColor {
+            r: 200,
+            g: 100,
+            b: 50,
+        },
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).unwrap();
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .unwrap();
     capture.start().unwrap();
     let frame = capture.next_frame().unwrap();
     test_step_ok!(logger);

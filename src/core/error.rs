@@ -174,7 +174,10 @@ impl MicroundError {
             Self::Render { source, .. } => source.user_message(),
             Self::Config { source, .. } => source.user_message(),
             Self::Internal { message, .. } => {
-                format!("An unexpected error occurred. Please restart the application. ({})", message)
+                format!(
+                    "An unexpected error occurred. Please restart the application. ({})",
+                    message
+                )
             }
         }
     }
@@ -269,10 +272,11 @@ impl CaptureError {
     pub fn severity(&self) -> ErrorSeverity {
         match self {
             Self::Timeout(_) | Self::Disconnected => ErrorSeverity::Recoverable,
-            Self::DeviceNotFound(_) | Self::DeviceBusy | Self::NoCameras |
-            Self::PermissionDenied(_) | Self::FormatNegotiationFailed(_) => {
-                ErrorSeverity::UserActionable
-            }
+            Self::DeviceNotFound(_)
+            | Self::DeviceBusy
+            | Self::NoCameras
+            | Self::PermissionDenied(_)
+            | Self::FormatNegotiationFailed(_) => ErrorSeverity::UserActionable,
             Self::Platform(_) => ErrorSeverity::Fatal,
         }
     }
@@ -366,9 +370,7 @@ impl RenderError {
             Self::DisplayNotFound(_) | Self::WallpaperIntegration(_) => {
                 ErrorSeverity::UserActionable
             }
-            Self::SurfaceCreation(_) | Self::Gpu(_) | Self::Platform(_) => {
-                ErrorSeverity::Fatal
-            }
+            Self::SurfaceCreation(_) | Self::Gpu(_) | Self::Platform(_) => ErrorSeverity::Fatal,
         }
     }
 
@@ -379,17 +381,19 @@ impl RenderError {
                 "Unable to create display surface. Please check your graphics drivers.".into()
             }
             Self::DisplayNotFound(name) => {
-                format!("Display '{}' is not available. Please check your display settings.", name)
+                format!(
+                    "Display '{}' is not available. Please check your display settings.",
+                    name
+                )
             }
             Self::Gpu(_) => {
                 "A graphics error occurred. Please update your graphics drivers.".into()
             }
             Self::WallpaperIntegration(_) => {
-                "Unable to set wallpaper. Your desktop environment may not support this feature.".into()
+                "Unable to set wallpaper. Your desktop environment may not support this feature."
+                    .into()
             }
-            Self::FrameProcessing(_) => {
-                "Error processing video frame. Skipping frame...".into()
-            }
+            Self::FrameProcessing(_) => "Error processing video frame. Skipping frame...".into(),
             Self::Platform(msg) => {
                 format!("A system error occurred: {}", msg)
             }
@@ -451,18 +455,12 @@ impl ConfigError {
     /// Get a user-friendly message for this error
     pub fn user_message(&self) -> String {
         match self {
-            Self::ReadFailed(_) => {
-                "Unable to read settings. Using default configuration.".into()
-            }
+            Self::ReadFailed(_) => "Unable to read settings. Using default configuration.".into(),
             Self::WriteFailed(_) => {
                 "Unable to save settings. Check that you have write permissions.".into()
             }
-            Self::Invalid(_) => {
-                "Settings file is corrupted. Using default configuration.".into()
-            }
-            Self::NotFound(_) => {
-                "Settings file not found. Using default configuration.".into()
-            }
+            Self::Invalid(_) => "Settings file is corrupted. Using default configuration.".into(),
+            Self::NotFound(_) => "Settings file not found. Using default configuration.".into(),
         }
     }
 
@@ -527,7 +525,8 @@ impl PlatformError {
                 format!("This feature is not available on your system: {}", msg)
             }
             Self::CommandFailed(_) => {
-                "A system command failed. Please check your desktop environment configuration.".into()
+                "A system command failed. Please check your desktop environment configuration."
+                    .into()
             }
             Self::InvalidState(msg) => {
                 format!("Operation cannot be completed: {}", msg)
@@ -610,9 +609,18 @@ mod tests {
 
     #[test]
     fn test_capture_error_severity() {
-        assert_eq!(CaptureError::Timeout(1000).severity(), ErrorSeverity::Recoverable);
-        assert_eq!(CaptureError::PermissionDenied("camera".into()).severity(), ErrorSeverity::UserActionable);
-        assert_eq!(CaptureError::Platform("unknown".into()).severity(), ErrorSeverity::Fatal);
+        assert_eq!(
+            CaptureError::Timeout(1000).severity(),
+            ErrorSeverity::Recoverable
+        );
+        assert_eq!(
+            CaptureError::PermissionDenied("camera".into()).severity(),
+            ErrorSeverity::UserActionable
+        );
+        assert_eq!(
+            CaptureError::Platform("unknown".into()).severity(),
+            ErrorSeverity::Fatal
+        );
     }
 
     #[test]

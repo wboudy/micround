@@ -186,15 +186,20 @@ impl GpuProcessor {
         let expected_size = (frame.width as usize)
             .checked_mul(frame.height as usize)
             .and_then(|pixels| pixels.checked_mul(4))
-            .ok_or_else(|| GpuError::InvalidInput(format!(
-                "Frame dimensions overflow: {}x{}",
-                frame.width, frame.height
-            )))?;
+            .ok_or_else(|| {
+                GpuError::InvalidInput(format!(
+                    "Frame dimensions overflow: {}x{}",
+                    frame.width, frame.height
+                ))
+            })?;
 
         if frame.data.len() != expected_size {
             return Err(GpuError::InvalidInput(format!(
                 "Frame data size mismatch: expected {} bytes for {}x{} RGBA, got {}",
-                expected_size, frame.width, frame.height, frame.data.len()
+                expected_size,
+                frame.width,
+                frame.height,
+                frame.data.len()
             )));
         }
 
@@ -218,9 +223,7 @@ impl GpuProcessor {
 
             // Calculate output dimensions after rotation
             let (out_w, out_h) = match config.rotation {
-                Rotation::Clockwise90 | Rotation::Clockwise270 => {
-                    (current_height, current_width)
-                }
+                Rotation::Clockwise90 | Rotation::Clockwise270 => (current_height, current_width),
                 _ => (current_width, current_height),
             };
 
@@ -324,20 +327,23 @@ impl GpuProcessor {
 
     /// Create an empty texture for output
     fn create_empty_texture(&self, width: u32, height: u32) -> Result<wgpu::Texture, GpuError> {
-        let texture = self.context.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Output Frame"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
+        let texture = self
+            .context
+            .device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Output Frame"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
+            });
 
         Ok(texture)
     }
@@ -362,12 +368,12 @@ impl GpuProcessor {
             mapped_at_creation: false,
         });
 
-        let mut encoder = self
-            .context
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Download Encoder"),
-            });
+        let mut encoder =
+            self.context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Download Encoder"),
+                });
 
         encoder.copy_texture_to_buffer(
             wgpu::ImageCopyTexture {
@@ -621,16 +627,15 @@ impl ScalePipeline {
                     push_constant_ranges: &[],
                 });
 
-        let pipeline =
-            context
-                .device
-                .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                    label: Some("Scale Pipeline"),
-                    layout: Some(&pipeline_layout),
-                    module: &shader,
-                    entry_point: "main",
-                    compilation_options: Default::default(),
-                });
+        let pipeline = context
+            .device
+            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Scale Pipeline"),
+                layout: Some(&pipeline_layout),
+                module: &shader,
+                entry_point: "main",
+                compilation_options: Default::default(),
+            });
 
         Ok(Self {
             pipeline,
@@ -882,16 +887,15 @@ impl TransformPipeline {
                     push_constant_ranges: &[],
                 });
 
-        let pipeline =
-            context
-                .device
-                .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                    label: Some("Transform Pipeline"),
-                    layout: Some(&pipeline_layout),
-                    module: &shader,
-                    entry_point: "main",
-                    compilation_options: Default::default(),
-                });
+        let pipeline = context
+            .device
+            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Transform Pipeline"),
+                layout: Some(&pipeline_layout),
+                module: &shader,
+                entry_point: "main",
+                compilation_options: Default::default(),
+            });
 
         Ok(Self {
             pipeline,
@@ -1238,7 +1242,11 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(GpuError::InvalidInput(msg)) => {
-                assert!(msg.contains("mismatch"), "Error should mention mismatch: {}", msg);
+                assert!(
+                    msg.contains("mismatch"),
+                    "Error should mention mismatch: {}",
+                    msg
+                );
             }
             _ => panic!("Expected InvalidInput error for frame size mismatch"),
         }
@@ -1265,7 +1273,11 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(GpuError::InvalidInput(msg)) => {
-                assert!(msg.contains("mismatch"), "Error should mention mismatch: {}", msg);
+                assert!(
+                    msg.contains("mismatch"),
+                    "Error should mention mismatch: {}",
+                    msg
+                );
             }
             _ => panic!("Expected InvalidInput error for frame size mismatch"),
         }

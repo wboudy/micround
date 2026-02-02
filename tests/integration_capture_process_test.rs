@@ -11,8 +11,8 @@ mod common;
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern},
 };
 use micround::core::{CaptureSettings, Flip, PixelFormat, Rotation, ScalingMode};
 use micround::process::{process_frame, ProcessorConfig};
@@ -54,19 +54,45 @@ fn test_basic_capture_to_process_flow() {
     let raw_frame = backend.next_frame().unwrap();
     test_assert!(logger, raw_frame.width == 320, "Frame width is correct");
     test_assert!(logger, raw_frame.height == 240, "Frame height is correct");
-    test_assert!(logger, raw_frame.format == PixelFormat::Rgba32, "Frame format is RGBA32");
-    test_step_ok!(logger, "Captured frame {}x{}", raw_frame.width, raw_frame.height);
+    test_assert!(
+        logger,
+        raw_frame.format == PixelFormat::Rgba32,
+        "Frame format is RGBA32"
+    );
+    test_step_ok!(
+        logger,
+        "Captured frame {}x{}",
+        raw_frame.width,
+        raw_frame.height
+    );
 
     test_step!(logger, "Processing captured frame");
     let proc_config = ProcessorConfig::new(640, 480);
     let processed = process_frame(&raw_frame, &proc_config).unwrap();
-    test_step_ok!(logger, "Processed to {}x{}", processed.width, processed.height);
+    test_step_ok!(
+        logger,
+        "Processed to {}x{}",
+        processed.width,
+        processed.height
+    );
 
     test_step!(logger, "Validating processed frame");
-    test_assert!(logger, processed.width == 640, "Processed width matches target");
-    test_assert!(logger, processed.height == 480, "Processed height matches target");
+    test_assert!(
+        logger,
+        processed.width == 640,
+        "Processed width matches target"
+    );
+    test_assert!(
+        logger,
+        processed.height == 480,
+        "Processed height matches target"
+    );
     let expected_size = 640 * 480 * 4; // RGBA
-    test_assert!(logger, processed.data.len() == expected_size, "Processed data size correct");
+    test_assert!(
+        logger,
+        processed.data.len() == expected_size,
+        "Processed data size correct"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleaning up");
@@ -166,7 +192,14 @@ fn test_various_patterns_through_pipeline() {
 
     let patterns = [
         (FramePattern::ColorBars, "ColorBars"),
-        (FramePattern::SolidColor { r: 128, g: 64, b: 192 }, "SolidColor"),
+        (
+            FramePattern::SolidColor {
+                r: 128,
+                g: 64,
+                b: 192,
+            },
+            "SolidColor",
+        ),
         (FramePattern::HorizontalGradient, "HorizontalGradient"),
         (FramePattern::VerticalGradient, "VerticalGradient"),
         (FramePattern::Checkerboard { size: 16 }, "Checkerboard"),
@@ -197,14 +230,22 @@ fn test_various_patterns_through_pipeline() {
 
         let raw_frame = backend.next_frame().unwrap();
         test_assert!(logger, !raw_frame.data.is_empty(), "Frame has data");
-        test_assert!(logger, raw_frame.data.len() == 64 * 64 * 4, "Correct data size");
+        test_assert!(
+            logger,
+            raw_frame.data.len() == 64 * 64 * 4,
+            "Correct data size"
+        );
 
         let proc_config = ProcessorConfig::new(128, 128);
         let processed = process_frame(&raw_frame, &proc_config).unwrap();
 
         test_assert!(logger, processed.width == 128, "Output width correct");
         test_assert!(logger, processed.height == 128, "Output height correct");
-        test_assert!(logger, processed.data.len() == 128 * 128 * 4, "Output data size correct");
+        test_assert!(
+            logger,
+            processed.data.len() == 128 * 128 * 4,
+            "Output data size correct"
+        );
 
         backend.stop().unwrap();
         backend.close();
@@ -264,7 +305,13 @@ fn test_scaling_modes_integration() {
         // All modes should produce target dimensions
         test_assert!(logger, processed.width == 300, "Output width is target");
         test_assert!(logger, processed.height == 300, "Output height is target");
-        test_step_ok!(logger, "Mode {} produced {}x{}", name, processed.width, processed.height);
+        test_step_ok!(
+            logger,
+            "Mode {} produced {}x{}",
+            name,
+            processed.width,
+            processed.height
+        );
     }
 
     test_step!(logger, "Cleanup");
@@ -317,12 +364,27 @@ fn test_transforms_integration() {
             .with_metrics(true);
 
         let processed = process_frame(&raw_frame, &proc_config).unwrap();
-        test_assert!(logger, processed.width == 320, "Width correct for rotation {}", name);
-        test_assert!(logger, processed.height == 240, "Height correct for rotation {}", name);
+        test_assert!(
+            logger,
+            processed.width == 320,
+            "Width correct for rotation {}",
+            name
+        );
+        test_assert!(
+            logger,
+            processed.height == 240,
+            "Height correct for rotation {}",
+            name
+        );
 
         if rotation != Rotation::None {
             let metrics = processed.metrics.as_ref().unwrap();
-            test_assert!(logger, metrics.transform_executed, "Transform executed for {}", name);
+            test_assert!(
+                logger,
+                metrics.transform_executed,
+                "Transform executed for {}",
+                name
+            );
         }
     }
     test_step_ok!(logger);
@@ -343,8 +405,18 @@ fn test_transforms_integration() {
             .with_metrics(true);
 
         let processed = process_frame(&raw_frame, &proc_config).unwrap();
-        test_assert!(logger, processed.width == 320, "Width correct for flip {}", name);
-        test_assert!(logger, processed.height == 240, "Height correct for flip {}", name);
+        test_assert!(
+            logger,
+            processed.width == 320,
+            "Width correct for flip {}",
+            name
+        );
+        test_assert!(
+            logger,
+            processed.height == 240,
+            "Height correct for flip {}",
+            name
+        );
     }
     test_step_ok!(logger);
 
@@ -385,7 +457,11 @@ fn test_frame_data_integrity() {
         width: 100,
         height: 100,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 200, g: 100, b: 50 },
+        pattern: FramePattern::SolidColor {
+            r: 200,
+            g: 100,
+            b: 50,
+        },
         ..Default::default()
     };
     let mut backend = SimulatorBackend::new(config);
@@ -411,8 +487,7 @@ fn test_frame_data_integrity() {
     test_step_ok!(logger);
 
     test_step!(logger, "Processing at same size (no scaling)");
-    let proc_config = ProcessorConfig::new(100, 100)
-        .with_scaling(ScalingMode::Fill);
+    let proc_config = ProcessorConfig::new(100, 100).with_scaling(ScalingMode::Fill);
     let processed = process_frame(&raw_frame, &proc_config).unwrap();
     test_step_ok!(logger);
 
@@ -424,17 +499,20 @@ fn test_frame_data_integrity() {
             test_assert!(
                 logger,
                 processed.data[pos] == 200,
-                "Processed R at offset {} correct", pos
+                "Processed R at offset {} correct",
+                pos
             );
             test_assert!(
                 logger,
                 processed.data[pos + 1] == 100,
-                "Processed G at offset {} correct", pos
+                "Processed G at offset {} correct",
+                pos
             );
             test_assert!(
                 logger,
                 processed.data[pos + 2] == 50,
-                "Processed B at offset {} correct", pos
+                "Processed B at offset {} correct",
+                pos
             );
         }
     }
@@ -611,16 +689,14 @@ fn test_aspect_ratio_handling() {
         let raw_frame = backend.next_frame().unwrap();
 
         // Test with Fit mode to see letterboxing
-        let proc_config = ProcessorConfig::new(out_w, out_h)
-            .with_scaling(ScalingMode::Fit);
+        let proc_config = ProcessorConfig::new(out_w, out_h).with_scaling(ScalingMode::Fit);
         let processed = process_frame(&raw_frame, &proc_config).unwrap();
 
         test_assert!(logger, processed.width == out_w, "Fit output width");
         test_assert!(logger, processed.height == out_h, "Fit output height");
 
         // Test with Fill mode
-        let proc_config = ProcessorConfig::new(out_w, out_h)
-            .with_scaling(ScalingMode::Fill);
+        let proc_config = ProcessorConfig::new(out_w, out_h).with_scaling(ScalingMode::Fill);
         let processed = process_frame(&raw_frame, &proc_config).unwrap();
 
         test_assert!(logger, processed.width == out_w, "Fill output width");
@@ -695,7 +771,9 @@ fn test_sustained_throughput() {
     test_step_ok!(
         logger,
         "Throughput: {:.1} FPS, avg decode: {:?}, avg scale: {:?}",
-        fps, avg_decode, avg_scale
+        fps,
+        avg_decode,
+        avg_scale
     );
 
     test_step!(logger, "Cleanup");
@@ -750,7 +828,11 @@ fn test_metrics_collection() {
     test_assert!(logger, metrics.decode_executed, "Decode was executed");
     test_assert!(logger, metrics.transform_executed, "Transform was executed");
     test_assert!(logger, metrics.scale_executed, "Scale was executed");
-    test_assert!(logger, metrics.total_time > Duration::ZERO, "Total time recorded");
+    test_assert!(
+        logger,
+        metrics.total_time > Duration::ZERO,
+        "Total time recorded"
+    );
     test_assert!(
         logger,
         metrics.total_time >= metrics.decode_time,
@@ -759,7 +841,10 @@ fn test_metrics_collection() {
     test_step_ok!(
         logger,
         "decode: {:?}, transform: {:?}, scale: {:?}, total: {:?}",
-        metrics.decode_time, metrics.transform_time, metrics.scale_time, metrics.total_time
+        metrics.decode_time,
+        metrics.transform_time,
+        metrics.scale_time,
+        metrics.total_time
     );
 
     test_step!(logger, "Cleanup");
@@ -785,7 +870,11 @@ fn test_minimum_frame_size() {
         width: 1,
         height: 1,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 255, g: 128, b: 64 },
+        pattern: FramePattern::SolidColor {
+            r: 255,
+            g: 128,
+            b: 64,
+        },
         ..Default::default()
     };
     let mut backend = SimulatorBackend::new(config);
@@ -884,12 +973,19 @@ fn test_sequence_continuity() {
 fn test_letterbox_background_color() {
     let mut logger = TestLogger::new("letterbox_background_color", 4);
 
-    test_step!(logger, "Setting up 16:9 capture for 4:3 target (will letterbox)");
+    test_step!(
+        logger,
+        "Setting up 16:9 capture for 4:3 target (will letterbox)"
+    );
     let config = SimulatorConfig {
         width: 160,
         height: 90, // 16:9
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 200, g: 100, b: 50 },
+        pattern: FramePattern::SolidColor {
+            r: 200,
+            g: 100,
+            b: 50,
+        },
         ..Default::default()
     };
     let mut backend = SimulatorBackend::new(config);

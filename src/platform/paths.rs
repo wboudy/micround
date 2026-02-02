@@ -91,8 +91,7 @@ impl AppPaths {
     pub fn ensure_dirs(&self) -> Result<(), PathError> {
         for dir in [&self.config, &self.data, &self.cache, &self.logs] {
             if !dir.exists() {
-                std::fs::create_dir_all(dir)
-                    .map_err(|e| PathError::CreateFailed(e.to_string()))?;
+                std::fs::create_dir_all(dir).map_err(|e| PathError::CreateFailed(e.to_string()))?;
             }
         }
         Ok(())

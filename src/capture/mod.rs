@@ -37,24 +37,21 @@ pub mod avfoundation;
 // Simulator module is always available - it's production code, not mocks
 pub mod simulator;
 
-use crate::core::{CameraDevice, CaptureSettings, DeviceId, Frame, CaptureError, NegotiatedFormat};
+use crate::core::{CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat};
 
-pub use enumerator::*;
-pub use negotiation::{negotiate_format, filter_acceptable_capabilities};
 pub use capture_loop::{
-    start_capture_loop, CaptureLoopHandle, CaptureLoopError, CaptureMetrics,
-    CaptureState, FrameReceiver, MetricsSnapshot,
+    start_capture_loop, CaptureLoopError, CaptureLoopHandle, CaptureMetrics, CaptureState,
+    FrameReceiver, MetricsSnapshot,
 };
-pub use state::{
-    CameraState, CameraStateManager, CameraErrorInfo, StateTransition,
-    TransitionReason, SharedCameraState, shared_camera_state, shared_camera_state_available,
-};
+pub use enumerator::*;
 pub use hotplug::{
-    HotplugConfig, HotplugMonitorHandle, start_hotplug_monitor,
-    ChannelHandler, TokioChannelHandler,
+    start_hotplug_monitor, ChannelHandler, HotplugConfig, HotplugMonitorHandle, TokioChannelHandler,
 };
-pub use manager::{
-    CaptureManager, CameraHandle, DeviceEvent,
+pub use manager::{CameraHandle, CaptureManager, DeviceEvent};
+pub use negotiation::{filter_acceptable_capabilities, negotiate_format};
+pub use state::{
+    shared_camera_state, shared_camera_state_available, CameraErrorInfo, CameraState,
+    CameraStateManager, SharedCameraState, StateTransition, TransitionReason,
 };
 
 /// Trait for platform-specific capture implementations
@@ -72,7 +69,11 @@ pub trait CaptureBackend: Send {
     /// - `DeviceBusy` - Device is in use by another application
     /// - `FormatNegotiationFailed` - No suitable format available
     /// - `PermissionDenied` - Insufficient permissions
-    fn open(&mut self, device_id: &DeviceId, settings: CaptureSettings) -> Result<NegotiatedFormat, CaptureError>;
+    fn open(
+        &mut self,
+        device_id: &DeviceId,
+        settings: CaptureSettings,
+    ) -> Result<NegotiatedFormat, CaptureError>;
 
     /// Start capturing frames
     fn start(&mut self) -> Result<(), CaptureError>;
@@ -148,6 +149,8 @@ pub fn create_simulator_backend() -> Box<dyn CaptureBackend> {
 
 /// Create a simulator backend with custom configuration
 #[cfg(feature = "test-simulator")]
-pub fn create_simulator_backend_with_config(config: simulator::SimulatorConfig) -> Box<dyn CaptureBackend> {
+pub fn create_simulator_backend_with_config(
+    config: simulator::SimulatorConfig,
+) -> Box<dyn CaptureBackend> {
     Box::new(simulator::SimulatorBackend::new(config))
 }

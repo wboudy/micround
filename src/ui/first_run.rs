@@ -54,8 +54,8 @@
 //!                  (user connects camera)
 //! ```
 
-use std::time::Instant;
 use crate::core::{CameraDevice, DeviceId};
+use std::time::Instant;
 
 /// Current state of the first-run experience
 #[derive(Debug, Clone)]
@@ -73,9 +73,7 @@ pub enum FirstRunState {
     },
 
     /// Single camera found - show preview
-    SingleCamera {
-        device: CameraDevice,
-    },
+    SingleCamera { device: CameraDevice },
 
     /// Multiple cameras found - let user choose
     MultipleCamera {
@@ -84,24 +82,16 @@ pub enum FirstRunState {
     },
 
     /// Showing camera preview before committing
-    Preview {
-        device: CameraDevice,
-    },
+    Preview { device: CameraDevice },
 
     /// Permission denied (macOS)
-    PermissionDenied {
-        platform: String,
-    },
+    PermissionDenied { platform: String },
 
     /// Confirming setup before applying
-    ConfirmSetup {
-        device: CameraDevice,
-    },
+    ConfirmSetup { device: CameraDevice },
 
     /// Setup complete!
-    Success {
-        device: CameraDevice,
-    },
+    Success { device: CameraDevice },
 
     /// User cancelled the wizard
     Cancelled,
@@ -165,7 +155,7 @@ impl FirstRunState {
                 show_camera_list: false,
                 trust_message: Some(
                     "Privacy first: Your camera feed stays on your computer. \
-                    Nothing is recorded or sent anywhere."
+                    Nothing is recorded or sent anywhere.",
                 ),
             },
 
@@ -231,7 +221,7 @@ impl FirstRunState {
                 show_camera_list: false,
                 trust_message: Some(
                     "Your camera feed is only used for the wallpaper display. \
-                    We don't record, store, or transmit any video."
+                    We don't record, store, or transmit any video.",
                 ),
             },
 
@@ -318,7 +308,11 @@ impl FirstRunController {
             }
 
             FirstRunAction::SelectCamera(index) => {
-                if let FirstRunState::MultipleCamera { ref mut selected_index, .. } = self.state {
+                if let FirstRunState::MultipleCamera {
+                    ref mut selected_index,
+                    ..
+                } = self.state
+                {
                     *selected_index = Some(index);
                 }
                 None
@@ -345,7 +339,9 @@ impl FirstRunController {
             FirstRunAction::ApplyWallpaper => {
                 if let FirstRunState::ConfirmSetup { ref device } = self.state {
                     let device = device.clone();
-                    self.state = FirstRunState::Success { device: device.clone() };
+                    self.state = FirstRunState::Success {
+                        device: device.clone(),
+                    };
                     Some(FirstRunEvent::ApplyWallpaper(device.id.clone()))
                 } else {
                     None
@@ -357,9 +353,7 @@ impl FirstRunController {
                 None
             }
 
-            FirstRunAction::OpenSettings => {
-                Some(FirstRunEvent::OpenSystemSettings)
-            }
+            FirstRunAction::OpenSettings => Some(FirstRunEvent::OpenSystemSettings),
 
             FirstRunAction::Cancel => {
                 self.state = FirstRunState::Cancelled;
@@ -382,8 +376,12 @@ impl FirstRunController {
         self.cameras = cameras.clone();
 
         self.state = match cameras.len() {
-            0 => FirstRunState::NoCamera { since: Instant::now() },
-            1 => FirstRunState::SingleCamera { device: cameras.into_iter().next().unwrap() },
+            0 => FirstRunState::NoCamera {
+                since: Instant::now(),
+            },
+            1 => FirstRunState::SingleCamera {
+                device: cameras.into_iter().next().unwrap(),
+            },
             _ => FirstRunState::MultipleCamera {
                 devices: cameras,
                 selected_index: None,
@@ -409,7 +407,7 @@ impl FirstRunController {
                 match self.cameras.len() {
                     0 => FirstRunState::DetectingCameras,
                     1 => FirstRunState::SingleCamera {
-                        device: self.cameras[0].clone()
+                        device: self.cameras[0].clone(),
                     },
                     _ => FirstRunState::MultipleCamera {
                         devices: self.cameras.clone(),
@@ -417,9 +415,9 @@ impl FirstRunController {
                     },
                 }
             }
-            FirstRunState::ConfirmSetup { device } => {
-                FirstRunState::Preview { device: device.clone() }
-            }
+            FirstRunState::ConfirmSetup { device } => FirstRunState::Preview {
+                device: device.clone(),
+            },
             _ => FirstRunState::Welcome,
         };
     }
@@ -428,9 +426,10 @@ impl FirstRunController {
     fn get_selected_camera(&self) -> Option<&CameraDevice> {
         match &self.state {
             FirstRunState::SingleCamera { device } => Some(device),
-            FirstRunState::MultipleCamera { devices, selected_index } => {
-                selected_index.and_then(|i| devices.get(i))
-            }
+            FirstRunState::MultipleCamera {
+                devices,
+                selected_index,
+            } => selected_index.and_then(|i| devices.get(i)),
             FirstRunState::Preview { device } => Some(device),
             FirstRunState::ConfirmSetup { device } => Some(device),
             _ => None,
@@ -488,7 +487,10 @@ mod tests {
 
         let event = controller.handle_action(FirstRunAction::StartSetup);
 
-        assert!(matches!(controller.state(), FirstRunState::DetectingCameras));
+        assert!(matches!(
+            controller.state(),
+            FirstRunState::DetectingCameras
+        ));
         assert!(matches!(event, Some(FirstRunEvent::StartCameraDetection)));
     }
 
@@ -510,7 +512,10 @@ mod tests {
         let device = make_test_device("USB Microscope");
         controller.on_cameras_detected(vec![device.clone()]);
 
-        assert!(matches!(controller.state(), FirstRunState::SingleCamera { .. }));
+        assert!(matches!(
+            controller.state(),
+            FirstRunState::SingleCamera { .. }
+        ));
     }
 
     #[test]
@@ -524,7 +529,10 @@ mod tests {
         ];
         controller.on_cameras_detected(devices);
 
-        assert!(matches!(controller.state(), FirstRunState::MultipleCamera { .. }));
+        assert!(matches!(
+            controller.state(),
+            FirstRunState::MultipleCamera { .. }
+        ));
     }
 
     #[test]
@@ -544,7 +552,10 @@ mod tests {
 
         // Confirm camera
         controller.handle_action(FirstRunAction::ConfirmCamera);
-        assert!(matches!(controller.state(), FirstRunState::ConfirmSetup { .. }));
+        assert!(matches!(
+            controller.state(),
+            FirstRunState::ConfirmSetup { .. }
+        ));
 
         // Apply wallpaper
         let event = controller.handle_action(FirstRunAction::ApplyWallpaper);
@@ -563,7 +574,10 @@ mod tests {
 
         controller.handle_action(FirstRunAction::GoBack);
 
-        assert!(matches!(controller.state(), FirstRunState::SingleCamera { .. }));
+        assert!(matches!(
+            controller.state(),
+            FirstRunState::SingleCamera { .. }
+        ));
     }
 
     #[test]
@@ -579,7 +593,8 @@ mod tests {
     fn test_terminal_states() {
         assert!(FirstRunState::Success {
             device: make_test_device("test")
-        }.is_terminal());
+        }
+        .is_terminal());
         assert!(FirstRunState::Cancelled.is_terminal());
         assert!(!FirstRunState::Welcome.is_terminal());
     }

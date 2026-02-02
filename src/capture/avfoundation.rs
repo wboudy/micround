@@ -30,10 +30,10 @@ use crate::core::{
 
 #[cfg(target_os = "macos")]
 mod objc_bindings {
-    use objc2::rc::{Retained, Allocated};
-    use objc2::runtime::{AnyClass, AnyObject, Sel, Bool};
-    use objc2::{class, msg_send, msg_send_id, sel, ClassType};
     use objc2::ffi::NSInteger;
+    use objc2::rc::{Allocated, Retained};
+    use objc2::runtime::{AnyClass, AnyObject, Bool, Sel};
+    use objc2::{class, msg_send, msg_send_id, sel, ClassType};
     use std::ptr::NonNull;
 
     /// AVAuthorizationStatus enumeration
@@ -55,7 +55,8 @@ mod objc_bindings {
     pub fn authorization_status() -> AVAuthorizationStatus {
         unsafe {
             let cls = class!(AVCaptureDevice);
-            let status: NSInteger = msg_send![cls, authorizationStatusForMediaType: av_media_type_video()];
+            let status: NSInteger =
+                msg_send![cls, authorizationStatusForMediaType: av_media_type_video()];
             match status {
                 0 => AVAuthorizationStatus::NotDetermined,
                 1 => AVAuthorizationStatus::Restricted,
@@ -109,8 +110,8 @@ impl AVFoundationEnumerator {
     /// Enumerate video capture devices using AVFoundation
     #[cfg(target_os = "macos")]
     fn enumerate_devices_internal() -> Result<Vec<CameraDevice>, CaptureError> {
-        use objc2::{class, msg_send, msg_send_id, sel};
         use objc2::rc::Retained;
+        use objc2::{class, msg_send, msg_send_id, sel};
 
         let mut devices = Vec::new();
 
@@ -143,7 +144,8 @@ impl AVFoundationEnumerator {
             let count: usize = msg_send![device_array, count];
 
             for i in 0..count {
-                let device: *const objc2::runtime::AnyObject = msg_send![device_array, objectAtIndex: i];
+                let device: *const objc2::runtime::AnyObject =
+                    msg_send![device_array, objectAtIndex: i];
                 if device.is_null() {
                     continue;
                 }
@@ -157,7 +159,8 @@ impl AVFoundationEnumerator {
                 let name_str = nsstring_to_string(name);
 
                 // Get manufacturer (if available)
-                let manufacturer: *const objc2::runtime::AnyObject = msg_send![device, manufacturer];
+                let manufacturer: *const objc2::runtime::AnyObject =
+                    msg_send![device, manufacturer];
                 let manufacturer_str = if !manufacturer.is_null() {
                     Some(nsstring_to_string(manufacturer))
                 } else {
@@ -238,7 +241,9 @@ unsafe fn nsstring_to_string(nsstring: *const objc2::runtime::AnyObject) -> Stri
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn query_device_capabilities(device: *const objc2::runtime::AnyObject) -> Vec<CameraCapability> {
+unsafe fn query_device_capabilities(
+    device: *const objc2::runtime::AnyObject,
+) -> Vec<CameraCapability> {
     use objc2::msg_send;
 
     let mut capabilities = Vec::new();
@@ -296,9 +301,8 @@ unsafe fn query_device_capabilities(device: *const objc2::runtime::AnyObject) ->
     }
 
     // Deduplicate
-    capabilities.dedup_by(|a, b| {
-        a.width == b.width && a.height == b.height && a.format == b.format
-    });
+    capabilities
+        .dedup_by(|a, b| a.width == b.width && a.height == b.height && a.format == b.format);
 
     capabilities
 }
@@ -368,7 +372,10 @@ impl AVFoundationBackend {
 
     /// Find a device by ID
     #[cfg(target_os = "macos")]
-    fn find_device(&self, device_id: &DeviceId) -> Result<*const objc2::runtime::AnyObject, CaptureError> {
+    fn find_device(
+        &self,
+        device_id: &DeviceId,
+    ) -> Result<*const objc2::runtime::AnyObject, CaptureError> {
         use objc2::{class, msg_send};
 
         unsafe {
@@ -399,7 +406,9 @@ impl AVFoundationBackend {
             let session_cls = class!(AVCaptureSession);
             let session: *const objc2::runtime::AnyObject = msg_send![session_cls, new];
             if session.is_null() {
-                return Err(CaptureError::Platform("Failed to create capture session".to_string()));
+                return Err(CaptureError::Platform(
+                    "Failed to create capture session".to_string(),
+                ));
             }
 
             // Begin configuration
@@ -432,7 +441,9 @@ impl AVFoundationBackend {
             if input.is_null() {
                 let _: () = msg_send![session, commitConfiguration];
                 let _: () = msg_send![session, release];
-                return Err(CaptureError::Platform("Failed to create device input".to_string()));
+                return Err(CaptureError::Platform(
+                    "Failed to create device input".to_string(),
+                ));
             }
 
             // Add input to session
@@ -450,7 +461,9 @@ impl AVFoundationBackend {
             if output.is_null() {
                 let _: () = msg_send![session, commitConfiguration];
                 let _: () = msg_send![session, release];
-                return Err(CaptureError::Platform("Failed to create video output".to_string()));
+                return Err(CaptureError::Platform(
+                    "Failed to create video output".to_string(),
+                ));
             }
 
             // Configure output settings - prefer NV12 (kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
@@ -462,7 +475,9 @@ impl AVFoundationBackend {
                 let _: () = msg_send![session, commitConfiguration];
                 let _: () = msg_send![output, release];
                 let _: () = msg_send![session, release];
-                return Err(CaptureError::Platform("Cannot add video output to session".to_string()));
+                return Err(CaptureError::Platform(
+                    "Cannot add video output to session".to_string(),
+                ));
             }
             let _: () = msg_send![session, addOutput: output];
 

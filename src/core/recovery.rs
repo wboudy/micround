@@ -24,7 +24,7 @@
 
 use crate::config::{load_config, save_config, AppConfig};
 use crate::core::logging::log_safe_path;
-use crate::core::{ConfigError, messages};
+use crate::core::{messages, ConfigError};
 use crate::platform::wallpaper::restore_wallpaper_from_path;
 
 /// Result of crash detection check
@@ -53,7 +53,9 @@ impl StartupState {
     pub fn user_message(&self) -> Option<messages::UserMessage> {
         match self {
             Self::Clean | Self::FirstRun => None,
-            Self::RecoveredFromCrash { wallpaper_restored, .. } => {
+            Self::RecoveredFromCrash {
+                wallpaper_restored, ..
+            } => {
                 if *wallpaper_restored {
                     Some(messages::recovery::recovered_from_crash())
                 } else {
@@ -98,9 +100,7 @@ impl RecoveryManager {
         }
 
         // Crash detected!
-        tracing::warn!(
-            "Crash detected: previous session did not shut down cleanly"
-        );
+        tracing::warn!("Crash detected: previous session did not shut down cleanly");
 
         // Attempt to restore wallpaper
         let wallpaper_restored = self.try_restore_wallpaper();
@@ -114,7 +114,11 @@ impl RecoveryManager {
 
         Ok(StartupState::RecoveredFromCrash {
             wallpaper_restored,
-            restored_wallpaper_path: if wallpaper_restored { restored_path } else { None },
+            restored_wallpaper_path: if wallpaper_restored {
+                restored_path
+            } else {
+                None
+            },
         })
     }
 

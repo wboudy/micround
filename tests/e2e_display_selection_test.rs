@@ -11,18 +11,18 @@ use std::time::Duration;
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern},
 };
 use micround::config::AppConfig;
 use micround::core::{
-    AppContext, AppState, Command, DeviceId, DisplayId, Event,
-    CaptureSettings, ScalingMode, Rotation, Flip,
+    AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event, Flip, Rotation,
+    ScalingMode,
 };
 use micround::process::{process_frame, ProcessorConfig};
 use micround::render::{
+    simulator::{CapturedFrame, DisplaySimulator, DisplaySimulatorConfig, RenderStats},
     WallpaperRenderer,
-    simulator::{DisplaySimulator, DisplaySimulatorConfig, CapturedFrame, RenderStats},
 };
 
 // ============================================================================
@@ -40,7 +40,11 @@ fn test_display_enumeration_and_properties() {
         ("Secondary", 2560u32, 1440u32),
         ("Portrait", 1080u32, 1920u32),
     ];
-    test_step_ok!(logger, "Defined {} display configurations", display_configs.len());
+    test_step_ok!(
+        logger,
+        "Defined {} display configurations",
+        display_configs.len()
+    );
 
     test_step!(logger, "Initializing display simulators");
     let mut initialized_displays = Vec::new();
@@ -62,7 +66,11 @@ fn test_display_enumeration_and_properties() {
         );
         initialized_displays.push((display, display_id));
     }
-    test_assert!(logger, initialized_displays.len() == 3, "All displays initialized");
+    test_assert!(
+        logger,
+        initialized_displays.len() == 3,
+        "All displays initialized"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Validating display properties");
@@ -93,10 +101,7 @@ fn test_display_target_selection() {
     let mut logger = TestLogger::new("display_target_selection", 5);
 
     test_step!(logger, "Creating multiple display targets");
-    let configs = [
-        DisplaySimulatorConfig::hd(),
-        DisplaySimulatorConfig::uhd(),
-    ];
+    let configs = [DisplaySimulatorConfig::hd(), DisplaySimulatorConfig::uhd()];
 
     let mut displays: Vec<_> = configs
         .iter()
@@ -122,12 +127,17 @@ fn test_display_target_selection() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open capture");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open capture");
     capture.start().expect("start capture");
     let frame = capture.next_frame().expect("get frame");
     test_step_ok!(logger);
@@ -137,8 +147,16 @@ fn test_display_target_selection() {
     let processed_hd = process_frame(&frame, &proc_config_hd).expect("process for HD");
 
     displays[0].0.render(&processed_hd).expect("render to HD");
-    test_assert!(logger, displays[0].0.frame_count() == 1, "HD display received frame");
-    test_assert!(logger, displays[1].0.frame_count() == 0, "4K display not affected");
+    test_assert!(
+        logger,
+        displays[0].0.frame_count() == 1,
+        "HD display received frame"
+    );
+    test_assert!(
+        logger,
+        displays[1].0.frame_count() == 0,
+        "4K display not affected"
+    );
 
     let hd_frame = displays[0].0.last_frame().expect("get HD frame");
     test_assert!(logger, hd_frame.width == 1920, "HD frame width correct");
@@ -150,7 +168,11 @@ fn test_display_target_selection() {
     let processed_4k = process_frame(&frame, &proc_config_4k).expect("process for 4K");
 
     displays[1].0.render(&processed_4k).expect("render to 4K");
-    test_assert!(logger, displays[1].0.frame_count() == 1, "4K display received frame");
+    test_assert!(
+        logger,
+        displays[1].0.frame_count() == 1,
+        "4K display received frame"
+    );
 
     let uhd_frame = displays[1].0.last_frame().expect("get 4K frame");
     test_assert!(logger, uhd_frame.width == 3840, "4K frame width correct");
@@ -186,7 +208,9 @@ fn test_wallpaper_activation() {
         frame_history_size: 5,
         ..Default::default()
     });
-    display.init(&DisplayId("test:primary".into())).expect("init display");
+    display
+        .init(&DisplayId("test:primary".into()))
+        .expect("init display");
     test_assert!(logger, display.frame_count() == 0, "Display starts empty");
     test_step_ok!(logger);
 
@@ -199,12 +223,17 @@ fn test_wallpaper_activation() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 1920,
-        height: 1080,
-        framerate: 30.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 1920,
+                height: 1080,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -214,7 +243,11 @@ fn test_wallpaper_activation() {
     let processed = process_frame(&frame, &proc_config).expect("process frame");
 
     display.render(&processed).expect("render wallpaper");
-    test_assert!(logger, display.frame_count() == 1, "Wallpaper frame rendered");
+    test_assert!(
+        logger,
+        display.frame_count() == 1,
+        "Wallpaper frame rendered"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying wallpaper content");
@@ -222,7 +255,11 @@ fn test_wallpaper_activation() {
     test_assert!(logger, captured.width == 1920, "Wallpaper width correct");
     test_assert!(logger, captured.height == 1080, "Wallpaper height correct");
     test_assert!(logger, !captured.data.is_empty(), "Wallpaper has data");
-    test_assert!(logger, captured.is_solid_color().is_none(), "Checkerboard is not solid");
+    test_assert!(
+        logger,
+        captured.is_solid_color().is_none(),
+        "Checkerboard is not solid"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -246,9 +283,17 @@ fn test_wallpaper_restoration() {
 
     let mut capture = SimulatorBackend::new_default();
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 30.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     let frame = capture.next_frame().expect("get frame");
@@ -299,8 +344,12 @@ fn test_multi_display_rendering() {
         ..Default::default()
     });
 
-    display1.init(&DisplayId("display:0".into())).expect("init display1");
-    display2.init(&DisplayId("display:1".into())).expect("init display2");
+    display1
+        .init(&DisplayId("display:0".into()))
+        .expect("init display1");
+    display2
+        .init(&DisplayId("display:1".into()))
+        .expect("init display2");
     test_step_ok!(logger);
 
     test_step!(logger, "Setting up capture pipeline");
@@ -312,9 +361,17 @@ fn test_multi_display_rendering() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 1280, height: 720, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 1280,
+                height: 720,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -335,8 +392,16 @@ fn test_multi_display_rendering() {
     let frame1 = display1.last_frame().expect("get frame1");
     let frame2 = display2.last_frame().expect("get frame2");
 
-    test_assert!(logger, frame1.width == 1920 && frame1.height == 1080, "Display1 dimensions");
-    test_assert!(logger, frame2.width == 2560 && frame2.height == 1440, "Display2 dimensions");
+    test_assert!(
+        logger,
+        frame1.width == 1920 && frame1.height == 1080,
+        "Display1 dimensions"
+    );
+    test_assert!(
+        logger,
+        frame2.width == 2560 && frame2.height == 1440,
+        "Display2 dimensions"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -373,16 +438,28 @@ fn test_display_switch_during_operation() {
         ..Default::default()
     });
 
-    display_primary.init(&DisplayId("display:primary".into())).expect("init primary");
-    display_secondary.init(&DisplayId("display:secondary".into())).expect("init secondary");
+    display_primary
+        .init(&DisplayId("display:primary".into()))
+        .expect("init primary");
+    display_secondary
+        .init(&DisplayId("display:secondary".into()))
+        .expect("init secondary");
     test_step_ok!(logger);
 
     test_step!(logger, "Setting up capture");
     let mut capture = SimulatorBackend::new_default();
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 30.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -390,22 +467,42 @@ fn test_display_switch_during_operation() {
     let frame1 = capture.next_frame().expect("get frame");
     let processed1 = process_frame(&frame1, &ProcessorConfig::new(1920, 1080)).expect("process");
     display_primary.render(&processed1).expect("render primary");
-    test_assert!(logger, display_primary.frame_count() == 1, "Primary has frame");
+    test_assert!(
+        logger,
+        display_primary.frame_count() == 1,
+        "Primary has frame"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Switching to secondary display");
     let frame2 = capture.next_frame().expect("get frame");
     let processed2 = process_frame(&frame2, &ProcessorConfig::new(2560, 1440)).expect("process");
-    display_secondary.render(&processed2).expect("render secondary");
-    test_assert!(logger, display_secondary.frame_count() == 1, "Secondary has frame");
+    display_secondary
+        .render(&processed2)
+        .expect("render secondary");
+    test_assert!(
+        logger,
+        display_secondary.frame_count() == 1,
+        "Secondary has frame"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Continuing on secondary display");
     let frame3 = capture.next_frame().expect("get frame");
     let processed3 = process_frame(&frame3, &ProcessorConfig::new(2560, 1440)).expect("process");
-    display_secondary.render(&processed3).expect("render secondary again");
-    test_assert!(logger, display_secondary.frame_count() == 2, "Secondary has 2 frames");
-    test_assert!(logger, display_primary.frame_count() == 1, "Primary unchanged");
+    display_secondary
+        .render(&processed3)
+        .expect("render secondary again");
+    test_assert!(
+        logger,
+        display_secondary.frame_count() == 2,
+        "Secondary has 2 frames"
+    );
+    test_assert!(
+        logger,
+        display_primary.frame_count() == 1,
+        "Primary unchanged"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -435,9 +532,12 @@ async fn test_display_selection_command_dispatch() {
 
     test_step!(logger, "Sending display selection command");
     let target_display = DisplayId("monitor:1".into());
-    handle.send_command(Command::SelectDisplay {
-        display_id: target_display.clone(),
-    }).await.expect("send command");
+    handle
+        .send_command(Command::SelectDisplay {
+            display_id: target_display.clone(),
+        })
+        .await
+        .expect("send command");
 
     let cmd = cmd_rx.recv().await.expect("receive command");
     if let Command::SelectDisplay { display_id } = cmd {
@@ -450,9 +550,12 @@ async fn test_display_selection_command_dispatch() {
     test_step!(logger, "Sending multiple display commands");
     let displays = ["primary", "secondary", "external"];
     for d in &displays {
-        handle.send_command(Command::SelectDisplay {
-            display_id: DisplayId((*d).into()),
-        }).await.expect("send");
+        handle
+            .send_command(Command::SelectDisplay {
+                display_id: DisplayId((*d).into()),
+            })
+            .await
+            .expect("send");
     }
 
     let mut received = Vec::new();
@@ -499,9 +602,17 @@ fn test_display_render_statistics() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     let proc_config = ProcessorConfig::new(1920, 1080);
@@ -517,7 +628,11 @@ fn test_display_render_statistics() {
     let stats = display.stats();
     test_assert!(logger, stats.frames_rendered == 10, "Stats show 10 frames");
     test_assert!(logger, stats.errors == 0, "No render errors");
-    test_assert!(logger, stats.last_render_time.is_some(), "Has last render time");
+    test_assert!(
+        logger,
+        stats.last_render_time.is_some(),
+        "Has last render time"
+    );
     tracing::info!(
         frames = stats.frames_rendered,
         errors = stats.errors,
@@ -546,15 +661,25 @@ fn test_display_frame_history() {
         frame_history_size: 5,
         ..Default::default()
     });
-    display.init(&DisplayId("test:history".into())).expect("init");
+    display
+        .init(&DisplayId("test:history".into()))
+        .expect("init");
     test_step_ok!(logger);
 
     test_step!(logger, "Rendering frames beyond history capacity");
     let mut capture = SimulatorBackend::new_default();
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     let proc_config = ProcessorConfig::new(1920, 1080);

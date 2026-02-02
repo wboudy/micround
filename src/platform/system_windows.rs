@@ -12,25 +12,23 @@ use std::thread::{self, JoinHandle};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Power::{
-    PBT_APMRESUMEAUTOMATIC, PBT_APMRESUMESUSPEND, PBT_APMSUSPEND,
-};
+use windows::Win32::System::Power::{PBT_APMRESUMEAUTOMATIC, PBT_APMRESUMESUSPEND, PBT_APMSUSPEND};
 use windows::Win32::System::RemoteDesktop::{
-    WTSRegisterSessionNotification, WTSUnRegisterSessionNotification,
-    NOTIFY_FOR_THIS_SESSION, WTS_SESSION_LOCK, WTS_SESSION_LOGOFF,
-    WTS_SESSION_LOGON, WTS_SESSION_REMOTE_CONTROL, WTS_SESSION_REMOTE_DISCONNECT,
-    WTS_SESSION_REMOTE_CONNECT, WTS_SESSION_UNLOCK,
+    WTSRegisterSessionNotification, WTSUnRegisterSessionNotification, NOTIFY_FOR_THIS_SESSION,
+    WTS_SESSION_LOCK, WTS_SESSION_LOGOFF, WTS_SESSION_LOGON, WTS_SESSION_REMOTE_CONNECT,
+    WTS_SESSION_REMOTE_CONTROL, WTS_SESSION_REMOTE_DISCONNECT, WTS_SESSION_UNLOCK,
 };
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, PostQuitMessage,
-    PostThreadMessageW, RegisterClassExW, SetWindowLongPtrW, TranslateMessage,
-    CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HWND_MESSAGE, MSG, SC_MONITORPOWER,
-    SC_SCREENSAVE, WM_DESTROY, WM_POWERBROADCAST, WM_SYSCOMMAND, WM_WTSSESSION_CHANGE,
-    WNDCLASSEXW, WM_QUIT,
+    PostThreadMessageW, RegisterClassExW, SetWindowLongPtrW, TranslateMessage, CS_HREDRAW,
+    CS_VREDRAW, GWLP_USERDATA, HWND_MESSAGE, MSG, SC_MONITORPOWER, SC_SCREENSAVE, WM_DESTROY,
+    WM_POWERBROADCAST, WM_QUIT, WM_SYSCOMMAND, WM_WTSSESSION_CHANGE, WNDCLASSEXW,
 };
 
-use super::{SessionEvent, SleepEvent, SystemError, SystemEvent, SystemEventHandler, SystemMonitor};
+use super::{
+    SessionEvent, SleepEvent, SystemError, SystemEvent, SystemEventHandler, SystemMonitor,
+};
 
 const WINDOW_CLASS_NAME: &str = "MicroundSystemMonitorWindow\0";
 
@@ -44,10 +42,7 @@ unsafe extern "system" fn window_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let user_data = windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(
-        hwnd,
-        GWLP_USERDATA,
-    );
+    let user_data = windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(hwnd, GWLP_USERDATA);
 
     let handler = if user_data != 0 {
         Some(&mut *(user_data as *mut HandlerState))
@@ -134,9 +129,8 @@ unsafe extern "system" fn window_proc(
 
 fn create_message_window(handler: Box<dyn SystemEventHandler>) -> Result<HWND, SystemError> {
     unsafe {
-        let hinstance = GetModuleHandleW(PCWSTR::null()).map_err(|e| {
-            SystemError::Platform(format!("GetModuleHandle failed: {:?}", e))
-        })?;
+        let hinstance = GetModuleHandleW(PCWSTR::null())
+            .map_err(|e| SystemError::Platform(format!("GetModuleHandle failed: {:?}", e)))?;
 
         let class_name: Vec<u16> = WINDOW_CLASS_NAME.encode_utf16().collect();
         let wc = WNDCLASSEXW {

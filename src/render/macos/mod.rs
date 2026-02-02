@@ -38,10 +38,10 @@ use crate::render::WallpaperRenderer;
 
 #[cfg(target_os = "macos")]
 mod objc_impl {
+    use objc2::ffi::NSInteger;
     use objc2::rc::autoreleasepool;
     use objc2::runtime::{AnyObject, Bool};
     use objc2::{class, msg_send};
-    use objc2::ffi::NSInteger;
     use std::ptr;
 
     /// NSWindowLevel for desktop level
@@ -108,13 +108,15 @@ mod objc_impl {
             height: f64,
         }
 
-        let content_rect = NSRect { x, y, width, height };
+        let content_rect = NSRect {
+            x,
+            y,
+            width,
+            height,
+        };
 
         // Create window with borderless style
-        let window: *const AnyObject = msg_send![
-            window_cls,
-            alloc
-        ];
+        let window: *const AnyObject = msg_send![window_cls, alloc];
         if window.is_null() {
             return Err("Failed to allocate NSWindow".to_string());
         }
@@ -199,10 +201,7 @@ mod objc_impl {
 
             // Create bitmap image rep
             // Note: This creates a new buffer, we'll need to copy data into it
-            let image_rep: *const AnyObject = msg_send![
-                image_rep_cls,
-                alloc
-            ];
+            let image_rep: *const AnyObject = msg_send![image_rep_cls, alloc];
 
             let image_rep: *const AnyObject = msg_send![
                 image_rep,
@@ -337,9 +336,8 @@ impl WallpaperRenderer for MacOSRenderer {
         }
 
         // Create new desktop window
-        let window = unsafe {
-            create_desktop_window().map_err(|e| RenderError::InitializationFailed(e))?
-        };
+        let window =
+            unsafe { create_desktop_window().map_err(|e| RenderError::InitializationFailed(e))? };
 
         // Show the window
         unsafe {
@@ -366,9 +364,9 @@ impl WallpaperRenderer for MacOSRenderer {
     fn render(&mut self, frame: &ProcessedFrame) -> Result<(), RenderError> {
         use objc_impl::*;
 
-        let window = self.window.ok_or_else(|| {
-            RenderError::RenderFailed("Window not initialized".to_string())
-        })?;
+        let window = self
+            .window
+            .ok_or_else(|| RenderError::RenderFailed("Window not initialized".to_string()))?;
 
         unsafe {
             render_to_window(window, &frame.data, frame.width, frame.height)

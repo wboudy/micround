@@ -94,8 +94,10 @@ impl AppConfig {
             });
         }
 
-        if self.camera.framerate <= 0.0 || self.camera.framerate > 240.0
-            || !self.camera.framerate.is_finite() {
+        if self.camera.framerate <= 0.0
+            || self.camera.framerate > 240.0
+            || !self.camera.framerate.is_finite()
+        {
             errors.push(ConfigValidationError {
                 field: "camera.framerate".into(),
                 message: "Framerate must be a finite number between 0 and 240".into(),
@@ -121,8 +123,10 @@ impl AppConfig {
         if self.camera.height == 0 {
             self.camera.height = 1080;
         }
-        if self.camera.framerate <= 0.0 || self.camera.framerate > 240.0
-            || !self.camera.framerate.is_finite() {
+        if self.camera.framerate <= 0.0
+            || self.camera.framerate > 240.0
+            || !self.camera.framerate.is_finite()
+        {
             self.camera.framerate = 30.0;
         }
         if !matches!(self.display.rotation, 0 | 90 | 180 | 270) {
@@ -173,7 +177,6 @@ pub struct DisplayConfig {
     pub flip_vertical: bool,
 }
 
-
 impl DisplayConfig {
     /// Convert rotation degrees to Rotation enum
     pub fn rotation_enum(&self) -> Rotation {
@@ -208,7 +211,6 @@ pub struct StartupConfig {
     /// Minimize to tray on startup (if auto-starting)
     pub minimize_on_start: bool,
 }
-
 
 /// Internal state (managed by application, not user-editable)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -331,32 +333,39 @@ pub fn save_config(config: &AppConfig) -> Result<(), ConfigError> {
     })?;
 
     // Serialize to TOML
-    let contents = toml::to_string_pretty(config).map_err(|e| {
-        ConfigError::WriteFailed(format!("Failed to serialize config: {}", e))
-    })?;
+    let contents = toml::to_string_pretty(config)
+        .map_err(|e| ConfigError::WriteFailed(format!("Failed to serialize config: {}", e)))?;
 
     // Write to temp file first (atomic write)
     let temp_path = dir.join("config.toml.tmp");
     {
-        let mut file = fs::File::create(&temp_path).map_err(|e| {
-            ConfigError::WriteFailed(format!("Failed to create temp file: {}", e))
-        })?;
+        let mut file = fs::File::create(&temp_path)
+            .map_err(|e| ConfigError::WriteFailed(format!("Failed to create temp file: {}", e)))?;
 
         // Write and sync, cleaning up temp file on failure
         if let Err(e) = file.write_all(contents.as_bytes()) {
             let _ = fs::remove_file(&temp_path); // Best-effort cleanup
-            return Err(ConfigError::WriteFailed(format!("Failed to write temp file: {}", e)));
+            return Err(ConfigError::WriteFailed(format!(
+                "Failed to write temp file: {}",
+                e
+            )));
         }
         if let Err(e) = file.sync_all() {
             let _ = fs::remove_file(&temp_path); // Best-effort cleanup
-            return Err(ConfigError::WriteFailed(format!("Failed to sync temp file: {}", e)));
+            return Err(ConfigError::WriteFailed(format!(
+                "Failed to sync temp file: {}",
+                e
+            )));
         }
     }
 
     // Rename temp to final (atomic on most filesystems)
     if let Err(e) = fs::rename(&temp_path, &path) {
         let _ = fs::remove_file(&temp_path); // Best-effort cleanup
-        return Err(ConfigError::WriteFailed(format!("Failed to rename config file: {}", e)));
+        return Err(ConfigError::WriteFailed(format!(
+            "Failed to rename config file: {}",
+            e
+        )));
     }
 
     tracing::debug!(path = %log_safe_path(&path), "Config saved");

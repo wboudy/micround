@@ -122,7 +122,11 @@ pub fn rgba_checkerboard_1920x1080() -> Frame {
         for x in 0..width {
             let block_x = x / block_size;
             let block_y = y / block_size;
-            let value = if (block_x + block_y) % 2 == 0 { 255u8 } else { 0u8 };
+            let value = if (block_x + block_y) % 2 == 0 {
+                255u8
+            } else {
+                0u8
+            };
             data.extend_from_slice(&[value, value, value, 255]);
         }
     }
@@ -391,7 +395,11 @@ pub fn nv12_checkerboard_1920x1080() -> Frame {
         for x in 0..width {
             let block_x = x / block_size;
             let block_y = y / block_size;
-            let value = if (block_x + block_y) % 2 == 0 { 235 } else { 16 }; // Video range
+            let value = if (block_x + block_y) % 2 == 0 {
+                235
+            } else {
+                16
+            }; // Video range
             data.push(value);
         }
     }
@@ -474,7 +482,7 @@ pub fn corrupted_format_mismatch() -> Frame {
     let height = 100u32;
     Frame {
         data: vec![128u8; (width * height * 3) as usize], // RGB data
-        format: PixelFormat::Rgba32, // But claiming RGBA
+        format: PixelFormat::Rgba32,                      // But claiming RGBA
         width,
         height,
         timestamp_ns: 0,
@@ -632,7 +640,10 @@ mod tests {
         assert_eq!(&frame.data[0..4], &[255, 0, 0, 255]);
         // Top-right should be green
         let top_right_idx = (99 * 4) as usize;
-        assert_eq!(&frame.data[top_right_idx..top_right_idx + 4], &[0, 255, 0, 255]);
+        assert_eq!(
+            &frame.data[top_right_idx..top_right_idx + 4],
+            &[0, 255, 0, 255]
+        );
     }
 
     #[test]

@@ -35,19 +35,18 @@
 //! manager.stop_capture()?;
 //! ```
 
-use std::sync::{Arc, Mutex, RwLock};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
 
 use tokio::sync::broadcast;
 
-use crate::core::{
-    CameraCapability, CameraDevice, CaptureError, CaptureSettings,
-    DeviceId, Frame, NegotiatedFormat,
-};
 use crate::capture::{
-    CaptureBackend, CameraEnumerator,
-    CameraState, SharedCameraState, shared_camera_state,
-    start_capture_loop, CaptureLoopHandle, FrameReceiver, MetricsSnapshot,
+    shared_camera_state, start_capture_loop, CameraEnumerator, CameraState, CaptureBackend,
+    CaptureLoopHandle, FrameReceiver, MetricsSnapshot, SharedCameraState,
+};
+use crate::core::{
+    CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame,
+    NegotiatedFormat,
 };
 
 // ============================================================================
@@ -62,7 +61,10 @@ pub enum DeviceEvent {
     /// A camera was disconnected
     Disconnected(DeviceId),
     /// Camera availability changed
-    AvailabilityChanged { device_id: DeviceId, available: bool },
+    AvailabilityChanged {
+        device_id: DeviceId,
+        available: bool,
+    },
 }
 
 /// Broadcast channel capacity for device events
@@ -181,9 +183,7 @@ impl CaptureManager {
         let mut handle_guard = self.capture_handle.lock().unwrap();
         if let Some(handle) = handle_guard.as_ref() {
             if handle.is_running() {
-                return Err(CaptureError::Platform(
-                    "Capture is still running".into(),
-                ));
+                return Err(CaptureError::Platform("Capture is still running".into()));
             }
         }
 
@@ -260,10 +260,13 @@ impl CaptureManager {
         for device in &devices {
             let id = device.id.0.clone();
             if !cameras.contains_key(&id) {
-                cameras.insert(id.clone(), ManagedCamera {
-                    device: device.clone(),
-                    state: shared_camera_state(device.id.clone()),
-                });
+                cameras.insert(
+                    id.clone(),
+                    ManagedCamera {
+                        device: device.clone(),
+                        state: shared_camera_state(device.id.clone()),
+                    },
+                );
                 // Mark as available
                 if let Some(cam) = cameras.get(&id) {
                     let _ = cam.state.device_arrived();
@@ -277,7 +280,9 @@ impl CaptureManager {
         for (id, cam) in cameras.iter() {
             if !current_ids.contains(id) && cam.state.state().is_connected() {
                 let _ = cam.state.device_removed();
-                let _ = self.device_events.send(DeviceEvent::Disconnected(DeviceId(id.clone())));
+                let _ = self
+                    .device_events
+                    .send(DeviceEvent::Disconnected(DeviceId(id.clone())));
             }
         }
 
@@ -285,9 +290,13 @@ impl CaptureManager {
     }
 
     /// Get capabilities for a specific device
-    pub fn get_capabilities(&self, device_id: &DeviceId) -> Result<Vec<CameraCapability>, CaptureError> {
+    pub fn get_capabilities(
+        &self,
+        device_id: &DeviceId,
+    ) -> Result<Vec<CameraCapability>, CaptureError> {
         let enumerator_guard = self.enumerator.lock().unwrap();
-        let enumerator = enumerator_guard.as_ref()
+        let enumerator = enumerator_guard
+            .as_ref()
             .ok_or_else(|| CaptureError::Platform("No enumerator available".into()))?;
 
         enumerator.get_capabilities(device_id)
@@ -309,7 +318,8 @@ impl CaptureManager {
     pub fn select_camera(&self, device_id: &DeviceId) -> Result<CameraHandle, CaptureError> {
         // Check if camera exists
         let cameras = self.cameras.read().unwrap();
-        let cam = cameras.get(&device_id.0)
+        let cam = cameras
+            .get(&device_id.0)
             .ok_or_else(|| CaptureError::DeviceNotFound(device_id.0.clone()))?;
 
         // Create handle
@@ -345,10 +355,14 @@ impl CaptureManager {
     ///
     /// Opens the camera with the given settings and begins frame capture.
     /// Frames are delivered to subscribers via `subscribe_frames()`.
-    pub fn start_capture(&self, settings: CaptureSettings) -> Result<NegotiatedFormat, CaptureError> {
+    pub fn start_capture(
+        &self,
+        settings: CaptureSettings,
+    ) -> Result<NegotiatedFormat, CaptureError> {
         // Get selected camera
         let selected = self.selected_camera.read().unwrap();
-        let handle = selected.as_ref()
+        let handle = selected
+            .as_ref()
             .ok_or_else(|| CaptureError::Platform("No camera selected".into()))?
             .clone();
         drop(selected);
@@ -364,7 +378,11 @@ impl CaptureManager {
         self.ensure_backend_available()?;
 
         // Take the backend (we give it to the capture loop)
-        let backend = self.backend.lock().unwrap().take()
+        let backend = self
+            .backend
+            .lock()
+            .unwrap()
+            .take()
             .ok_or_else(|| CaptureError::Platform("Backend already in use".into()))?;
 
         // Update state
@@ -421,7 +439,9 @@ impl CaptureManager {
 
     /// Check if currently capturing
     pub fn is_capturing(&self) -> bool {
-        self.capture_handle.lock().unwrap()
+        self.capture_handle
+            .lock()
+            .unwrap()
             .as_ref()
             .map(|h| h.is_running())
             .unwrap_or(false)
@@ -429,14 +449,18 @@ impl CaptureManager {
 
     /// Get the current capture format (if capturing)
     pub fn current_format(&self) -> Option<NegotiatedFormat> {
-        self.selected_camera.read().unwrap()
+        self.selected_camera
+            .read()
+            .unwrap()
             .as_ref()
             .and_then(|h| h.format())
     }
 
     /// Get current capture metrics
     pub fn metrics(&self) -> Option<MetricsSnapshot> {
-        self.capture_handle.lock().unwrap()
+        self.capture_handle
+            .lock()
+            .unwrap()
             .as_ref()
             .map(|h| h.metrics())
     }
@@ -469,7 +493,9 @@ impl CaptureManager {
 
     /// Get the state of a specific camera
     pub fn camera_state(&self, device_id: &DeviceId) -> Option<CameraState> {
-        self.cameras.read().unwrap()
+        self.cameras
+            .read()
+            .unwrap()
             .get(&device_id.0)
             .map(|c| c.state.state())
     }
@@ -521,7 +547,11 @@ mod tests {
             self.devices.clone()
         }
 
-        fn open(&mut self, _device_id: &DeviceId, _settings: CaptureSettings) -> Result<NegotiatedFormat, CaptureError> {
+        fn open(
+            &mut self,
+            _device_id: &DeviceId,
+            _settings: CaptureSettings,
+        ) -> Result<NegotiatedFormat, CaptureError> {
             self.open_result.clone()
         }
 
@@ -586,7 +616,8 @@ mod tests {
         }
 
         fn get_device(&self, id: &DeviceId) -> Result<CameraDevice, CaptureError> {
-            self.devices.iter()
+            self.devices
+                .iter()
                 .find(|d| &d.id == id)
                 .cloned()
                 .ok_or_else(|| CaptureError::DeviceNotFound(id.0.clone()))

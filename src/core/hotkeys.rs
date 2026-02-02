@@ -202,7 +202,10 @@ mod manager {
         }
 
         /// Create with custom configuration
-        pub fn with_config(app_handle: AppHandle, config: HotkeyConfig) -> Result<Self, HotkeyError> {
+        pub fn with_config(
+            app_handle: AppHandle,
+            config: HotkeyConfig,
+        ) -> Result<Self, HotkeyError> {
             let manager = Self::new(app_handle)?;
             *manager.config.write().unwrap() = config;
             Ok(manager)
@@ -302,7 +305,9 @@ mod manager {
                     }
                     HotkeyId::TakeSnapshot => {
                         info!("Take snapshot hotkey pressed");
-                        Some(Command::TakeSnapshot { to_clipboard: false })
+                        Some(Command::TakeSnapshot {
+                            to_clipboard: false,
+                        })
                     }
                 };
 

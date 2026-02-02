@@ -365,6 +365,10 @@ pub struct MediaFoundationBackend {
     frame_sequence: u64,
 }
 
+// SAFETY: MediaFoundationBackend is only accessed from a single thread at a time.
+// The COM/MF objects are properly initialized and released in a single-threaded context.
+unsafe impl Send for MediaFoundationBackend {}
+
 impl MediaFoundationBackend {
     pub fn new() -> Self {
         Self {
@@ -690,15 +694,11 @@ impl CaptureBackend for MediaFoundationBackend {
         let source = self.activate_device(device_id)?;
 
         // Create source reader
-        let mut reader: Option<IMFSourceReader> = None;
-        unsafe {
-            MFCreateSourceReaderFromMediaSource(&source, None, &mut reader).map_err(|e| {
+        let reader = unsafe {
+            MFCreateSourceReaderFromMediaSource(&source, None).map_err(|e| {
                 CaptureError::Platform(format!("Failed to create source reader: {:?}", e))
-            })?;
-        }
-        let reader = reader.ok_or_else(|| {
-            CaptureError::Platform("Source reader creation returned null".to_string())
-        })?;
+            })?
+        };
 
         // Configure format
         let negotiated = Self::configure_format(&reader, &settings)?;

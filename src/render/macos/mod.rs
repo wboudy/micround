@@ -59,6 +59,11 @@ impl MacOSRenderer {
             initialized: false,
         })
     }
+
+    /// Check if the renderer has been initialized
+    pub fn is_initialized(&self) -> bool {
+        self.initialized
+    }
 }
 
 impl Default for MacOSRenderer {
@@ -132,7 +137,7 @@ mod tests {
     #[test]
     fn test_renderer_default() {
         let renderer = MacOSRenderer::default();
-        assert!(!renderer.initialized);
+        assert!(!renderer.is_initialized());
     }
 
     #[test]
@@ -163,7 +168,7 @@ mod tests {
 
         // Initialize
         assert!(renderer.init(&display).is_ok());
-        assert!(renderer.initialized);
+        assert!(renderer.is_initialized());
 
         // Render should succeed in placeholder mode
         let frame = ProcessedFrame {

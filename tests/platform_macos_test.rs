@@ -481,7 +481,7 @@ fn test_macos_renderer_creation() {
     let renderer = renderer.unwrap();
     test_assert!(
         logger,
-        !renderer.initialized,
+        !renderer.is_initialized(),
         "Renderer starts uninitialized"
     );
     test_step_ok!(logger);

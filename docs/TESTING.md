@@ -1,5 +1,9 @@
 # Micround Testing Guide
 
+> **AGENT NOTICE**: Agents must NOT run local build/test commands.
+> All testing happens via GitHub Actions CI. See `AGENTS.md` for
+> the CI-first workflow. The commands below are for human developers only.
+
 This document describes the testing infrastructure, conventions, and best practices for the Micround project.
 
 ## Test Categories

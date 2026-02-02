@@ -1,0 +1,275 @@
+#!/bin/bash
+# ci - Unified CI workflow tool for agents
+#
+# Usage: ci <command>
+#
+# Commands:
+#   submit   Push + create PR + wait for CI
+#   status   Show CI check status
+#   wait     Wait for CI to complete (blocking)
+#   logs     View failed CI logs
+#   merge    Merge PR (only if CI green)
+#   fmt      Run cargo fmt (allowed locally)
+#   rerun    Re-run failed CI jobs
+
+set -euo pipefail
+
+# Colors for output (if terminal supports it)
+if [ -t 1 ]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[0;33m'
+  BLUE='\033[0;34m'
+  NC='\033[0m' # No Color
+else
+  RED=''
+  GREEN=''
+  YELLOW=''
+  BLUE=''
+  NC=''
+fi
+
+# Check gh CLI availability
+check_gh() {
+  if ! command -v gh &>/dev/null; then
+    echo -e "${RED}ERROR: gh CLI required${NC}"
+    echo ""
+    echo "Install from: https://cli.github.com/"
+    echo ""
+    echo "Quick install options:"
+    echo "  macOS:  brew install gh"
+    echo "  Linux:  sudo apt install gh"
+    exit 1
+  fi
+
+  # Check if authenticated
+  if ! gh auth status &>/dev/null; then
+    echo -e "${RED}ERROR: gh CLI not authenticated${NC}"
+    echo ""
+    echo "Run: gh auth login"
+    exit 1
+  fi
+}
+
+# Show usage
+show_help() {
+  cat <<'EOF'
+ci - Unified CI workflow tool for agents
+
+Usage: ci <command>
+
+Commands:
+  submit   Push + create PR + wait for CI (full workflow)
+  status   Show CI check status (non-blocking)
+  wait     Wait for CI to complete (blocking)
+  logs     View failed CI logs
+  merge    Merge PR (only if CI green)
+  fmt      Run cargo fmt (allowed locally)
+  rerun    Re-run failed CI jobs
+
+Typical workflow:
+  1. Make changes and commit
+  2. ci submit          # Push, create PR, wait for CI
+  3. ci logs            # If CI fails, view logs
+  4. Fix issues, commit, git push
+  5. ci wait            # Wait for CI again
+  6. ci merge           # Merge when green
+
+See AGENTS.md for the complete CI-first workflow.
+EOF
+}
+
+# ci submit: Push, create PR if needed, wait for CI
+cmd_submit() {
+  check_gh
+
+  echo -e "${BLUE}Pushing to remote...${NC}"
+  git push -u origin HEAD
+
+  echo ""
+  echo -e "${BLUE}Checking for existing PR...${NC}"
+
+  # Check if PR exists for current branch
+  if ! gh pr view &>/dev/null; then
+    echo -e "${YELLOW}No PR found, creating one...${NC}"
+    gh pr create --fill
+  else
+    echo -e "${GREEN}PR already exists${NC}"
+  fi
+
+  echo ""
+  echo -e "${BLUE}Waiting for CI checks...${NC}"
+  echo "(This will block until all checks complete)"
+  echo ""
+
+  # Wait for CI
+  cmd_wait
+}
+
+# ci status: Show current PR check status
+cmd_status() {
+  check_gh
+  gh pr checks
+}
+
+# ci wait: Block until CI completes
+cmd_wait() {
+  check_gh
+
+  # gh pr checks --watch blocks until completion
+  if gh pr checks --watch; then
+    echo ""
+    echo -e "${GREEN}========================================"
+    echo "All CI checks PASSED!"
+    echo "========================================${NC}"
+    echo ""
+    echo "You can now merge with: ci merge"
+  else
+    echo ""
+    echo -e "${RED}========================================"
+    echo "CI checks FAILED"
+    echo "========================================${NC}"
+    echo ""
+    echo "View logs: ci logs"
+    echo "After fixing: git push && ci wait"
+    exit 1
+  fi
+}
+
+# ci logs: View logs from most recent failed run
+cmd_logs() {
+  check_gh
+
+  # Get the most recent run
+  RUN_ID=$(gh run list --limit 1 --json databaseId --jq ".[0].databaseId" 2>/dev/null || true)
+
+  if [ -z "$RUN_ID" ]; then
+    echo -e "${YELLOW}No recent workflow runs found${NC}"
+    echo ""
+    echo "Push changes first: git push"
+    exit 1
+  fi
+
+  echo -e "${BLUE}Viewing logs for run $RUN_ID...${NC}"
+  echo ""
+
+  # Show failed logs (or all logs if none failed)
+  if ! gh run view "$RUN_ID" --log-failed 2>/dev/null; then
+    echo -e "${YELLOW}No failed jobs - showing full log summary${NC}"
+    gh run view "$RUN_ID"
+  fi
+}
+
+# ci merge: Merge PR only if all checks pass
+cmd_merge() {
+  check_gh
+
+  echo -e "${BLUE}Checking CI status...${NC}"
+
+  # gh pr checks exits non-zero if any checks fail or are pending
+  if ! gh pr checks &>/dev/null; then
+    echo ""
+    echo -e "${RED}========================================"
+    echo "ERROR: Cannot merge - CI not green"
+    echo "========================================${NC}"
+    echo ""
+    echo "Current status:"
+    gh pr checks || true
+    echo ""
+    echo "Fix failures and push, then: ci wait"
+    exit 1
+  fi
+
+  echo -e "${GREEN}All checks passed!${NC}"
+  echo ""
+  echo -e "${BLUE}Merging PR...${NC}"
+
+  gh pr merge --squash --delete-branch
+
+  echo ""
+  echo -e "${GREEN}========================================"
+  echo "PR merged successfully!"
+  echo "========================================${NC}"
+  echo ""
+  echo "Don't forget:"
+  echo "  git checkout main && git pull"
+  echo "  bd close <bead-id>"
+  echo "  bd sync"
+}
+
+# ci fmt: Run cargo fmt (the only allowed local operation)
+cmd_fmt() {
+  echo -e "${BLUE}Running cargo fmt...${NC}"
+
+  # Use real cargo, not cargo-guard (which would allow it anyway)
+  if [ -x "$HOME/.cargo/bin/cargo" ]; then
+    "$HOME/.cargo/bin/cargo" fmt
+  else
+    cargo fmt
+  fi
+
+  echo -e "${GREEN}Formatting complete${NC}"
+
+  # Optionally show what changed
+  if ! git diff --quiet; then
+    echo ""
+    echo "Files modified:"
+    git diff --name-only
+    echo ""
+    echo "Stage changes with: git add -u"
+  fi
+}
+
+# ci rerun: Re-run failed CI jobs
+cmd_rerun() {
+  check_gh
+
+  # Get the most recent run
+  RUN_ID=$(gh run list --limit 1 --json databaseId --jq ".[0].databaseId" 2>/dev/null || true)
+
+  if [ -z "$RUN_ID" ]; then
+    echo -e "${YELLOW}No recent workflow runs found${NC}"
+    exit 1
+  fi
+
+  echo -e "${BLUE}Re-running failed jobs for run $RUN_ID...${NC}"
+  gh run rerun "$RUN_ID" --failed
+
+  echo ""
+  echo -e "${GREEN}Re-run triggered${NC}"
+  echo "Wait for completion: ci wait"
+}
+
+# Main command dispatcher
+case "${1:-help}" in
+  submit)
+    cmd_submit
+    ;;
+  status)
+    cmd_status
+    ;;
+  wait)
+    cmd_wait
+    ;;
+  logs)
+    cmd_logs
+    ;;
+  merge)
+    cmd_merge
+    ;;
+  fmt)
+    cmd_fmt
+    ;;
+  rerun)
+    cmd_rerun
+    ;;
+  help|--help|-h)
+    show_help
+    ;;
+  *)
+    echo -e "${RED}Unknown command: $1${NC}"
+    echo ""
+    show_help
+    exit 1
+    ;;
+esac

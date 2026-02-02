@@ -26,7 +26,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libv4l-dev libx11-dev libxcb1-dev libglib2.0-dev
+          sudo apt-get install -y libv4l-dev libx11-dev libxcb1-dev libgtk-3-dev
 
       - name: Check formatting
         run: cargo fmt --all -- --check

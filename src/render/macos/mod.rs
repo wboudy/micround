@@ -300,6 +300,14 @@ pub struct MacOSRenderer {
     initialized: bool,
 }
 
+// SAFETY: MacOSRenderer is only used from the main thread. The window pointer
+// is an NSWindow reference that must be accessed from the main thread anyway
+// (Cocoa threading model). The Send impl allows the struct to be stored in
+// contexts that require Send, but actual window operations should only be
+// performed on the main thread.
+#[cfg(target_os = "macos")]
+unsafe impl Send for MacOSRenderer {}
+
 impl MacOSRenderer {
     /// Create a new macOS renderer
     pub fn new() -> Result<Self, RenderError> {

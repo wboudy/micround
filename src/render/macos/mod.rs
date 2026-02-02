@@ -71,12 +71,12 @@ impl Default for MacOSRenderer {
 }
 
 impl WallpaperRenderer for MacOSRenderer {
-    fn init(&mut self, display: &DisplayId) -> Result<(), RenderError> {
+    fn init(&mut self, display_id: &DisplayId) -> Result<(), RenderError> {
         // Placeholder: Full implementation requires objc2 0.5 API updates
-        self.display_id = Some(display.clone());
+        self.display_id = Some(display_id.clone());
         self.initialized = true;
         debug!(
-            target_display = %display,
+            target_display = %display_id,
             "macOS renderer initialized (placeholder mode)"
         );
         Ok(())

@@ -149,7 +149,7 @@ mod tests {
             data: vec![0u8; 1920 * 1080 * 4],
             width: 1920,
             height: 1080,
-            timestamp_ns: 0,
+            metrics: None,
         };
         let result = renderer.render(&frame);
         // Should fail since not initialized
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_render_after_init() {
         let mut renderer = MacOSRenderer::default();
-        let display = DisplayId::primary();
+        let display = DisplayId("primary".to_string());
 
         // Initialize
         assert!(renderer.init(&display).is_ok());
@@ -170,7 +170,7 @@ mod tests {
             data: vec![0u8; 1920 * 1080 * 4],
             width: 1920,
             height: 1080,
-            timestamp_ns: 0,
+            metrics: None,
         };
         assert!(renderer.render(&frame).is_ok());
     }

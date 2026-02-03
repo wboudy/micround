@@ -278,9 +278,16 @@ pub struct CollectingHandler {
 }
 
 #[cfg(test)]
+impl Default for CollectingHandler {
+    fn default() -> Self {
+        Self { events: Vec::new() }
+    }
+}
+
+#[cfg(test)]
 impl CollectingHandler {
     pub fn new() -> Self {
-        Self { events: Vec::new() }
+        Self::default()
     }
 }
 

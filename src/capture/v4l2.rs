@@ -656,9 +656,9 @@ mod tests {
     #[test]
     fn test_permission_helpers() {
         // Test that the video group check doesn't panic
+        // Result depends on system configuration, just verify it returns without panicking
         let in_group = is_user_in_video_group();
-        // Result depends on system configuration, just verify it returns
-        assert!(in_group || !in_group);
+        let _ = in_group; // Use the value to avoid unused warning
 
         // Test permission denied message generation
         let msg = permission_denied_message("/dev/video0");

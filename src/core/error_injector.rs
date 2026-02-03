@@ -626,13 +626,13 @@ mod tests {
 
         let results: Vec<bool> = (0..10).map(|_| injector.should_inject()).collect();
         // Operations 1-10, inject at 2, 5, 7
-        assert_eq!(results[0], false); // op 1
-        assert_eq!(results[1], true); // op 2
-        assert_eq!(results[2], false); // op 3
-        assert_eq!(results[3], false); // op 4
-        assert_eq!(results[4], true); // op 5
-        assert_eq!(results[5], false); // op 6
-        assert_eq!(results[6], true); // op 7
+        assert!(!results[0]); // op 1
+        assert!(results[1]); // op 2
+        assert!(!results[2]); // op 3
+        assert!(!results[3]); // op 4
+        assert!(results[4]); // op 5
+        assert!(!results[5]); // op 6
+        assert!(results[6]); // op 7
     }
 
     #[test]

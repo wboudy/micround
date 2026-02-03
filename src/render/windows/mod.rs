@@ -641,6 +641,12 @@ impl Default for WindowsRenderer {
     }
 }
 
+// SAFETY: WindowsRenderer contains Windows handles (HWND, HDC, HBITMAP) which are
+// raw pointers. These handles are only accessed from the thread that created them
+// (the render thread). The WallpaperRenderer trait requires Send, and we ensure
+// thread-safety by only using these handles on the designated render thread.
+unsafe impl Send for WindowsRenderer {}
+
 impl WallpaperRenderer for WindowsRenderer {
     fn init(&mut self, _display_id: &DisplayId) -> Result<(), RenderError> {
         #[cfg(all(target_os = "windows", feature = "windows"))]

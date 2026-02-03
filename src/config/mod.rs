@@ -502,39 +502,59 @@ mod tests {
 
     #[test]
     fn test_rotation_enum_conversion() {
-        let mut display = DisplayConfig::default();
-
-        display.rotation = 0;
+        let display = DisplayConfig {
+            rotation: 0,
+            ..Default::default()
+        };
         assert_eq!(display.rotation_enum(), Rotation::None);
 
-        display.rotation = 90;
+        let display = DisplayConfig {
+            rotation: 90,
+            ..Default::default()
+        };
         assert_eq!(display.rotation_enum(), Rotation::Clockwise90);
 
-        display.rotation = 180;
+        let display = DisplayConfig {
+            rotation: 180,
+            ..Default::default()
+        };
         assert_eq!(display.rotation_enum(), Rotation::Clockwise180);
 
-        display.rotation = 270;
+        let display = DisplayConfig {
+            rotation: 270,
+            ..Default::default()
+        };
         assert_eq!(display.rotation_enum(), Rotation::Clockwise270);
     }
 
     #[test]
     fn test_flip_enum_conversion() {
-        let mut display = DisplayConfig::default();
-
-        display.flip_horizontal = false;
-        display.flip_vertical = false;
+        let display = DisplayConfig {
+            flip_horizontal: false,
+            flip_vertical: false,
+            ..Default::default()
+        };
         assert_eq!(display.flip_enum(), Flip::None);
 
-        display.flip_horizontal = true;
-        display.flip_vertical = false;
+        let display = DisplayConfig {
+            flip_horizontal: true,
+            flip_vertical: false,
+            ..Default::default()
+        };
         assert_eq!(display.flip_enum(), Flip::Horizontal);
 
-        display.flip_horizontal = false;
-        display.flip_vertical = true;
+        let display = DisplayConfig {
+            flip_horizontal: false,
+            flip_vertical: true,
+            ..Default::default()
+        };
         assert_eq!(display.flip_enum(), Flip::Vertical);
 
-        display.flip_horizontal = true;
-        display.flip_vertical = true;
+        let display = DisplayConfig {
+            flip_horizontal: true,
+            flip_vertical: true,
+            ..Default::default()
+        };
         assert_eq!(display.flip_enum(), Flip::Both);
     }
 

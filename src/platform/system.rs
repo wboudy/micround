@@ -174,6 +174,7 @@ pub trait SystemMonitor: Send {
 
 // Platform-specific implementations
 #[cfg(target_os = "windows")]
+#[path = "system_windows.rs"]
 mod system_windows;
 #[cfg(target_os = "windows")]
 pub use system_windows::WindowsSystemMonitor;

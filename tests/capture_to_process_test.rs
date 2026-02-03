@@ -275,14 +275,14 @@ async fn capture_to_process_multiple_frames() {
     for i in 0..THROUGHPUT_FRAME_COUNT {
         let frame = tokio::time::timeout(FRAME_TIMEOUT, receiver.recv())
             .await
-            .expect(&format!("Timeout on frame {}", i))
+            .unwrap_or_else(|_| panic!("Timeout on frame {}", i))
             .expect("Channel closed");
 
         sequences.push(frame.sequence);
 
         let frame_start = Instant::now();
         let _processed = process_frame(&frame, &processor_config)
-            .expect(&format!("Process failed on frame {}", i));
+            .unwrap_or_else(|_| panic!("Process failed on frame {}", i));
         frame_times.push(frame_start.elapsed());
     }
     let total_time = start.elapsed();
@@ -531,7 +531,7 @@ async fn capture_to_process_scaling_modes() {
             .with_metrics(true);
 
         let processed = process_frame(&frame, &processor_config)
-            .expect(&format!("{} scaling failed", mode_name));
+            .unwrap_or_else(|_| panic!("{} scaling failed", mode_name));
 
         logger.assert_eq(
             &format!("{} output width", mode_name),
@@ -603,7 +603,7 @@ async fn capture_to_process_scale_filters() {
 
         let start = Instant::now();
         let processed = process_frame(&frame, &processor_config)
-            .expect(&format!("{} filter failed", filter_name));
+            .unwrap_or_else(|_| panic!("{} filter failed", filter_name));
         let elapsed = start.elapsed();
 
         logger.assert_eq(
@@ -824,12 +824,12 @@ async fn capture_to_process_throughput_benchmark() {
     for i in 0..BENCHMARK_FRAMES {
         let frame = tokio::time::timeout(BENCHMARK_TIMEOUT, receiver.recv())
             .await
-            .expect(&format!("Timeout on frame {}", i))
+            .unwrap_or_else(|_| panic!("Timeout on frame {}", i))
             .expect("Channel closed");
 
         let start = Instant::now();
         let _processed = process_frame(&frame, &processor_config)
-            .expect(&format!("Process failed on frame {}", i));
+            .unwrap_or_else(|_| panic!("Process failed on frame {}", i));
         process_times.push(start.elapsed());
     }
 

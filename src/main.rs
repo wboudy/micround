@@ -68,7 +68,8 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
     #[cfg(target_os = "windows")]
     let mut _system_monitor = {
         use crate::platform::{
-            SessionEvent, SleepEvent, SystemEvent, SystemEventHandler, WindowsSystemMonitor,
+            SessionEvent, SleepEvent, SystemEvent, SystemEventHandler, SystemMonitor,
+            WindowsSystemMonitor,
         };
 
         struct SystemEventBridge {

@@ -32,6 +32,7 @@ fn test_error_severity_equality() {
 }
 
 #[test]
+#[allow(clippy::clone_on_copy)] // Test intentionally uses clone() on Copy type
 fn test_error_severity_clone() {
     let s1 = ErrorSeverity::UserActionable;
     let s2 = s1.clone();

@@ -484,14 +484,9 @@ async fn test_concurrent_pub_sub() {
             let mut sub = bus_clone.subscribe();
             let mut local_count = 0;
             // Wait for events with timeout
-            loop {
-                match timeout(Duration::from_millis(500), sub.recv()).await {
-                    Ok(Some(_)) => {
-                        local_count += 1;
-                        count.fetch_add(1, Ordering::Relaxed);
-                    }
-                    _ => break,
-                }
+            while let Ok(Some(_)) = timeout(Duration::from_millis(500), sub.recv()).await {
+                local_count += 1;
+                count.fetch_add(1, Ordering::Relaxed);
             }
             (i, local_count)
         });

@@ -8,6 +8,9 @@
 //! - Step-by-step progress logging
 //! - Assertion tracking with pass/fail indicators
 //! - Timing measurements per step and total
+
+// Test utilities may not all be used in every test file
+#![allow(dead_code)]
 //! - Multiple output formats (Console, JSON, Tracing)
 //! - Environment variable configuration
 //!
@@ -601,7 +604,7 @@ impl TestLogger {
     }
 
     /// Finish with explicit failure
-    pub fn finish_failed(mut self, reason: &str) -> TestResult {
+    pub fn finish_failed(self, reason: &str) -> TestResult {
         self.error(reason);
         let total_duration = self.start_time.elapsed();
 

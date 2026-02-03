@@ -11,14 +11,12 @@ async fn event_bus_message_flow_reaches_subscribers() {
 
     let engine_handle = handle.clone();
     let engine = tokio::spawn(async move {
-        if let Some(command) = command_rx.recv().await {
-            if let Command::StartCapture { device_id } = command {
-                engine_handle.publish_event(Event::CaptureStarted {
-                    device_id,
-                    resolution: (640, 480),
-                    fps: 30.0,
-                });
-            }
+        if let Some(Command::StartCapture { device_id }) = command_rx.recv().await {
+            engine_handle.publish_event(Event::CaptureStarted {
+                device_id,
+                resolution: (640, 480),
+                fps: 30.0,
+            });
         }
     });
 

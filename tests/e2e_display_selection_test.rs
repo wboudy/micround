@@ -7,21 +7,16 @@
 
 mod common;
 
-use std::time::Duration;
-
 use common::test_logger::*;
 use micround::capture::{
     simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
 };
 use micround::config::AppConfig;
-use micround::core::{
-    AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event, Flip, Rotation,
-    ScalingMode,
-};
+use micround::core::{AppContext, CaptureSettings, Command, DisplayId};
 use micround::process::{process_frame, ProcessorConfig};
 use micround::render::{
-    simulator::{CapturedFrame, DisplaySimulator, DisplaySimulatorConfig, RenderStats},
+    simulator::{DisplaySimulator, DisplaySimulatorConfig},
     WallpaperRenderer,
 };
 
@@ -560,10 +555,8 @@ async fn test_display_selection_command_dispatch() {
 
     let mut received = Vec::new();
     for _ in 0..3 {
-        if let Some(cmd) = cmd_rx.recv().await {
-            if let Command::SelectDisplay { display_id } = cmd {
-                received.push(display_id.0.clone());
-            }
+        if let Some(Command::SelectDisplay { display_id }) = cmd_rx.recv().await {
+            received.push(display_id.0.clone());
         }
     }
     test_assert!(logger, received.len() == 3, "All commands received");

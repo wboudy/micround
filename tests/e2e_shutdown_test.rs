@@ -1135,7 +1135,7 @@ fn test_config_preservation_on_shutdown() {
     test_step!(logger, "Simulating config save on shutdown");
     // In production, config would be serialized here
     // For testing, we just verify the config is accessible
-    let serialized = format!("Config saved at shutdown - internal state preserved");
+    let serialized = "Config saved at shutdown - internal state preserved".to_string();
     tracing::info!(config_state = %serialized, "Config save simulation");
     test_step_ok!(logger);
 

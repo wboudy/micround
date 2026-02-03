@@ -10,7 +10,7 @@
 
 mod common;
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use common::test_logger::*;
 use micround::capture::{
@@ -107,7 +107,7 @@ async fn test_disconnect_state_transitions() {
     let mut logger = TestLogger::new("disconnect_state_transitions", 5);
 
     test_step!(logger, "Creating application context");
-    let (ctx, mut cmd_rx) = AppContext::new();
+    let (ctx, _cmd_rx) = AppContext::new();
     let handle = ctx.handle();
     let mut event_sub = handle.subscribe_events();
     test_step_ok!(logger);
@@ -275,7 +275,7 @@ async fn test_reconnection_events() {
     let mut logger = TestLogger::new("reconnection_events", 5);
 
     test_step!(logger, "Creating application context");
-    let (ctx, mut cmd_rx) = AppContext::new();
+    let (ctx, _cmd_rx) = AppContext::new();
     let handle = ctx.handle();
     let mut event_sub = handle.subscribe_events();
     test_step_ok!(logger);

@@ -888,7 +888,7 @@ async fn app_handle_cloning() {
 
     // Step 1: Create context and handles
     logger.step("Creating context and handles");
-    let (ctx, mut cmd_rx) = AppContext::new();
+    let (ctx, _cmd_rx) = AppContext::new();
     let handle1 = ctx.handle();
     let handle2 = handle1.clone();
     let handle3 = ctx.handle();

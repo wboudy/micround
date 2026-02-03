@@ -1,6 +1,7 @@
 //! Global keyboard shortcuts
 //!
 //! Provides cross-platform global hotkey support using the `global-hotkey` crate.
+#![allow(dead_code)] // Hotkey system API
 //! Hotkeys work even when the application is not focused.
 //!
 //! # Platform Notes
@@ -201,7 +202,10 @@ mod manager {
         }
 
         /// Create with custom configuration
-        pub fn with_config(app_handle: AppHandle, config: HotkeyConfig) -> Result<Self, HotkeyError> {
+        pub fn with_config(
+            app_handle: AppHandle,
+            config: HotkeyConfig,
+        ) -> Result<Self, HotkeyError> {
             let manager = Self::new(app_handle)?;
             *manager.config.write().unwrap() = config;
             Ok(manager)
@@ -301,7 +305,9 @@ mod manager {
                     }
                     HotkeyId::TakeSnapshot => {
                         info!("Take snapshot hotkey pressed");
-                        Some(Command::TakeSnapshot { to_clipboard: false })
+                        Some(Command::TakeSnapshot {
+                            to_clipboard: false,
+                        })
                     }
                 };
 
@@ -560,8 +566,10 @@ mod tests {
 
     #[test]
     fn test_hotkey_config_reset() {
-        let mut config = HotkeyConfig::default();
-        config.enabled = false;
+        let mut config = HotkeyConfig {
+            enabled: false,
+            ..Default::default()
+        };
         config.set_binding(HotkeyId::ToggleFeed, "Custom".to_string());
 
         config.reset_to_defaults();

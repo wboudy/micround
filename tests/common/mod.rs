@@ -11,39 +11,41 @@
 //! use common::test_logger::*;
 //! ```
 
+// Test utilities are re-exported for convenience; not all are used in every test file
+#![allow(unused_imports)]
+
 pub mod assertions;
 pub mod test_logger;
 
 // Re-export commonly used items at the module level
 pub use assertions::{
-    // Frame comparison
-    frame_psnr,
-    assert_frames_similar,
-    assert_frame_metadata_eq,
-    assert_frames_identical,
-    FrameCompareError,
-
     // Timing
     assert_completes_within,
-    timed,
-    timed_samples,
+    assert_error_contains,
+    // Error assertions
+    assert_error_severity,
+    assert_frame_metadata_eq,
+    assert_frames_identical,
+    assert_frames_similar,
     assert_timing_within,
-    TimingStats,
-
-    // State transitions
-    is_valid_camera_transition,
+    assert_user_message_contains,
     assert_valid_camera_transition,
     assert_valid_camera_transition_sequence,
 
-    // Error assertions
-    assert_error_severity,
-    assert_error_contains,
-    assert_user_message_contains,
+    create_checkerboard_frame,
+    create_gradient_frame,
+    // Test helpers
+    create_test_frame,
+    // Frame comparison
+    frame_psnr,
+    // State transitions
+    is_valid_camera_transition,
+    timed,
+    timed_samples,
+    FrameCompareError,
+
     HasSeverity,
     HasUserMessage,
 
-    // Test helpers
-    create_test_frame,
-    create_gradient_frame,
-    create_checkerboard_frame,
+    TimingStats,
 };

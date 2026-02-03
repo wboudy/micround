@@ -2,6 +2,7 @@
 //!
 //! Provides controllable, deterministic error injection for testing error handling
 //! and recovery paths in the application.
+#![allow(dead_code)] // Test infrastructure
 //!
 //! # Feature Gate
 //!
@@ -42,8 +43,10 @@ use std::time::{Duration, Instant};
 use crate::core::{CaptureError, ConfigError, MicroundError, PlatformError, RenderError};
 
 /// Trigger conditions for error injection
+#[derive(Default)]
 pub enum InjectionTrigger {
     /// Never inject errors
+    #[default]
     Never,
     /// Always inject errors
     Always,
@@ -70,20 +73,16 @@ impl std::fmt::Debug for InjectionTrigger {
             Self::Probability(p) => write!(f, "Probability({})", p),
             Self::OnOperations(ops) => write!(f, "OnOperations({:?})", ops),
             Self::AfterDuration(d) => write!(f, "AfterDuration({:?})", d),
-            Self::InRange { start, end } => write!(f, "InRange {{ start: {}, end: {} }}", start, end),
+            Self::InRange { start, end } => {
+                write!(f, "InRange {{ start: {}, end: {} }}", start, end)
+            }
             Self::Custom(_) => write!(f, "Custom(<fn>)"),
         }
     }
 }
 
-impl Default for InjectionTrigger {
-    fn default() -> Self {
-        Self::Never
-    }
-}
-
 /// Type of error to inject
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ErrorType {
     /// Camera/capture related errors
     Capture(CaptureErrorKind),
@@ -94,13 +93,8 @@ pub enum ErrorType {
     /// Platform-specific errors
     Platform(PlatformErrorKind),
     /// Generic application errors
+    #[default]
     Generic,
-}
-
-impl Default for ErrorType {
-    fn default() -> Self {
-        Self::Generic
-    }
 }
 
 /// Specific capture error types (maps to CaptureError variants)
@@ -220,17 +214,23 @@ impl ErrorInjector {
 
     /// Create an injector that injects every N operations
     pub fn every_n(n: u64) -> Self {
-        Self::new().with_trigger(InjectionTrigger::EveryN(n)).activate()
+        Self::new()
+            .with_trigger(InjectionTrigger::EveryN(n))
+            .activate()
     }
 
     /// Create an injector with a probability
     pub fn with_probability(p: f64) -> Self {
-        Self::new().with_trigger(InjectionTrigger::Probability(p)).activate()
+        Self::new()
+            .with_trigger(InjectionTrigger::Probability(p))
+            .activate()
     }
 
     /// Create an injector for specific operations
     pub fn on_operations(ops: Vec<u64>) -> Self {
-        Self::new().with_trigger(InjectionTrigger::OnOperations(ops)).activate()
+        Self::new()
+            .with_trigger(InjectionTrigger::OnOperations(ops))
+            .activate()
     }
 
     /// Set the trigger condition
@@ -293,7 +293,7 @@ impl ErrorInjector {
         let should_inject = match &self.trigger {
             InjectionTrigger::Never => false,
             InjectionTrigger::Always => true,
-            InjectionTrigger::EveryN(n) => *n > 0 && operation % *n == 0,
+            InjectionTrigger::EveryN(n) => *n > 0 && operation.is_multiple_of(*n),
             InjectionTrigger::Probability(p) => {
                 let hash = self.deterministic_random(operation);
                 hash < *p
@@ -346,16 +346,22 @@ impl ErrorInjector {
 
     /// Generate a CaptureError based on the configured error type
     pub fn capture_error(&self, context: &str) -> CaptureError {
-        let message = self.custom_message.clone()
-            .unwrap_or_else(|| format!("Injected error at operation {}: {}",
-                self.operation_count.load(Ordering::SeqCst), context));
+        let message = self.custom_message.clone().unwrap_or_else(|| {
+            format!(
+                "Injected error at operation {}: {}",
+                self.operation_count.load(Ordering::SeqCst),
+                context
+            )
+        });
 
         match &self.error_type {
             ErrorType::Capture(kind) => match kind {
                 CaptureErrorKind::DeviceNotFound => CaptureError::DeviceNotFound(message),
                 CaptureErrorKind::Disconnected => CaptureError::Disconnected,
                 CaptureErrorKind::PermissionDenied => CaptureError::PermissionDenied(message),
-                CaptureErrorKind::FormatNegotiationFailed => CaptureError::FormatNegotiationFailed(message),
+                CaptureErrorKind::FormatNegotiationFailed => {
+                    CaptureError::FormatNegotiationFailed(message)
+                }
                 CaptureErrorKind::Timeout => CaptureError::Timeout(1000), // Default timeout value
                 CaptureErrorKind::DeviceBusy => CaptureError::DeviceBusy,
                 CaptureErrorKind::NoCameras => CaptureError::NoCameras,
@@ -367,9 +373,13 @@ impl ErrorInjector {
 
     /// Generate a RenderError based on the configured error type
     pub fn render_error(&self, context: &str) -> RenderError {
-        let message = self.custom_message.clone()
-            .unwrap_or_else(|| format!("Injected error at operation {}: {}",
-                self.operation_count.load(Ordering::SeqCst), context));
+        let message = self.custom_message.clone().unwrap_or_else(|| {
+            format!(
+                "Injected error at operation {}: {}",
+                self.operation_count.load(Ordering::SeqCst),
+                context
+            )
+        });
 
         match &self.error_type {
             ErrorType::Render(kind) => match kind {
@@ -385,9 +395,13 @@ impl ErrorInjector {
 
     /// Generate a ConfigError based on the configured error type
     pub fn config_error(&self, context: &str) -> ConfigError {
-        let message = self.custom_message.clone()
-            .unwrap_or_else(|| format!("Injected error at operation {}: {}",
-                self.operation_count.load(Ordering::SeqCst), context));
+        let message = self.custom_message.clone().unwrap_or_else(|| {
+            format!(
+                "Injected error at operation {}: {}",
+                self.operation_count.load(Ordering::SeqCst),
+                context
+            )
+        });
 
         match &self.error_type {
             ErrorType::Config(kind) => match kind {
@@ -402,9 +416,13 @@ impl ErrorInjector {
 
     /// Generate a PlatformError based on the configured error type
     pub fn platform_error(&self, context: &str) -> PlatformError {
-        let message = self.custom_message.clone()
-            .unwrap_or_else(|| format!("Injected error at operation {}: {}",
-                self.operation_count.load(Ordering::SeqCst), context));
+        let message = self.custom_message.clone().unwrap_or_else(|| {
+            format!(
+                "Injected error at operation {}: {}",
+                self.operation_count.load(Ordering::SeqCst),
+                context
+            )
+        });
 
         match &self.error_type {
             ErrorType::Platform(kind) => match kind {
@@ -420,9 +438,13 @@ impl ErrorInjector {
 
     /// Generate a generic MicroundError
     pub fn generic_error(&self, context: &str) -> MicroundError {
-        let message = self.custom_message.clone()
-            .unwrap_or_else(|| format!("Injected error at operation {}: {}",
-                self.operation_count.load(Ordering::SeqCst), context));
+        let message = self.custom_message.clone().unwrap_or_else(|| {
+            format!(
+                "Injected error at operation {}: {}",
+                self.operation_count.load(Ordering::SeqCst),
+                context
+            )
+        });
         MicroundError::Internal {
             message,
             context: crate::core::ErrorContext::new()
@@ -592,7 +614,10 @@ mod tests {
         // Operations: 1, 2, 3, 4, 5, 6, 7, 8, 9
         // Inject at: 3, 6, 9
         let results: Vec<bool> = (0..9).map(|_| injector.should_inject()).collect();
-        assert_eq!(results, vec![false, false, true, false, false, true, false, false, true]);
+        assert_eq!(
+            results,
+            vec![false, false, true, false, false, true, false, false, true]
+        );
     }
 
     #[test]
@@ -601,13 +626,13 @@ mod tests {
 
         let results: Vec<bool> = (0..10).map(|_| injector.should_inject()).collect();
         // Operations 1-10, inject at 2, 5, 7
-        assert_eq!(results[0], false); // op 1
-        assert_eq!(results[1], true);  // op 2
-        assert_eq!(results[2], false); // op 3
-        assert_eq!(results[3], false); // op 4
-        assert_eq!(results[4], true);  // op 5
-        assert_eq!(results[5], false); // op 6
-        assert_eq!(results[6], true);  // op 7
+        assert!(!results[0]); // op 1
+        assert!(results[1]); // op 2
+        assert!(!results[2]); // op 3
+        assert!(!results[3]); // op 4
+        assert!(results[4]); // op 5
+        assert!(!results[5]); // op 6
+        assert!(results[6]); // op 7
     }
 
     #[test]
@@ -634,8 +659,11 @@ mod tests {
         }
 
         // Should be roughly 500 with some variance
-        assert!(injections > 400 && injections < 600,
-            "Expected ~500 injections, got {}", injections);
+        assert!(
+            injections > 400 && injections < 600,
+            "Expected ~500 injections, got {}",
+            injections
+        );
     }
 
     #[test]

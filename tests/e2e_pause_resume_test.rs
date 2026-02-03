@@ -14,16 +14,14 @@ use std::time::{Duration, Instant};
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern},
 };
-use micround::core::{
-    AppContext, AppState, CaptureSettings, Command, DisplayId, Event,
-};
+use micround::core::{AppContext, AppState, CaptureSettings, Command, DisplayId, Event};
 use micround::process::{process_frame, ProcessorConfig};
 use micround::render::{
-    WallpaperRenderer,
     simulator::{DisplaySimulator, DisplaySimulatorConfig},
+    WallpaperRenderer,
 };
 
 // ============================================================================
@@ -52,12 +50,17 @@ fn test_pause_resume_complete_flow() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
@@ -91,7 +94,11 @@ fn test_pause_resume_complete_flow() {
     let paused_result = capture.next_frame();
     test_assert!(logger, paused_result.is_err(), "No frames while paused");
     let paused_count = display.frame_count();
-    test_assert!(logger, paused_count == initial_count, "Frame count unchanged");
+    test_assert!(
+        logger,
+        paused_count == initial_count,
+        "Frame count unchanged"
+    );
     test_step_ok!(logger);
 
     // Resume capture
@@ -108,7 +115,11 @@ fn test_pause_resume_complete_flow() {
     }
     let final_count = display.frame_count();
     test_assert!(logger, final_count == 10, "More frames after resume");
-    test_step_ok!(logger, "Resumed and captured {} more frames", final_count - paused_count);
+    test_step_ok!(
+        logger,
+        "Resumed and captured {} more frames",
+        final_count - paused_count
+    );
 
     // Cleanup
     test_step!(logger, "Cleanup");
@@ -144,10 +155,20 @@ async fn test_pause_resume_state_transitions() {
     }
     test_step_ok!(logger);
 
-    test_step!(logger, "Sending PauseDisplay command and transition to Paused");
-    handle.send_command(Command::PauseDisplay).await.expect("send pause");
+    test_step!(
+        logger,
+        "Sending PauseDisplay command and transition to Paused"
+    );
+    handle
+        .send_command(Command::PauseDisplay)
+        .await
+        .expect("send pause");
     let cmd = cmd_rx.recv().await.expect("receive pause");
-    test_assert!(logger, matches!(cmd, Command::PauseDisplay), "PauseDisplay command received");
+    test_assert!(
+        logger,
+        matches!(cmd, Command::PauseDisplay),
+        "PauseDisplay command received"
+    );
 
     handle.publish_event(Event::StateChanged {
         old_state: AppState::Running,
@@ -159,10 +180,20 @@ async fn test_pause_resume_state_transitions() {
     }
     test_step_ok!(logger);
 
-    test_step!(logger, "Sending ResumeDisplay command and transition to Running");
-    handle.send_command(Command::ResumeDisplay).await.expect("send resume");
+    test_step!(
+        logger,
+        "Sending ResumeDisplay command and transition to Running"
+    );
+    handle
+        .send_command(Command::ResumeDisplay)
+        .await
+        .expect("send resume");
     let cmd = cmd_rx.recv().await.expect("receive resume");
-    test_assert!(logger, matches!(cmd, Command::ResumeDisplay), "ResumeDisplay command received");
+    test_assert!(
+        logger,
+        matches!(cmd, Command::ResumeDisplay),
+        "ResumeDisplay command received"
+    );
 
     handle.publish_event(Event::StateChanged {
         old_state: AppState::Paused,
@@ -188,16 +219,25 @@ fn test_rapid_pause_resume() {
         width: 640,
         height: 480,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 100, g: 150, b: 200 },
+        pattern: FramePattern::SolidColor {
+            r: 100,
+            g: 150,
+            b: 200,
+        },
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -219,12 +259,24 @@ fn test_rapid_pause_resume() {
         capture.start().expect("resume");
         test_assert!(logger, capture.is_capturing(), "Cycle {} resumed", i);
     }
-    tracing::info!(frames = frames_captured, cycles = 10, "Rapid cycles completed");
-    test_step_ok!(logger, "Completed 10 cycles, captured {} frames", frames_captured);
+    tracing::info!(
+        frames = frames_captured,
+        cycles = 10,
+        "Rapid cycles completed"
+    );
+    test_step_ok!(
+        logger,
+        "Completed 10 cycles, captured {} frames",
+        frames_captured
+    );
 
     test_step!(logger, "Final capture verification");
     let frame = capture.next_frame();
-    test_assert!(logger, frame.is_ok(), "Can still capture after rapid cycles");
+    test_assert!(
+        logger,
+        frame.is_ok(),
+        "Can still capture after rapid cycles"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -254,12 +306,17 @@ fn test_snapshot_capture() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -287,7 +344,11 @@ fn test_snapshot_capture() {
     test_step!(logger, "Verifying snapshot data is valid RGBA");
     // Verify RGBA format: data size should be width * height * 4
     let expected_size = (snapshot.width * snapshot.height * 4) as usize;
-    test_assert!(logger, snapshot.data.len() == expected_size, "Snapshot is valid RGBA");
+    test_assert!(
+        logger,
+        snapshot.data.len() == expected_size,
+        "Snapshot is valid RGBA"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -313,12 +374,17 @@ fn test_snapshot_while_paused() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -336,8 +402,16 @@ fn test_snapshot_while_paused() {
     test_step!(logger, "Taking snapshot from last captured frame");
     // In a real app, the last frame would be stored for snapshot use
     // Here we use the already-processed frame as the "snapshot"
-    test_assert!(logger, last_processed.width == 640, "Snapshot width from paused");
-    test_assert!(logger, last_processed.height == 480, "Snapshot height from paused");
+    test_assert!(
+        logger,
+        last_processed.width == 640,
+        "Snapshot width from paused"
+    );
+    test_assert!(
+        logger,
+        last_processed.height == 480,
+        "Snapshot height from paused"
+    );
     tracing::info!(
         width = last_processed.width,
         height = last_processed.height,
@@ -367,12 +441,17 @@ fn test_multiple_snapshots() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -432,9 +511,12 @@ async fn test_snapshot_command() {
     test_step_ok!(logger);
 
     test_step!(logger, "Sending TakeSnapshot to file command");
-    handle.send_command(Command::TakeSnapshot {
-        to_clipboard: false,
-    }).await.expect("send snapshot");
+    handle
+        .send_command(Command::TakeSnapshot {
+            to_clipboard: false,
+        })
+        .await
+        .expect("send snapshot");
 
     let cmd = cmd_rx.recv().await.expect("receive snapshot");
     if let Command::TakeSnapshot { to_clipboard } = cmd {
@@ -446,14 +528,18 @@ async fn test_snapshot_command() {
     test_step_ok!(logger);
 
     test_step!(logger, "Sending TakeSnapshot to clipboard command");
-    handle.send_command(Command::TakeSnapshot {
-        to_clipboard: true,
-    }).await.expect("send clipboard snapshot");
+    handle
+        .send_command(Command::TakeSnapshot { to_clipboard: true })
+        .await
+        .expect("send clipboard snapshot");
 
     let cmd = cmd_rx.recv().await.expect("receive clipboard snapshot");
     if let Command::TakeSnapshot { to_clipboard } = cmd {
         test_assert!(logger, to_clipboard, "Snapshot to clipboard");
-        tracing::info!(to_clipboard = to_clipboard, "TakeSnapshot to clipboard received");
+        tracing::info!(
+            to_clipboard = to_clipboard,
+            "TakeSnapshot to clipboard received"
+        );
     }
     test_step_ok!(logger);
 
@@ -479,12 +565,17 @@ fn test_frozen_frame_during_pause() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
@@ -514,12 +605,28 @@ fn test_frozen_frame_during_pause() {
     std::thread::sleep(Duration::from_millis(50));
 
     let current_frame = display.last_frame().expect("get current frame");
-    test_assert!(logger, current_frame.width == frozen_frame.width, "Same width");
-    test_assert!(logger, current_frame.height == frozen_frame.height, "Same height");
-    test_assert!(logger, current_frame.data.len() == frozen_frame.data.len(), "Same data size");
+    test_assert!(
+        logger,
+        current_frame.width == frozen_frame.width,
+        "Same width"
+    );
+    test_assert!(
+        logger,
+        current_frame.height == frozen_frame.height,
+        "Same height"
+    );
+    test_assert!(
+        logger,
+        current_frame.data.len() == frozen_frame.data.len(),
+        "Same data size"
+    );
 
     let post_pause_count = display.frame_count();
-    test_assert!(logger, post_pause_count == pre_pause_count, "No new frames during pause");
+    test_assert!(
+        logger,
+        post_pause_count == pre_pause_count,
+        "No new frames during pause"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -543,12 +650,17 @@ fn test_pause_when_already_paused() {
     test_step!(logger, "Starting capture");
     let mut capture = SimulatorBackend::new_default();
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -580,12 +692,17 @@ fn test_resume_when_not_paused() {
     test_step!(logger, "Starting capture");
     let mut capture = SimulatorBackend::new_default();
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_assert!(logger, capture.is_capturing(), "Capturing");
     test_step_ok!(logger);
@@ -625,12 +742,17 @@ fn test_pause_during_processing() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 1920,
-        height: 1080,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 1920,
+                height: 1080,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 

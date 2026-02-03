@@ -1,6 +1,7 @@
 //! Wallpaper rendering backends
 //!
 //! Platform-specific implementations for rendering frames to the desktop wallpaper.
+#![allow(dead_code)] // Renderer API
 
 use crate::config::AppConfig;
 use crate::core::{DisplayId, RenderError};
@@ -29,6 +30,9 @@ pub mod linux;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+#[cfg(target_os = "macos")]
+pub mod macos;
+
 // Simulator for testing (no feature gate - always available for testing)
 pub mod simulator;
 
@@ -44,8 +48,14 @@ pub fn create_renderer() -> Result<Box<dyn WallpaperRenderer>, RenderError> {
     Ok(Box::new(windows::WindowsRenderer::new()?))
 }
 
-// Placeholder for other platforms (macOS)
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+/// Create a platform-appropriate wallpaper renderer (macOS)
+#[cfg(target_os = "macos")]
+pub fn create_renderer() -> Result<Box<dyn WallpaperRenderer>, RenderError> {
+    Ok(Box::new(macos::MacOSRenderer::new()?))
+}
+
+// Placeholder for other platforms
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn create_renderer() -> Result<Box<dyn WallpaperRenderer>, RenderError> {
     unimplemented!("Wallpaper renderer not implemented for this platform")
 }

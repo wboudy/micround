@@ -1,6 +1,7 @@
 //! Snapshot feature - capture current frame to file or clipboard
 //!
 //! Allows users to capture a still image of the current feed:
+#![allow(dead_code)] // Snapshot feature API
 //! - Save to file (PNG format by default)
 //! - Copy to clipboard (platform-specific)
 //!
@@ -14,10 +15,11 @@ use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 
 use chrono::Local;
-use image::{ImageBuffer, ImageEncoder, Rgba};
 use image::codecs::png::PngEncoder;
+use image::{ImageBuffer, ImageEncoder, Rgba};
 use thiserror::Error;
 
+use crate::core::logging::log_safe_path;
 use crate::process::ProcessedFrame;
 
 /// Errors that can occur during snapshot operations
@@ -162,18 +164,14 @@ impl SnapshotManager {
 
         // Ensure parent directory exists
         if let Some(parent) = output_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                SnapshotError::CreateDir(format!("{}: {}", parent.display(), e))
-            })?;
+            fs::create_dir_all(parent)
+                .map_err(|e| SnapshotError::CreateDir(format!("{}: {}", parent.display(), e)))?;
         }
 
         // Validate image buffer can be created (sanity check)
-        let _: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(
-            frame.width,
-            frame.height,
-            frame.data.clone(),
-        )
-        .ok_or_else(|| SnapshotError::Encode("Failed to create image buffer".into()))?;
+        let _: ImageBuffer<Rgba<u8>, _> =
+            ImageBuffer::from_raw(frame.width, frame.height, frame.data.clone())
+                .ok_or_else(|| SnapshotError::Encode("Failed to create image buffer".into()))?;
 
         // Save to file
         match self.config.format {
@@ -198,17 +196,16 @@ impl SnapshotManager {
                     .flat_map(|rgba| [rgba[0], rgba[1], rgba[2]])
                     .collect();
 
-                let rgb_img: ImageBuffer<image::Rgb<u8>, _> = ImageBuffer::from_raw(
-                    frame.width,
-                    frame.height,
-                    rgb_data,
-                )
-                .ok_or_else(|| SnapshotError::Encode("Failed to create RGB image buffer".into()))?;
+                let rgb_img: ImageBuffer<image::Rgb<u8>, _> =
+                    ImageBuffer::from_raw(frame.width, frame.height, rgb_data).ok_or_else(
+                        || SnapshotError::Encode("Failed to create RGB image buffer".into()),
+                    )?;
 
                 // Use the specified JPEG quality
                 let file = File::create(&output_path)?;
                 let writer = BufWriter::new(file);
-                let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(writer, quality);
+                let mut encoder =
+                    image::codecs::jpeg::JpegEncoder::new_with_quality(writer, quality);
                 encoder
                     .encode(
                         rgb_img.as_raw(),
@@ -221,7 +218,7 @@ impl SnapshotManager {
         }
 
         tracing::info!(
-            path = %output_path.display(),
+            path = %log_safe_path(&output_path),
             width = frame.width,
             height = frame.height,
             "Snapshot saved to file"
@@ -279,7 +276,10 @@ impl SnapshotManager {
             SnapshotFormat::Jpeg { .. } => "jpg",
         };
 
-        let filename = format!("{}_{}.{}", self.config.filename_prefix, timestamp, extension);
+        let filename = format!(
+            "{}_{}.{}",
+            self.config.filename_prefix, timestamp, extension
+        );
         let path = self.config.save_dir.join(filename);
 
         Ok(path)
@@ -319,14 +319,9 @@ pub enum SnapshotEvent {
         height: u32,
     },
     /// Snapshot copied to clipboard
-    CopiedToClipboard {
-        width: u32,
-        height: u32,
-    },
+    CopiedToClipboard { width: u32, height: u32 },
     /// Snapshot operation failed
-    Failed {
-        error: String,
-    },
+    Failed { error: String },
 }
 
 // ============================================================================
@@ -417,7 +412,10 @@ mod tests {
 
         let result = manager.save_to_file(&frame);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), SnapshotError::InvalidFrameData { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            SnapshotError::InvalidFrameData { .. }
+        ));
     }
 
     #[test]

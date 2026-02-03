@@ -1,6 +1,7 @@
 //! Camera hot-plug detection and monitoring
 //!
 //! Detects when cameras are connected or disconnected and fires events.
+#![allow(dead_code)] // Hotplug detection infrastructure
 //!
 //! # Platform Support
 //!
@@ -146,8 +147,7 @@ fn hotplug_thread_main<E, H>(
     mut known_devices: HashSet<DeviceId>,
     config: HotplugConfig,
     stop_signal: Arc<AtomicBool>,
-)
-where
+) where
     E: CameraEnumerator,
     H: CameraEventHandler,
 {
@@ -273,6 +273,7 @@ pub mod linux {
 
 /// A simple handler that collects events into a Vec for testing
 #[cfg(test)]
+#[derive(Default)]
 pub struct CollectingHandler {
     pub events: Vec<CameraEvent>,
 }
@@ -280,7 +281,7 @@ pub struct CollectingHandler {
 #[cfg(test)]
 impl CollectingHandler {
     pub fn new() -> Self {
-        Self { events: Vec::new() }
+        Self::default()
     }
 }
 

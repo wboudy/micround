@@ -11,10 +11,10 @@ mod common;
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, InjectedErrorType, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern, InjectedErrorType},
 };
-use micround::core::{CaptureSettings, DeviceId, PixelFormat, CaptureError};
+use micround::core::{CaptureError, CaptureSettings, DeviceId, PixelFormat};
 use std::time::{Duration, Instant};
 
 // ============================================================================
@@ -41,10 +41,22 @@ fn test_enumerate_single_device() {
 
     test_step!(logger, "Validating device properties");
     test_assert!(logger, devices.len() == 1, "Expected 1 device");
-    test_assert!(logger, devices[0].id.0.starts_with("simulator:"), "Device ID has correct prefix");
-    test_assert!(logger, devices[0].name == "Test Camera", "Device name matches");
+    test_assert!(
+        logger,
+        devices[0].id.0.starts_with("simulator:"),
+        "Device ID has correct prefix"
+    );
+    test_assert!(
+        logger,
+        devices[0].name == "Test Camera",
+        "Device name matches"
+    );
     test_assert!(logger, devices[0].is_available, "Device is available");
-    test_assert!(logger, !devices[0].capabilities.is_empty(), "Device has capabilities");
+    test_assert!(
+        logger,
+        !devices[0].capabilities.is_empty(),
+        "Device has capabilities"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Validating capabilities");
@@ -90,8 +102,16 @@ fn test_enumerate_multiple_devices() {
     }
 
     // First device has base name, others have numbered suffix
-    test_assert!(logger, devices[0].name == "Multi Camera", "First device has base name");
-    test_assert!(logger, devices[1].name.contains("#2"), "Second device is numbered");
+    test_assert!(
+        logger,
+        devices[0].name == "Multi Camera",
+        "First device has base name"
+    );
+    test_assert!(
+        logger,
+        devices[1].name.contains("#2"),
+        "Second device is numbered"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -116,18 +136,28 @@ fn test_device_capabilities() {
     test_step!(logger, "Enumerating devices and checking capabilities");
     let devices = backend.enumerate_devices();
     let device = &devices[0];
-    test_step_ok!(logger, "Device has {} capabilities", device.capabilities.len());
+    test_step_ok!(
+        logger,
+        "Device has {} capabilities",
+        device.capabilities.len()
+    );
 
     test_step!(logger, "Validating capability includes config dimensions");
-    let has_config_cap = device.capabilities.iter().any(|c|
-        c.width == 1920 && c.height == 1080 && c.framerate == 60.0
+    let has_config_cap = device
+        .capabilities
+        .iter()
+        .any(|c| c.width == 1920 && c.height == 1080 && c.framerate == 60.0);
+    test_assert!(
+        logger,
+        has_config_cap,
+        "Capabilities include configured resolution"
     );
-    test_assert!(logger, has_config_cap, "Capabilities include configured resolution");
 
     // Should also have standard resolutions
-    let has_640x480 = device.capabilities.iter().any(|c|
-        c.width == 640 && c.height == 480
-    );
+    let has_640x480 = device
+        .capabilities
+        .iter()
+        .any(|c| c.width == 640 && c.height == 480);
     test_assert!(logger, has_640x480, "Capabilities include 640x480");
     test_step_ok!(logger);
 
@@ -164,7 +194,13 @@ fn test_stream_lifecycle() {
     let format = backend.open(device_id, settings).unwrap();
     test_assert!(logger, format.width == 640, "Negotiated width matches");
     test_assert!(logger, format.height == 480, "Negotiated height matches");
-    test_step_ok!(logger, "Format: {}x{} @ {}fps", format.width, format.height, format.framerate);
+    test_step_ok!(
+        logger,
+        "Format: {}x{} @ {}fps",
+        format.width,
+        format.height,
+        format.framerate
+    );
 
     test_step!(logger, "Starting capture");
     backend.start().unwrap();
@@ -178,7 +214,11 @@ fn test_stream_lifecycle() {
         test_assert!(logger, frame.sequence == i, "Frame sequence is correct");
         test_assert!(logger, frame.width == 640, "Frame width matches");
         test_assert!(logger, frame.height == 480, "Frame height matches");
-        test_assert!(logger, frame.format == PixelFormat::Rgba32, "Frame format is RGBA32");
+        test_assert!(
+            logger,
+            frame.format == PixelFormat::Rgba32,
+            "Frame format is RGBA32"
+        );
     }
     test_step_ok!(logger, "Captured 5 frames in {:?}", start.elapsed());
 
@@ -228,7 +268,9 @@ fn test_capture_without_start() {
     test_step!(logger, "Creating and opening simulator");
     let mut backend = SimulatorBackend::new_default();
     let devices = backend.enumerate_devices();
-    backend.open(&devices[0].id, CaptureSettings::default()).unwrap();
+    backend
+        .open(&devices[0].id, CaptureSettings::default())
+        .unwrap();
     test_step_ok!(logger);
 
     test_step!(logger, "Attempting to capture without start");
@@ -258,7 +300,11 @@ fn test_open_invalid_device() {
         &DeviceId("invalid:device".into()),
         CaptureSettings::default(),
     );
-    test_assert!(logger, result.is_err(), "Open should fail for invalid device");
+    test_assert!(
+        logger,
+        result.is_err(),
+        "Open should fail for invalid device"
+    );
     match result.unwrap_err() {
         CaptureError::DeviceNotFound(id) => {
             test_assert!(logger, id == "invalid:device", "Error contains device ID");
@@ -293,13 +339,23 @@ fn test_format_negotiation() {
         format: Some(PixelFormat::Rgba32),
     };
     let format = backend.open(&devices[0].id, settings).unwrap();
-    test_step_ok!(logger, "Negotiated: {}x{} @ {}fps {:?}",
-        format.width, format.height, format.framerate, format.format);
+    test_step_ok!(
+        logger,
+        "Negotiated: {}x{} @ {}fps {:?}",
+        format.width,
+        format.height,
+        format.framerate,
+        format.format
+    );
 
     test_step!(logger, "Validating negotiated format");
     test_assert!(logger, format.width == 1280, "Width matches request");
     test_assert!(logger, format.height == 720, "Height matches request");
-    test_assert!(logger, format.format == PixelFormat::Rgba32, "Format matches request");
+    test_assert!(
+        logger,
+        format.format == PixelFormat::Rgba32,
+        "Format matches request"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -317,7 +373,11 @@ fn test_current_format() {
     test_step_ok!(logger);
 
     test_step!(logger, "Checking format before open");
-    test_assert!(logger, backend.current_format().is_none(), "No format before open");
+    test_assert!(
+        logger,
+        backend.current_format().is_none(),
+        "No format before open"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Opening and checking format");
@@ -332,7 +392,11 @@ fn test_current_format() {
     test_assert!(logger, current.is_some(), "Format available after open");
     let format = current.unwrap();
     test_assert!(logger, format.width == 800, "Current format width matches");
-    test_assert!(logger, format.height == 600, "Current format height matches");
+    test_assert!(
+        logger,
+        format.height == 600,
+        "Current format height matches"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -472,7 +536,7 @@ fn test_frame_drop_simulation() {
     // With drop rate, some sequences should be skipped
     let mut gaps = 0;
     for i in 1..sequences.len() {
-        if sequences[i] > sequences[i-1] + 1 {
+        if sequences[i] > sequences[i - 1] + 1 {
             gaps += 1;
         }
     }
@@ -504,7 +568,14 @@ fn test_different_patterns() {
     test_step!(logger, "Capturing frames with different patterns");
     let patterns = [
         (FramePattern::ColorBars, "ColorBars"),
-        (FramePattern::SolidColor { r: 128, g: 64, b: 32 }, "SolidColor"),
+        (
+            FramePattern::SolidColor {
+                r: 128,
+                g: 64,
+                b: 32,
+            },
+            "SolidColor",
+        ),
         (FramePattern::Checkerboard { size: 8 }, "Checkerboard"),
     ];
 
@@ -531,9 +602,14 @@ fn test_different_patterns() {
     test_step!(logger, "Validating patterns are different");
     // Each pattern should produce different data
     for i in 0..frame_data.len() {
-        for j in (i+1)..frame_data.len() {
-            test_assert!(logger, frame_data[i] != frame_data[j],
-                "Pattern {} differs from {}", i, j);
+        for j in (i + 1)..frame_data.len() {
+            test_assert!(
+                logger,
+                frame_data[i] != frame_data[j],
+                "Pattern {} differs from {}",
+                i,
+                j
+            );
         }
     }
     test_step_ok!(logger);
@@ -577,7 +653,11 @@ fn test_high_framerate_capture() {
     let mut last_sequence = 0;
     for _ in 0..frame_count {
         let frame = backend.next_frame().unwrap();
-        test_assert!(logger, frame.sequence >= last_sequence, "Sequence increases");
+        test_assert!(
+            logger,
+            frame.sequence >= last_sequence,
+            "Sequence increases"
+        );
         last_sequence = frame.sequence;
     }
     let elapsed = start.elapsed();
@@ -588,7 +668,11 @@ fn test_high_framerate_capture() {
     let frame = backend.next_frame().unwrap();
     test_assert!(logger, frame.width == 320, "Frame width correct");
     test_assert!(logger, frame.height == 240, "Frame height correct");
-    test_assert!(logger, frame.data.len() == 320 * 240 * 4, "Frame data size correct");
+    test_assert!(
+        logger,
+        frame.data.len() == 320 * 240 * 4,
+        "Frame data size correct"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -625,9 +709,7 @@ fn test_thread_safe_enumeration() {
         }));
     }
 
-    let results: Vec<_> = handles.into_iter()
-        .map(|h| h.join().unwrap())
-        .collect();
+    let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
     test_step_ok!(logger, "All threads completed");
 
     test_step!(logger, "Validating consistent results");

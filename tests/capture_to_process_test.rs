@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 
 use micround::capture::simulator::{FramePattern, SimulatorBackend, SimulatorConfig};
 use micround::capture::{start_capture_loop, CaptureBackend};
-use micround::core::{CaptureSettings, PixelFormat, Rotation, Flip, ScalingMode};
+use micround::core::{CaptureSettings, Flip, PixelFormat, Rotation, ScalingMode};
 use micround::process::{process_frame, ProcessorConfig, ScaleFilter};
 
 use common::test_logger::TestLogger;
@@ -95,8 +95,8 @@ async fn capture_to_process_basic_flow() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture loop");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture loop");
     logger.step_ok("Capture loop started");
 
     // Step 3: Receive frame from capture
@@ -115,13 +115,14 @@ async fn capture_to_process_basic_flow() {
     logger.step("Processing frame");
     let processor_config = create_test_processor_config(800, 600);
     let start = Instant::now();
-    let processed = process_frame(&frame, &processor_config)
-        .expect("Failed to process frame");
+    let processed = process_frame(&frame, &processor_config).expect("Failed to process frame");
     let process_time = start.elapsed();
 
     logger.step_ok(&format!(
         "Processed to {}x{} in {:.1}ms",
-        processed.width, processed.height, process_time.as_secs_f64() * 1000.0
+        processed.width,
+        processed.height,
+        process_time.as_secs_f64() * 1000.0
     ));
 
     // Step 5: Verify processed frame
@@ -131,11 +132,14 @@ async fn capture_to_process_basic_flow() {
     logger.assert_eq(
         "Output data size",
         &processed.data.len(),
-        &(800 * 600 * 4) // RGBA
+        &(800 * 600 * 4), // RGBA
     );
 
     // Verify metrics were collected
-    let metrics = processed.metrics.as_ref().expect("Metrics should be present");
+    let metrics = processed
+        .metrics
+        .as_ref()
+        .expect("Metrics should be present");
     logger.assert_pass("Metrics collected");
     logger.assert_pass(&format!(
         "Decode time: {:.1}ms",
@@ -181,8 +185,8 @@ async fn capture_to_process_frame_integrity() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
 
     let frame = tokio::time::timeout(FRAME_TIMEOUT, receiver.recv())
         .await
@@ -196,9 +200,11 @@ async fn capture_to_process_frame_integrity() {
         .with_scaling(ScalingMode::Fill)
         .with_metrics(true);
 
-    let processed = process_frame(&frame, &processor_config)
-        .expect("Process failed");
-    logger.step_ok(&format!("Processed to {}x{}", processed.width, processed.height));
+    let processed = process_frame(&frame, &processor_config).expect("Process failed");
+    logger.step_ok(&format!(
+        "Processed to {}x{}",
+        processed.width, processed.height
+    ));
 
     // Step 4: Verify color integrity
     logger.step("Verifying color integrity");
@@ -218,7 +224,11 @@ async fn capture_to_process_frame_integrity() {
     logger.assert_pass(&format!("Red pixel ratio: {:.1}%", red_ratio * 100.0));
 
     // Should be mostly red (allowing for small processing artifacts)
-    assert!(red_ratio > 0.95, "Expected mostly red pixels, got {:.1}%", red_ratio * 100.0);
+    assert!(
+        red_ratio > 0.95,
+        "Expected mostly red pixels, got {:.1}%",
+        red_ratio * 100.0
+    );
     logger.step_ok("Color integrity verified");
 
     // Step 5: Cleanup
@@ -250,8 +260,8 @@ async fn capture_to_process_multiple_frames() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Step 2: Process multiple frames
@@ -265,14 +275,14 @@ async fn capture_to_process_multiple_frames() {
     for i in 0..THROUGHPUT_FRAME_COUNT {
         let frame = tokio::time::timeout(FRAME_TIMEOUT, receiver.recv())
             .await
-            .expect(&format!("Timeout on frame {}", i))
+            .unwrap_or_else(|_| panic!("Timeout on frame {}", i))
             .expect("Channel closed");
 
         sequences.push(frame.sequence);
 
         let frame_start = Instant::now();
         let _processed = process_frame(&frame, &processor_config)
-            .expect(&format!("Process failed on frame {}", i));
+            .unwrap_or_else(|_| panic!("Process failed on frame {}", i));
         frame_times.push(frame_start.elapsed());
     }
     let total_time = start.elapsed();
@@ -291,13 +301,18 @@ async fn capture_to_process_multiple_frames() {
             sequences_monotonic = false;
             logger.warn(&format!(
                 "Non-monotonic sequence: {} followed by {}",
-                sequences[i - 1], sequences[i]
+                sequences[i - 1],
+                sequences[i]
             ));
         }
     }
     logger.assert_pass(&format!(
         "Sequences monotonic: {}",
-        if sequences_monotonic { "yes" } else { "no (frames may have been dropped)" }
+        if sequences_monotonic {
+            "yes"
+        } else {
+            "no (frames may have been dropped)"
+        }
     ));
     logger.step_ok("Sequences verified");
 
@@ -335,8 +350,7 @@ async fn capture_to_process_multiple_frames() {
     let final_metrics = handle.metrics();
     logger.info(&format!(
         "Final capture metrics: captured={}, dropped={}",
-        final_metrics.frames_captured,
-        final_metrics.frames_dropped
+        final_metrics.frames_captured, final_metrics.frames_dropped
     ));
     logger.step_ok("Done");
 
@@ -365,8 +379,8 @@ async fn capture_to_process_with_rotation() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Step 2: Capture frame
@@ -384,20 +398,27 @@ async fn capture_to_process_with_rotation() {
         .with_scaling(ScalingMode::Fill)
         .with_metrics(true);
 
-    let processed = process_frame(&frame, &processor_config)
-        .expect("Process failed");
+    let processed = process_frame(&frame, &processor_config).expect("Process failed");
 
     // Verify metrics show transform was executed
     let metrics = processed.metrics.as_ref().expect("Metrics missing");
     logger.assert_pass(&format!(
         "Transform executed: {}",
-        if metrics.transform_executed { "yes" } else { "no" }
+        if metrics.transform_executed {
+            "yes"
+        } else {
+            "no"
+        }
     ));
-    assert!(metrics.transform_executed, "Transform should have been executed");
+    assert!(
+        metrics.transform_executed,
+        "Transform should have been executed"
+    );
 
     logger.step_ok(&format!(
         "Rotated to {}x{}, transform_time={:.1}ms",
-        processed.width, processed.height,
+        processed.width,
+        processed.height,
         metrics.transform_time.as_secs_f64() * 1000.0
     ));
 
@@ -427,8 +448,8 @@ async fn capture_to_process_with_flip() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Capture
@@ -446,11 +467,13 @@ async fn capture_to_process_with_flip() {
         .with_scaling(ScalingMode::Fill)
         .with_metrics(true);
 
-    let processed = process_frame(&frame, &processor_config)
-        .expect("Process failed");
+    let processed = process_frame(&frame, &processor_config).expect("Process failed");
 
     let metrics = processed.metrics.as_ref().expect("Metrics missing");
-    assert!(metrics.transform_executed, "Transform should have been executed for flip");
+    assert!(
+        metrics.transform_executed,
+        "Transform should have been executed for flip"
+    );
 
     logger.step_ok(&format!(
         "Flipped, transform_time={:.1}ms",
@@ -483,8 +506,8 @@ async fn capture_to_process_scaling_modes() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Test each scaling mode
@@ -508,17 +531,17 @@ async fn capture_to_process_scaling_modes() {
             .with_metrics(true);
 
         let processed = process_frame(&frame, &processor_config)
-            .expect(&format!("{} scaling failed", mode_name));
+            .unwrap_or_else(|_| panic!("{} scaling failed", mode_name));
 
         logger.assert_eq(
             &format!("{} output width", mode_name),
             &processed.width,
-            &800u32
+            &800u32,
         );
         logger.assert_eq(
             &format!("{} output height", mode_name),
             &processed.height,
-            &600u32
+            &600u32,
         );
 
         let metrics = processed.metrics.as_ref().unwrap();
@@ -555,8 +578,8 @@ async fn capture_to_process_scale_filters() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Test different scale filters
@@ -580,12 +603,13 @@ async fn capture_to_process_scale_filters() {
 
         let start = Instant::now();
         let processed = process_frame(&frame, &processor_config)
-            .expect(&format!("{} filter failed", filter_name));
+            .unwrap_or_else(|_| panic!("{} filter failed", filter_name));
         let elapsed = start.elapsed();
 
-        logger.assert_eq(&format!("{} output size", filter_name),
+        logger.assert_eq(
+            &format!("{} output size", filter_name),
             &processed.data.len(),
-            &(1280 * 720 * 4)
+            &(1280 * 720 * 4),
         );
 
         logger.timing(&format!("{} scaling", filter_name), elapsed);
@@ -625,8 +649,8 @@ async fn capture_to_process_noop_optimization() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Capture
@@ -645,25 +669,38 @@ async fn capture_to_process_noop_optimization() {
         .with_flip(Flip::None)
         .with_metrics(true);
 
-    let processed = process_frame(&frame, &processor_config)
-        .expect("Process failed");
+    let processed = process_frame(&frame, &processor_config).expect("Process failed");
 
     let metrics = processed.metrics.as_ref().expect("Metrics missing");
 
     // Verify optimizations kicked in
     logger.assert_pass(&format!(
         "Transform skipped: {}",
-        if !metrics.transform_executed { "yes (optimized)" } else { "no" }
+        if !metrics.transform_executed {
+            "yes (optimized)"
+        } else {
+            "no"
+        }
     ));
     logger.assert_pass(&format!(
         "Scale skipped: {}",
-        if !metrics.scale_executed { "yes (optimized)" } else { "no" }
+        if !metrics.scale_executed {
+            "yes (optimized)"
+        } else {
+            "no"
+        }
     ));
 
     // Transform should be skipped (no rotation, no flip)
-    assert!(!metrics.transform_executed, "Transform should be skipped for no-op");
+    assert!(
+        !metrics.transform_executed,
+        "Transform should be skipped for no-op"
+    );
     // Scale should be skipped (same dimensions with Fill mode)
-    assert!(!metrics.scale_executed, "Scale should be skipped for same dimensions");
+    assert!(
+        !metrics.scale_executed,
+        "Scale should be skipped for same dimensions"
+    );
 
     logger.step_ok(&format!(
         "No-op optimization verified, total_time={:.1}ms",
@@ -700,8 +737,8 @@ async fn capture_to_process_invalid_config() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Capture valid frame
@@ -771,8 +808,8 @@ async fn capture_to_process_throughput_benchmark() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("720p capture started");
 
     // Benchmark processing
@@ -787,12 +824,12 @@ async fn capture_to_process_throughput_benchmark() {
     for i in 0..BENCHMARK_FRAMES {
         let frame = tokio::time::timeout(BENCHMARK_TIMEOUT, receiver.recv())
             .await
-            .expect(&format!("Timeout on frame {}", i))
+            .unwrap_or_else(|_| panic!("Timeout on frame {}", i))
             .expect("Channel closed");
 
         let start = Instant::now();
         let _processed = process_frame(&frame, &processor_config)
-            .expect(&format!("Process failed on frame {}", i));
+            .unwrap_or_else(|_| panic!("Process failed on frame {}", i));
         process_times.push(start.elapsed());
     }
 
@@ -858,8 +895,8 @@ async fn capture_to_process_end_to_end_latency() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Measure end-to-end latency for several frames
@@ -875,8 +912,7 @@ async fn capture_to_process_end_to_end_latency() {
             .expect("Timeout")
             .expect("No frame");
 
-        let _processed = process_frame(&frame, &processor_config)
-            .expect("Process failed");
+        let _processed = process_frame(&frame, &processor_config).expect("Process failed");
 
         latencies.push(receive_start.elapsed());
     }
@@ -938,8 +974,8 @@ async fn capture_to_process_concurrent_consumers() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Simulate multiple processing tasks with different configs
@@ -959,8 +995,7 @@ async fn capture_to_process_concurrent_consumers() {
             .expect("No frame");
 
         let config_idx = i % 3;
-        let _processed = process_frame(&frame, &configs[config_idx])
-            .expect("Process failed");
+        let _processed = process_frame(&frame, &configs[config_idx]).expect("Process failed");
         processed_counts[config_idx] += 1;
     }
 
@@ -1008,8 +1043,8 @@ async fn capture_to_process_preserves_timing_info() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(backend, device_id, settings)
-        .expect("Failed to start capture");
+    let (handle, mut receiver) =
+        start_capture_loop(backend, device_id, settings).expect("Failed to start capture");
     logger.step_ok("Capture started");
 
     // Capture frames and check timestamp progression
@@ -1033,7 +1068,8 @@ async fn capture_to_process_preserves_timing_info() {
             timestamps_increasing = false;
             logger.warn(&format!(
                 "Non-increasing timestamp: {} -> {}",
-                timestamps[i - 1], timestamps[i]
+                timestamps[i - 1],
+                timestamps[i]
             ));
         }
     }

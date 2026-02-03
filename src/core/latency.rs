@@ -1,6 +1,7 @@
 //! Latency Measurement Tooling
 //!
 //! Provides end-to-end latency tracking from camera capture to display presentation.
+#![allow(dead_code)] // Performance measurement infrastructure
 //! Essential for validating the <100ms latency requirement.
 //!
 //! # Architecture
@@ -106,31 +107,36 @@ impl FrameMetrics {
 
     /// Get decode latency in microseconds (None if decode was skipped)
     pub fn decode_latency_us(&self) -> Option<u64> {
-        self.decode_time.map(|t| t.duration_since(self.capture_time).as_micros() as u64)
+        self.decode_time
+            .map(|t| t.duration_since(self.capture_time).as_micros() as u64)
     }
 
     /// Get processing latency in microseconds (from decode/capture to process complete)
     pub fn process_latency_us(&self) -> Option<u64> {
         let start = self.decode_time.unwrap_or(self.capture_time);
-        self.process_time.map(|t| t.duration_since(start).as_micros() as u64)
+        self.process_time
+            .map(|t| t.duration_since(start).as_micros() as u64)
     }
 
     /// Get render latency in microseconds (from process to render submit)
     pub fn render_latency_us(&self) -> Option<u64> {
         let start = self.process_time?;
-        self.render_time.map(|t| t.duration_since(start).as_micros() as u64)
+        self.render_time
+            .map(|t| t.duration_since(start).as_micros() as u64)
     }
 
     /// Get present latency in microseconds (from render to present)
     pub fn present_latency_us(&self) -> Option<u64> {
         let start = self.render_time?;
-        self.present_time.map(|t| t.duration_since(start).as_micros() as u64)
+        self.present_time
+            .map(|t| t.duration_since(start).as_micros() as u64)
     }
 
     /// Get total end-to-end latency in microseconds
     /// (from capture to present, or to last completed stage)
     pub fn total_latency_us(&self) -> u64 {
-        let end = self.present_time
+        let end = self
+            .present_time
             .or(self.render_time)
             .or(self.process_time)
             .or(self.decode_time)
@@ -223,7 +229,8 @@ impl LatencyHistogram {
         let latency_ms = latency_us / 1000;
 
         // Update bucket
-        let bucket_idx = BUCKET_BOUNDARIES.iter()
+        let bucket_idx = BUCKET_BOUNDARIES
+            .iter()
             .position(|&boundary| latency_ms < boundary)
             .unwrap_or(5);
         self.buckets[bucket_idx] += 1;
@@ -317,7 +324,9 @@ impl LatencyHistogram {
 
     /// Get bucket labels
     pub fn bucket_labels() -> [&'static str; 6] {
-        ["0-20ms", "20-40ms", "40-60ms", "60-80ms", "80-100ms", "100ms+"]
+        [
+            "0-20ms", "20-40ms", "40-60ms", "60-80ms", "80-100ms", "100ms+",
+        ]
     }
 
     /// Check if the latency meets targets
@@ -432,21 +441,14 @@ impl LatencyTracker {
 
     /// Get a copy of the current histogram
     pub fn histogram(&self) -> LatencyHistogram {
-        self.histogram.read()
-            .map(|h| h.clone())
-            .unwrap_or_default()
+        self.histogram.read().map(|h| h.clone()).unwrap_or_default()
     }
 
     /// Get recent frame metrics (up to count)
     pub fn recent_metrics(&self, count: usize) -> Vec<FrameMetrics> {
-        self.recent_metrics.read()
-            .map(|recent| {
-                recent.iter()
-                    .rev()
-                    .take(count)
-                    .cloned()
-                    .collect()
-            })
+        self.recent_metrics
+            .read()
+            .map(|recent| recent.iter().rev().take(count).cloned().collect())
             .unwrap_or_default()
     }
 
@@ -536,7 +538,10 @@ impl LatencySummaryReport {
         let mut report = String::new();
         report.push_str("=== Latency Summary Report ===\n");
         report.push_str(&format!("Frames tracked: {}\n", self.frames_tracked));
-        report.push_str(&format!("Target: {}ms (hit rate: {:.1}%)\n", self.target_ms, self.target_hit_rate));
+        report.push_str(&format!(
+            "Target: {}ms (hit rate: {:.1}%)\n",
+            self.target_ms, self.target_hit_rate
+        ));
         report.push_str("\nPercentiles:\n");
         report.push_str(&format!("  Min:  {:.2}ms\n", self.min_ms));
         report.push_str(&format!("  Mean: {:.2}ms\n", self.mean_ms));
@@ -546,13 +551,18 @@ impl LatencySummaryReport {
         report.push_str(&format!("  Max:  {:.2}ms\n", self.max_ms));
         report.push_str("\nDistribution:\n");
         let labels = LatencyHistogram::bucket_labels();
-        for (_i, (label, pct)) in labels.iter().zip(self.bucket_percentages.iter()).enumerate() {
+        for (label, pct) in labels.iter().zip(self.bucket_percentages.iter()) {
             let bar_len = (*pct / 5.0).round() as usize;
             let bar: String = "█".repeat(bar_len);
             report.push_str(&format!("  {:>10}: {:>5.1}% {}\n", label, pct, bar));
         }
-        report.push_str(&format!("\nAcceptance: {}\n",
-            if self.passes_acceptance() { "PASS ✓" } else { "FAIL ✗" }
+        report.push_str(&format!(
+            "\nAcceptance: {}\n",
+            if self.passes_acceptance() {
+                "PASS ✓"
+            } else {
+                "FAIL ✗"
+            }
         ));
         report
     }
@@ -651,11 +661,11 @@ mod tests {
         let mut hist = LatencyHistogram::new();
 
         // Add samples in different buckets
-        hist.record(10_000);  // 10ms -> bucket 0 (0-20)
-        hist.record(30_000);  // 30ms -> bucket 1 (20-40)
-        hist.record(50_000);  // 50ms -> bucket 2 (40-60)
-        hist.record(70_000);  // 70ms -> bucket 3 (60-80)
-        hist.record(90_000);  // 90ms -> bucket 4 (80-100)
+        hist.record(10_000); // 10ms -> bucket 0 (0-20)
+        hist.record(30_000); // 30ms -> bucket 1 (20-40)
+        hist.record(50_000); // 50ms -> bucket 2 (40-60)
+        hist.record(70_000); // 70ms -> bucket 3 (60-80)
+        hist.record(90_000); // 90ms -> bucket 4 (80-100)
         hist.record(150_000); // 150ms -> bucket 5 (100+)
 
         assert_eq!(hist.count(), 6);
@@ -682,11 +692,11 @@ mod tests {
 
         // p50 should be around 50ms
         let p50 = hist.p50();
-        assert!(p50 >= 49.0 && p50 <= 51.0, "p50={}", p50);
+        assert!((49.0..=51.0).contains(&p50), "p50={}", p50);
 
         // p95 should be around 95ms
         let p95 = hist.p95();
-        assert!(p95 >= 94.0 && p95 <= 96.0, "p95={}", p95);
+        assert!((94.0..=96.0).contains(&p95), "p95={}", p95);
     }
 
     #[test]
@@ -776,8 +786,11 @@ mod tests {
         let report = tracker.summary_report();
         assert_eq!(report.frames_tracked, 100);
         // Use a lenient threshold (90%) since sleep() can be delayed under load
-        assert!(report.target_hit_rate > 90.0,
-            "Expected >90% hit rate, got {}%", report.target_hit_rate);
+        assert!(
+            report.target_hit_rate > 90.0,
+            "Expected >90% hit rate, got {}%",
+            report.target_hit_rate
+        );
     }
 
     #[test]

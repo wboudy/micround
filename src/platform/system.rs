@@ -2,6 +2,7 @@
 //!
 //! Provides platform-independent handling of system-level events like
 //! sleep/wake, power state changes, and session events.
+#![allow(dead_code)] // System events infrastructure
 //!
 //! # Platform Implementations
 //! - Windows: Win32 WM_POWERBROADCAST, WM_WTSSESSION_CHANGE
@@ -170,6 +171,13 @@ pub trait SystemMonitor: Send {
         false
     }
 }
+
+// Platform-specific implementations
+#[cfg(target_os = "windows")]
+#[path = "system_windows.rs"]
+mod system_windows;
+#[cfg(target_os = "windows")]
+pub use system_windows::WindowsSystemMonitor;
 
 /// Guard that prevents system sleep while held
 ///

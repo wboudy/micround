@@ -1,16 +1,43 @@
 //! User interface components
 //!
 //! System tray integration and settings window using egui.
+#![allow(dead_code)] // UI components API
 //!
 //! # Features
 //!
 //! - `tray`: Enable system tray integration (requires GTK3 on Linux)
 
+pub mod first_run;
+pub mod settings;
+
 #[cfg(feature = "tray")]
 pub mod tray;
 
+// Re-exports for first-run wizard (will be used by settings window integration)
+#[allow(unused_imports)]
+pub use first_run::{
+    FirstRunAction, FirstRunController, FirstRunEvent, FirstRunState, StateContent,
+};
+
+// Re-exports for settings window
+#[allow(unused_imports)]
+pub use settings::{
+    create_preview_channel,
+    DisplayInfo,
+    PreviewFrame,
+    PreviewFrameReceiver,
+    PreviewFrameSender,
+    // Preview types (bd-37z)
+    PreviewState,
+    SettingsController,
+    SettingsError,
+    SettingsUI,
+    SettingsWindowState,
+};
+
 #[cfg(feature = "tray")]
-pub use tray::{TrayController, TrayError, TrayState, TrayMenuId, IconState, process_events};
+#[allow(unused_imports)]
+pub use tray::{process_events, IconState, TrayController, TrayError, TrayMenuId, TrayState};
 
 /// System tray state (stub for when tray feature is disabled)
 #[cfg(not(feature = "tray"))]

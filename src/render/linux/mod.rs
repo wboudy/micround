@@ -1,6 +1,7 @@
 //! Linux wallpaper backend
 //!
 //! Uses X11 root window drawing for wallpaper integration.
+#![allow(dead_code)] // Linux renderer implementation
 //!
 //! # Implementation Strategy
 //!
@@ -37,8 +38,8 @@ use crate::render::WallpaperRenderer;
 use x11rb::connection::Connection;
 #[cfg(feature = "linux")]
 use x11rb::protocol::xproto::{
-    AtomEnum, ConnectionExt, CreateGCAux, CreateWindowAux, EventMask,
-    ImageFormat, PropMode, Screen, VisualClass, Visualid, WindowClass,
+    AtomEnum, ConnectionExt, CreateGCAux, CreateWindowAux, EventMask, ImageFormat, PropMode,
+    Screen, VisualClass, Visualid, WindowClass,
 };
 #[cfg(feature = "linux")]
 use x11rb::rust_connection::RustConnection;
@@ -248,9 +249,9 @@ impl X11Renderer {
             gc,
             src_width,
             src_height,
-            0, // dst_x
-            0, // dst_y
-            0, // left_pad
+            0,  // dst_x
+            0,  // dst_y
+            0,  // left_pad
             24, // depth 24 uses BGRX (4 bytes/pixel, alpha ignored)
             &bgra_data,
         )
@@ -278,11 +279,7 @@ impl WallpaperRenderer for X11Renderer {
             self.create_desktop_window()?;
 
             self.initialized = true;
-            tracing::info!(
-                "X11 renderer initialized: {}x{}",
-                self.width,
-                self.height
-            );
+            tracing::info!("X11 renderer initialized: {}x{}", self.width, self.height);
 
             Ok(())
         }
@@ -300,7 +297,7 @@ impl WallpaperRenderer for X11Renderer {
 
         #[cfg(feature = "linux")]
         {
-            return self.render_frame_to_window(frame);
+            self.render_frame_to_window(frame)
         }
 
         #[cfg(not(feature = "linux"))]
@@ -388,15 +385,15 @@ mod tests {
 
         assert_eq!(bgra.len(), 8);
         // First pixel: R=255, G=128, B=64, A=255 -> B=64, G=128, R=255, A=255
-        assert_eq!(bgra[0], 64);  // B
+        assert_eq!(bgra[0], 64); // B
         assert_eq!(bgra[1], 128); // G
         assert_eq!(bgra[2], 255); // R
         assert_eq!(bgra[3], 255); // A
 
         // Second pixel: R=0, G=0, B=0, A=128 -> B=0, G=0, R=0, A=128
-        assert_eq!(bgra[4], 0);   // B
-        assert_eq!(bgra[5], 0);   // G
-        assert_eq!(bgra[6], 0);   // R
+        assert_eq!(bgra[4], 0); // B
+        assert_eq!(bgra[5], 0); // G
+        assert_eq!(bgra[6], 0); // R
         assert_eq!(bgra[7], 128); // A
     }
 
@@ -442,10 +439,10 @@ mod tests {
         for y in 0..height {
             for x in 0..width {
                 let idx = (y * width + x) * 4;
-                data[idx] = (x * 255 / width) as u8;     // R
+                data[idx] = (x * 255 / width) as u8; // R
                 data[idx + 1] = (y * 255 / height) as u8; // G
-                data[idx + 2] = 128;                      // B
-                data[idx + 3] = 255;                      // A
+                data[idx + 2] = 128; // B
+                data[idx + 3] = 255; // A
             }
         }
 

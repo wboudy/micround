@@ -1,6 +1,7 @@
 //! Display/monitor abstraction
 //!
 //! Provides platform-independent types and traits for working with displays/monitors.
+#![allow(dead_code)] // Complete API for cross-platform display handling
 //!
 //! # Platform Implementations
 //! - Windows: DXGI/Win32 EnumDisplayMonitors

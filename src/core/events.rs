@@ -1,6 +1,7 @@
 //! Internal event/message bus for Micround
 //!
 //! Provides type-safe, thread-safe communication between components:
+#![allow(dead_code)] // Full event system API
 //! - Commands: Synchronous dispatch from UI to components
 //! - Events: Asynchronous notification from components to UI
 //!
@@ -13,7 +14,9 @@
 use tokio::sync::{broadcast, mpsc};
 
 use super::error::MicroundError;
-use super::types::{CameraDevice, CaptureSettings, DeviceId, DisplayId, Flip, Rotation, ScalingMode};
+use super::types::{
+    CameraDevice, CaptureSettings, DeviceId, DisplayId, Flip, Rotation, ScalingMode,
+};
 
 // ============================================================================
 // Commands (UI → Components)
@@ -44,6 +47,19 @@ pub enum Command {
     SetRotation { rotation: Rotation },
     /// Update flip
     SetFlip { flip: Flip },
+    /// Refresh camera list
+    RefreshCameras,
+    /// Show settings window
+    ShowSettings,
+    /// Start camera preview in settings window (bd-37z)
+    StartPreview {
+        /// Preview width (typically smaller than capture)
+        width: u32,
+        /// Preview height
+        height: u32,
+    },
+    /// Stop camera preview in settings window
+    StopPreview,
     /// Quit the application
     Quit,
 }
@@ -97,7 +113,10 @@ pub enum Event {
     /// Settings were changed
     SettingsChanged,
     /// Application state changed
-    StateChanged { old_state: AppState, new_state: AppState },
+    StateChanged {
+        old_state: AppState,
+        new_state: AppState,
+    },
     /// Camera was reconnected after disconnection
     CameraReconnected { device_id: DeviceId },
     /// Camera reconnection failed
@@ -174,12 +193,18 @@ impl AppState {
 
     /// Returns true if the application is in an active capture state
     pub fn is_capturing(&self) -> bool {
-        matches!(self, AppState::Running | AppState::Paused | AppState::Reconnecting)
+        matches!(
+            self,
+            AppState::Running | AppState::Paused | AppState::Reconnecting
+        )
     }
 
     /// Returns true if the application can accept user commands
     pub fn can_accept_commands(&self) -> bool {
-        matches!(self, AppState::Idle | AppState::Running | AppState::Paused | AppState::Error)
+        matches!(
+            self,
+            AppState::Idle | AppState::Running | AppState::Paused | AppState::Error
+        )
     }
 }
 
@@ -262,15 +287,29 @@ impl EventSubscriber {
     /// Returns `None` if the bus is closed.
     /// May skip events if the subscriber falls behind (lagged).
     pub async fn recv(&mut self) -> Option<Event> {
+        let mut consecutive_lags = 0u32;
         loop {
             match self.receiver.recv().await {
-                Ok(event) => return Some(event),
+                Ok(event) => {
+                    return Some(event);
+                }
                 Err(broadcast::error::RecvError::Lagged(count)) => {
-                    // Log that we dropped events and continue
+                    consecutive_lags = consecutive_lags.saturating_add(1);
+                    // Log that we dropped events
                     tracing::warn!(
                         dropped = count,
+                        consecutive_lags,
                         "Event subscriber lagged, dropped events"
                     );
+                    // If severely lagging, yield to allow other tasks to run
+                    // and prevent spinning
+                    if consecutive_lags > 3 {
+                        tracing::error!(
+                            consecutive_lags,
+                            "Event subscriber severely lagged, yielding"
+                        );
+                        tokio::task::yield_now().await;
+                    }
                     continue;
                 }
                 Err(broadcast::error::RecvError::Closed) => return None,
@@ -279,15 +318,28 @@ impl EventSubscriber {
     }
 
     /// Try to receive an event without blocking
+    ///
+    /// Returns `None` if no event is available or the bus is closed.
+    /// May skip events if the subscriber fell behind (lagged).
     pub fn try_recv(&mut self) -> Option<Event> {
+        // Limit iterations to prevent infinite loop if continuously lagging
+        const MAX_LAG_ITERATIONS: u32 = 10;
+        let mut iterations = 0;
+
         loop {
             match self.receiver.try_recv() {
                 Ok(event) => return Some(event),
                 Err(broadcast::error::TryRecvError::Lagged(count)) => {
+                    iterations += 1;
                     tracing::warn!(
                         dropped = count,
+                        iteration = iterations,
                         "Event subscriber lagged, dropped events"
                     );
+                    if iterations >= MAX_LAG_ITERATIONS {
+                        tracing::error!("Event subscriber exceeded max lag iterations, giving up");
+                        return None;
+                    }
                     continue;
                 }
                 Err(_) => return None,
@@ -345,12 +397,18 @@ pub struct AppHandle {
 
 impl AppHandle {
     /// Send a command to the engine
-    pub async fn send_command(&self, command: Command) -> Result<(), mpsc::error::SendError<Command>> {
+    pub async fn send_command(
+        &self,
+        command: Command,
+    ) -> Result<(), mpsc::error::SendError<Command>> {
         self.commands.send(command).await
     }
 
     /// Try to send a command without blocking
-    pub fn try_send_command(&self, command: Command) -> Result<(), mpsc::error::TrySendError<Command>> {
+    pub fn try_send_command(
+        &self,
+        command: Command,
+    ) -> Result<(), mpsc::error::TrySendError<Command>> {
         self.commands.try_send(command)
     }
 
@@ -414,10 +472,7 @@ mod tests {
         let mut sub = handle.subscribe_events();
 
         // Send command
-        handle
-            .send_command(Command::PauseDisplay)
-            .await
-            .unwrap();
+        handle.send_command(Command::PauseDisplay).await.unwrap();
 
         // Publish event
         handle.publish_event(Event::DisplayPaused);

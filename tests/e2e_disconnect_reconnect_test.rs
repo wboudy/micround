@@ -10,20 +10,18 @@
 
 mod common;
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, InjectedErrorType, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern, InjectedErrorType},
 };
-use micround::core::{
-    AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event,
-};
+use micround::core::{AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event};
 use micround::process::{process_frame, ProcessorConfig};
 use micround::render::{
-    WallpaperRenderer,
     simulator::{DisplaySimulator, DisplaySimulatorConfig},
+    WallpaperRenderer,
 };
 
 // ============================================================================
@@ -40,18 +38,27 @@ fn test_disconnect_detection() {
         width: 640,
         height: 480,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         error_rate: 0.0, // Start with no errors
         error_type: InjectedErrorType::Disconnected,
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -66,13 +73,21 @@ fn test_disconnect_detection() {
     // In a real scenario, the simulator would inject errors
     // For testing, we stop capture to simulate disconnect
     capture.stop().expect("simulate disconnect");
-    test_assert!(logger, !capture.is_capturing(), "Capture stopped (disconnected)");
+    test_assert!(
+        logger,
+        !capture.is_capturing(),
+        "Capture stopped (disconnected)"
+    );
     tracing::info!("Simulated camera disconnect");
     test_step_ok!(logger);
 
     test_step!(logger, "Attempting to capture after disconnect");
     let result = capture.next_frame();
-    test_assert!(logger, result.is_err(), "Frame capture fails after disconnect");
+    test_assert!(
+        logger,
+        result.is_err(),
+        "Frame capture fails after disconnect"
+    );
     if let Err(e) = &result {
         tracing::warn!(error = %e, "Expected error after disconnect");
     }
@@ -92,7 +107,7 @@ async fn test_disconnect_state_transitions() {
     let mut logger = TestLogger::new("disconnect_state_transitions", 5);
 
     test_step!(logger, "Creating application context");
-    let (ctx, mut cmd_rx) = AppContext::new();
+    let (ctx, _cmd_rx) = AppContext::new();
     let handle = ctx.handle();
     let mut event_sub = handle.subscribe_events();
     test_step_ok!(logger);
@@ -103,8 +118,17 @@ async fn test_disconnect_state_transitions() {
         new_state: AppState::Running,
     });
     let event = event_sub.recv().await.expect("receive running");
-    test_assert!(logger, matches!(event, Event::StateChanged { new_state: AppState::Running, .. }),
-        "Now Running");
+    test_assert!(
+        logger,
+        matches!(
+            event,
+            Event::StateChanged {
+                new_state: AppState::Running,
+                ..
+            }
+        ),
+        "Now Running"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Publishing CameraDisconnected event");
@@ -113,8 +137,15 @@ async fn test_disconnect_state_transitions() {
         device_id: device_id.clone(),
     });
     let event = event_sub.recv().await.expect("receive disconnect");
-    if let Event::CameraDisconnected { device_id: disconnected_id } = event {
-        test_assert!(logger, disconnected_id == device_id, "Correct device disconnected");
+    if let Event::CameraDisconnected {
+        device_id: disconnected_id,
+    } = event
+    {
+        test_assert!(
+            logger,
+            disconnected_id == device_id,
+            "Correct device disconnected"
+        );
         tracing::warn!(device_id = %device_id, "Camera disconnected event received");
     }
     test_step_ok!(logger);
@@ -124,7 +155,11 @@ async fn test_disconnect_state_transitions() {
         device_id: device_id.clone(),
     });
     let event = event_sub.recv().await.expect("receive stopped");
-    test_assert!(logger, matches!(event, Event::CaptureStopped { .. }), "Capture stopped");
+    test_assert!(
+        logger,
+        matches!(event, Event::CaptureStopped { .. }),
+        "Capture stopped"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -151,19 +186,28 @@ fn test_reconnection_after_disconnect() {
     let devices = capture.enumerate_devices();
     let device_id = devices[0].id.clone();
 
-    capture.open(&device_id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &device_id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_assert!(logger, capture.is_capturing(), "Initial capture started");
     test_step_ok!(logger);
 
     test_step!(logger, "Capturing frames before disconnect");
     let frame_before = capture.next_frame().expect("get frame before");
-    test_assert!(logger, frame_before.width > 0, "Frame captured before disconnect");
+    test_assert!(
+        logger,
+        frame_before.width > 0,
+        "Frame captured before disconnect"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Simulating disconnect");
@@ -178,14 +222,21 @@ fn test_reconnection_after_disconnect() {
     // For testing, we re-enumerate and reopen
     let reconnect_start = Instant::now();
     let new_devices = capture.enumerate_devices();
-    test_assert!(logger, !new_devices.is_empty(), "Device available after reconnect");
+    test_assert!(
+        logger,
+        !new_devices.is_empty(),
+        "Device available after reconnect"
+    );
 
-    let reconnect_result = capture.open(&new_devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    });
+    let reconnect_result = capture.open(
+        &new_devices[0].id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 1000.0,
+            format: None,
+        },
+    );
     test_assert!(logger, reconnect_result.is_ok(), "Reconnection successful");
     capture.start().expect("restart");
     let reconnect_time = reconnect_start.elapsed();
@@ -197,8 +248,16 @@ fn test_reconnection_after_disconnect() {
 
     test_step!(logger, "Capturing frames after reconnect");
     let frame_after = capture.next_frame().expect("get frame after");
-    test_assert!(logger, frame_after.width > 0, "Frame captured after reconnect");
-    test_assert!(logger, frame_after.width == frame_before.width, "Resolution maintained");
+    test_assert!(
+        logger,
+        frame_after.width > 0,
+        "Frame captured after reconnect"
+    );
+    test_assert!(
+        logger,
+        frame_after.width == frame_before.width,
+        "Resolution maintained"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -216,7 +275,7 @@ async fn test_reconnection_events() {
     let mut logger = TestLogger::new("reconnection_events", 5);
 
     test_step!(logger, "Creating application context");
-    let (ctx, mut cmd_rx) = AppContext::new();
+    let (ctx, _cmd_rx) = AppContext::new();
     let handle = ctx.handle();
     let mut event_sub = handle.subscribe_events();
     test_step_ok!(logger);
@@ -228,8 +287,11 @@ async fn test_reconnection_events() {
         device_id: device_id.clone(),
     });
     let event = event_sub.recv().await.expect("receive disconnect");
-    test_assert!(logger, matches!(event, Event::CameraDisconnected { .. }),
-        "Disconnect received");
+    test_assert!(
+        logger,
+        matches!(event, Event::CameraDisconnected { .. }),
+        "Disconnect received"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Publishing reconnect event (CameraConnected)");
@@ -250,12 +312,19 @@ async fn test_reconnection_events() {
     test_step_ok!(logger);
 
     test_step!(logger, "Sending restart capture command");
-    handle.send_command(Command::StartCapture {
-        device_id: device_id.clone(),
-    }).await.expect("send start");
+    handle
+        .send_command(Command::StartCapture {
+            device_id: device_id.clone(),
+        })
+        .await
+        .expect("send start");
 
     let cmd = cmd_rx.recv().await.expect("receive start");
-    test_assert!(logger, matches!(cmd, Command::StartCapture { .. }), "Start command received");
+    test_assert!(
+        logger,
+        matches!(cmd, Command::StartCapture { .. }),
+        "Start command received"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -280,19 +349,26 @@ fn test_full_recovery_flow() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
         frame_history_size: 20,
         ..Default::default()
     });
-    display.init(&DisplayId("test:0".into())).expect("init display");
+    display
+        .init(&DisplayId("test:0".into()))
+        .expect("init display");
     test_step_ok!(logger);
 
     test_step!(logger, "Rendering frames before disconnect");
@@ -317,17 +393,26 @@ fn test_full_recovery_flow() {
     test_step!(logger, "Verifying frozen frame during disconnect");
     // Display should show last frame (frozen)
     let frozen = display.last_frame().expect("get frozen");
-    test_assert!(logger, frozen.width == last_frame.width, "Frozen frame preserved");
+    test_assert!(
+        logger,
+        frozen.width == last_frame.width,
+        "Frozen frame preserved"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Reconnecting camera");
     let new_devices = capture.enumerate_devices();
-    capture.open(&new_devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("reopen");
+    capture
+        .open(
+            &new_devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("reopen");
     capture.start().expect("restart");
     test_assert!(logger, capture.is_capturing(), "Capture resumed");
     tracing::info!("Camera reconnected, resuming capture");
@@ -401,7 +486,11 @@ fn test_multiple_disconnect_cycles() {
     capture.open(&device_id, settings).expect("final open");
     capture.start().expect("final start");
     let final_frame = capture.next_frame();
-    test_assert!(logger, final_frame.is_ok(), "Final capture works after cycles");
+    test_assert!(
+        logger,
+        final_frame.is_ok(),
+        "Final capture works after cycles"
+    );
     capture.stop().expect("final stop");
     capture.close();
     test_step_ok!(logger);
@@ -433,12 +522,17 @@ fn test_switch_device_after_disconnect() {
     test_step_ok!(logger, "Found {} devices", devices.len());
 
     test_step!(logger, "Capturing from device 0");
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open device 0");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open device 0");
     capture.start().expect("start");
     let _ = capture.next_frame().expect("frame from device 0");
     test_step_ok!(logger);
@@ -450,13 +544,20 @@ fn test_switch_device_after_disconnect() {
     test_step_ok!(logger);
 
     test_step!(logger, "Switching to device 1");
-    let switch_result = capture.open(&devices[1].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    });
-    test_assert!(logger, switch_result.is_ok(), "Switch to device 1 successful");
+    let switch_result = capture.open(
+        &devices[1].id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 1000.0,
+            format: None,
+        },
+    );
+    test_assert!(
+        logger,
+        switch_result.is_ok(),
+        "Switch to device 1 successful"
+    );
     capture.start().expect("start device 1");
     let frame = capture.next_frame().expect("frame from device 1");
     test_assert!(logger, frame.width > 0, "Capturing from device 1");
@@ -484,12 +585,17 @@ fn test_reconnect_device_not_found() {
     test_step!(logger, "Setting up capture");
     let mut capture = SimulatorBackend::new_default();
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -500,12 +606,15 @@ fn test_reconnect_device_not_found() {
 
     test_step!(logger, "Attempting reconnect with invalid device ID");
     let invalid_id = DeviceId("invalid:camera:not_found".into());
-    let result = capture.open(&invalid_id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let result = capture.open(
+        &invalid_id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
     test_assert!(logger, result.is_err(), "Invalid device returns error");
     if let Err(e) = &result {
         tracing::warn!(error = %e, "Expected error for missing device");
@@ -514,12 +623,15 @@ fn test_reconnect_device_not_found() {
 
     test_step!(logger, "Recovery by using valid device");
     let valid_devices = capture.enumerate_devices();
-    let recovery = capture.open(&valid_devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let recovery = capture.open(
+        &valid_devices[0].id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
     test_assert!(logger, recovery.is_ok(), "Recovery with valid device works");
     capture.close();
     test_step_ok!(logger);
@@ -542,12 +654,17 @@ fn test_disconnect_during_processing() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 1920,
-        height: 1080,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 1920,
+                height: 1080,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -562,17 +679,26 @@ fn test_disconnect_during_processing() {
     // Process the already-captured frame
     let config = ProcessorConfig::new(1920, 1080);
     let result = process_frame(&frame, &config);
-    test_assert!(logger, result.is_ok(), "Can process frame captured before disconnect");
+    test_assert!(
+        logger,
+        result.is_ok(),
+        "Can process frame captured before disconnect"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Reconnect and verify");
     let new_devices = capture.enumerate_devices();
-    capture.open(&new_devices[0].id, CaptureSettings {
-        width: 1920,
-        height: 1080,
-        framerate: 1000.0,
-        format: None,
-    }).expect("reconnect");
+    capture
+        .open(
+            &new_devices[0].id,
+            CaptureSettings {
+                width: 1920,
+                height: 1080,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("reconnect");
     capture.start().expect("restart");
     let new_frame = capture.next_frame();
     test_assert!(logger, new_frame.is_ok(), "Can capture after reconnect");

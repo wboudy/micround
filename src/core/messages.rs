@@ -1,6 +1,7 @@
 //! User-facing error messages and recovery guidance
 //!
 //! This module centralizes all user-visible error messages, following these principles:
+#![allow(dead_code)] // Complete API for future UI integration
 //!
 //! 1. **Tell users what happened** (in plain language)
 //! 2. **Tell users what to do** (specific action)
@@ -151,8 +152,14 @@ pub mod camera {
     pub fn no_camera_found() -> UserMessage {
         UserMessage::new("No camera detected. Connect your USB microscope and click Refresh.")
             .with_error_code("MIC-CAM-001")
-            .with_action(RecoveryAction::primary("Refresh", RecoveryActionId::RefreshCameras))
-            .with_action(RecoveryAction::secondary("Help", RecoveryActionId::OpenHelp))
+            .with_action(RecoveryAction::primary(
+                "Refresh",
+                RecoveryActionId::RefreshCameras,
+            ))
+            .with_action(RecoveryAction::secondary(
+                "Help",
+                RecoveryActionId::OpenHelp,
+            ))
     }
 
     /// Specific camera not found
@@ -162,8 +169,14 @@ pub mod camera {
             name
         ))
         .with_error_code("MIC-CAM-002")
-        .with_action(RecoveryAction::primary("Refresh", RecoveryActionId::RefreshCameras))
-        .with_action(RecoveryAction::secondary("Select Camera", RecoveryActionId::SelectCamera))
+        .with_action(RecoveryAction::primary(
+            "Refresh",
+            RecoveryActionId::RefreshCameras,
+        ))
+        .with_action(RecoveryAction::secondary(
+            "Select Camera",
+            RecoveryActionId::SelectCamera,
+        ))
     }
 
     /// Camera in use by another application
@@ -173,7 +186,10 @@ pub mod camera {
         )
         .with_error_code("MIC-CAM-003")
         .with_action(RecoveryAction::primary("Retry", RecoveryActionId::Retry))
-        .with_action(RecoveryAction::secondary("Close Other Apps", RecoveryActionId::CloseOtherApps))
+        .with_action(RecoveryAction::secondary(
+            "Close Other Apps",
+            RecoveryActionId::CloseOtherApps,
+        ))
     }
 
     /// Permission denied (generic)
@@ -196,7 +212,10 @@ pub mod camera {
             .with_error_code("MIC-CAM-004")
             .with_details(format!("Try: sudo chmod 666 {}", device_path))
             .with_action(RecoveryAction::primary("Retry", RecoveryActionId::Retry))
-            .with_action(RecoveryAction::secondary("Help", RecoveryActionId::OpenHelp))
+            .with_action(RecoveryAction::secondary(
+                "Help",
+                RecoveryActionId::OpenHelp,
+            ))
         } else {
             UserMessage::new(format!(
                 "Permission denied for '{}'. Your user account needs camera access.",
@@ -212,14 +231,20 @@ pub mod camera {
     pub fn disconnected() -> UserMessage {
         UserMessage::new("Camera disconnected. Waiting to reconnect...")
             .with_error_code("MIC-CAM-005")
-            .with_action(RecoveryAction::secondary("Select Camera", RecoveryActionId::SelectCamera))
+            .with_action(RecoveryAction::secondary(
+                "Select Camera",
+                RecoveryActionId::SelectCamera,
+            ))
     }
 
     /// Camera not responding (timeout)
     pub fn timeout() -> UserMessage {
         UserMessage::new("Camera is not responding. Attempting to reconnect...")
             .with_error_code("MIC-CAM-006")
-            .with_action(RecoveryAction::secondary("Restart Feed", RecoveryActionId::RestartFeed))
+            .with_action(RecoveryAction::secondary(
+                "Restart Feed",
+                RecoveryActionId::RestartFeed,
+            ))
     }
 
     /// Failed to negotiate format
@@ -229,22 +254,36 @@ pub mod camera {
         )
         .with_error_code("MIC-CAM-007")
         .with_details(details.to_string())
-        .with_action(RecoveryAction::primary("Select Camera", RecoveryActionId::SelectCamera))
-        .with_action(RecoveryAction::secondary("Settings", RecoveryActionId::OpenSettings))
+        .with_action(RecoveryAction::primary(
+            "Select Camera",
+            RecoveryActionId::SelectCamera,
+        ))
+        .with_action(RecoveryAction::secondary(
+            "Settings",
+            RecoveryActionId::OpenSettings,
+        ))
     }
 
     /// Camera reconnected after disconnect (success message)
     pub fn reconnected() -> UserMessage {
-        UserMessage::new("Camera reconnected. Feed resumed.")
-            .with_action(RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss))
+        UserMessage::new("Camera reconnected. Feed resumed.").with_action(RecoveryAction::primary(
+            "Dismiss",
+            RecoveryActionId::Dismiss,
+        ))
     }
 
     /// Reconnection failed after timeout
     pub fn reconnection_failed() -> UserMessage {
         UserMessage::new("Camera not found after waiting. Please check the connection.")
             .with_error_code("MIC-CAM-008")
-            .with_action(RecoveryAction::primary("Try Again", RecoveryActionId::Retry))
-            .with_action(RecoveryAction::secondary("Select Camera", RecoveryActionId::SelectCamera))
+            .with_action(RecoveryAction::primary(
+                "Try Again",
+                RecoveryActionId::Retry,
+            ))
+            .with_action(RecoveryAction::secondary(
+                "Select Camera",
+                RecoveryActionId::SelectCamera,
+            ))
     }
 }
 
@@ -263,7 +302,10 @@ pub mod display {
             name
         ))
         .with_error_code("MIC-DSP-001")
-        .with_action(RecoveryAction::primary("Settings", RecoveryActionId::OpenSettings))
+        .with_action(RecoveryAction::primary(
+            "Settings",
+            RecoveryActionId::OpenSettings,
+        ))
     }
 
     /// Display disconnected during operation
@@ -278,14 +320,21 @@ pub mod display {
         };
         UserMessage::new(msg)
             .with_error_code("MIC-DSP-002")
-            .with_action(RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss))
-            .with_action(RecoveryAction::secondary("Settings", RecoveryActionId::OpenSettings))
+            .with_action(RecoveryAction::primary(
+                "Dismiss",
+                RecoveryActionId::Dismiss,
+            ))
+            .with_action(RecoveryAction::secondary(
+                "Settings",
+                RecoveryActionId::OpenSettings,
+            ))
     }
 
     /// Resolution changed (informational, usually auto-handled)
     pub fn resolution_changed() -> UserMessage {
-        UserMessage::new("Display resolution changed. Adjusting feed...")
-            .with_action(RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss))
+        UserMessage::new("Display resolution changed. Adjusting feed...").with_action(
+            RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss),
+        )
     }
 
     /// Failed to set wallpaper
@@ -296,7 +345,10 @@ pub mod display {
         .with_error_code("MIC-DSP-003")
         .with_details(details.to_string())
         .with_action(RecoveryAction::primary("Help", RecoveryActionId::OpenHelp))
-        .with_action(RecoveryAction::secondary("Settings", RecoveryActionId::OpenSettings))
+        .with_action(RecoveryAction::secondary(
+            "Settings",
+            RecoveryActionId::OpenSettings,
+        ))
     }
 
     /// GPU/graphics error
@@ -304,8 +356,14 @@ pub mod display {
         UserMessage::new("A graphics error occurred. Please update your graphics drivers.")
             .with_error_code("MIC-DSP-004")
             .with_details(details.to_string())
-            .with_action(RecoveryAction::primary("Update Drivers", RecoveryActionId::UpdateDrivers))
-            .with_action(RecoveryAction::secondary("Help", RecoveryActionId::OpenHelp))
+            .with_action(RecoveryAction::primary(
+                "Update Drivers",
+                RecoveryActionId::UpdateDrivers,
+            ))
+            .with_action(RecoveryAction::secondary(
+                "Help",
+                RecoveryActionId::OpenHelp,
+            ))
     }
 
     /// Surface creation failed
@@ -313,7 +371,10 @@ pub mod display {
         UserMessage::new("Unable to create display surface. Please check your graphics drivers.")
             .with_error_code("MIC-DSP-005")
             .with_details(details.to_string())
-            .with_action(RecoveryAction::primary("Update Drivers", RecoveryActionId::UpdateDrivers))
+            .with_action(RecoveryAction::primary(
+                "Update Drivers",
+                RecoveryActionId::UpdateDrivers,
+            ))
     }
 }
 
@@ -329,20 +390,28 @@ pub mod feed {
     pub fn frozen() -> UserMessage {
         UserMessage::new("Feed appears frozen.")
             .with_error_code("MIC-FED-001")
-            .with_action(RecoveryAction::primary("Restart Feed", RecoveryActionId::RestartFeed))
+            .with_action(RecoveryAction::primary(
+                "Restart Feed",
+                RecoveryActionId::RestartFeed,
+            ))
     }
 
     /// Frame processing error (usually recoverable)
     pub fn processing_error() -> UserMessage {
         UserMessage::new("Error processing video frame. Skipping frame...")
             .with_error_code("MIC-FED-002")
-            .with_action(RecoveryAction::secondary("Dismiss", RecoveryActionId::Dismiss))
+            .with_action(RecoveryAction::secondary(
+                "Dismiss",
+                RecoveryActionId::Dismiss,
+            ))
     }
 
     /// Feed paused
     pub fn paused() -> UserMessage {
-        UserMessage::new("Feed paused.")
-            .with_action(RecoveryAction::primary("Resume", RecoveryActionId::RestartFeed))
+        UserMessage::new("Feed paused.").with_action(RecoveryAction::primary(
+            "Resume",
+            RecoveryActionId::RestartFeed,
+        ))
     }
 }
 
@@ -358,15 +427,24 @@ pub mod config {
     pub fn not_found() -> UserMessage {
         UserMessage::new("Settings file not found. Using default configuration.")
             .with_error_code("MIC-CFG-001")
-            .with_action(RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss))
+            .with_action(RecoveryAction::primary(
+                "Dismiss",
+                RecoveryActionId::Dismiss,
+            ))
     }
 
     /// Config file corrupted
     pub fn corrupted() -> UserMessage {
         UserMessage::new("Settings file is corrupted. Using default configuration.")
             .with_error_code("MIC-CFG-002")
-            .with_action(RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss))
-            .with_action(RecoveryAction::secondary("Settings", RecoveryActionId::OpenSettings))
+            .with_action(RecoveryAction::primary(
+                "Dismiss",
+                RecoveryActionId::Dismiss,
+            ))
+            .with_action(RecoveryAction::secondary(
+                "Settings",
+                RecoveryActionId::OpenSettings,
+            ))
     }
 
     /// Failed to save config
@@ -374,14 +452,20 @@ pub mod config {
         UserMessage::new("Unable to save settings. Check that you have write permissions.")
             .with_error_code("MIC-CFG-003")
             .with_action(RecoveryAction::primary("Retry", RecoveryActionId::Retry))
-            .with_action(RecoveryAction::secondary("Help", RecoveryActionId::OpenHelp))
+            .with_action(RecoveryAction::secondary(
+                "Help",
+                RecoveryActionId::OpenHelp,
+            ))
     }
 
     /// Failed to read config
     pub fn read_failed() -> UserMessage {
         UserMessage::new("Unable to read settings. Using default configuration.")
             .with_error_code("MIC-CFG-004")
-            .with_action(RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss))
+            .with_action(RecoveryAction::primary(
+                "Dismiss",
+                RecoveryActionId::Dismiss,
+            ))
     }
 }
 
@@ -405,8 +489,9 @@ pub mod recovery {
 
     /// Original wallpaper restored
     pub fn wallpaper_restored() -> UserMessage {
-        UserMessage::new("Your original wallpaper has been restored.")
-            .with_action(RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss))
+        UserMessage::new("Your original wallpaper has been restored.").with_action(
+            RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss),
+        )
     }
 }
 
@@ -425,16 +510,24 @@ pub mod platform {
             feature
         ))
         .with_error_code("MIC-PLT-001")
-        .with_action(RecoveryAction::primary("Dismiss", RecoveryActionId::Dismiss))
-        .with_action(RecoveryAction::secondary("Help", RecoveryActionId::OpenHelp))
+        .with_action(RecoveryAction::primary(
+            "Dismiss",
+            RecoveryActionId::Dismiss,
+        ))
+        .with_action(RecoveryAction::secondary(
+            "Help",
+            RecoveryActionId::OpenHelp,
+        ))
     }
 
     /// Generic platform error
     pub fn error(details: &str) -> UserMessage {
-        UserMessage::new("A system error occurred. Please check your desktop environment configuration.")
-            .with_error_code("MIC-PLT-002")
-            .with_details(details.to_string())
-            .with_action(RecoveryAction::primary("Help", RecoveryActionId::OpenHelp))
+        UserMessage::new(
+            "A system error occurred. Please check your desktop environment configuration.",
+        )
+        .with_error_code("MIC-PLT-002")
+        .with_details(details.to_string())
+        .with_action(RecoveryAction::primary("Help", RecoveryActionId::OpenHelp))
     }
 }
 

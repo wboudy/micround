@@ -19,6 +19,8 @@ hotkeys = ["dep:global-hotkey"]
 test-simulator = []
 # Clipboard support for snapshot feature (requires platform-specific deps)
 clipboard = []
+# Crash recovery and clean shutdown handling
+recovery = []
 
 [dependencies]
 # Graphics - wgpu handles platform selection automatically
@@ -66,6 +68,8 @@ windows = { version = "0.58", optional = true, features = [
     "Win32_Graphics_Gdi",
     "Win32_System_Threading",
     "Win32_System_LibraryLoader",
+    "Win32_System_Power",
+    "Win32_System_RemoteDesktop",
     # Media Foundation for camera capture
     "Win32_Media_MediaFoundation",
     "Win32_Media",

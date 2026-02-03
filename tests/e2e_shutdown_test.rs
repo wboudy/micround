@@ -14,17 +14,15 @@ use std::time::{Duration, Instant};
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern},
 };
 use micround::config::AppConfig;
-use micround::core::{
-    AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event,
-};
+use micround::core::{AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event};
 use micround::process::{process_frame, ProcessorConfig};
 use micround::render::{
-    WallpaperRenderer,
     simulator::{DisplaySimulator, DisplaySimulatorConfig},
+    WallpaperRenderer,
 };
 
 // ============================================================================
@@ -47,16 +45,17 @@ async fn test_quit_command_dispatch() {
 
     test_step!(logger, "Receiving Quit command");
     let cmd = cmd_rx.recv().await.expect("receive command");
-    test_assert!(logger, matches!(cmd, Command::Quit), "Quit command received");
+    test_assert!(
+        logger,
+        matches!(cmd, Command::Quit),
+        "Quit command received"
+    );
     tracing::info!("Quit command dispatched and received");
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying no more commands");
     // Channel should be empty now
-    let timeout_result = tokio::time::timeout(
-        Duration::from_millis(50),
-        cmd_rx.recv()
-    ).await;
+    let timeout_result = tokio::time::timeout(Duration::from_millis(50), cmd_rx.recv()).await;
     test_assert!(logger, timeout_result.is_err(), "No additional commands");
     test_step_ok!(logger);
 
@@ -81,7 +80,11 @@ async fn test_quit_command_try_send() {
 
     test_step!(logger, "Receiving command");
     let cmd = cmd_rx.recv().await.expect("receive");
-    test_assert!(logger, matches!(cmd, Command::Quit), "Quit received via try_send");
+    test_assert!(
+        logger,
+        matches!(cmd, Command::Quit),
+        "Quit received via try_send"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -109,21 +112,45 @@ async fn test_running_to_shutting_down() {
         new_state: AppState::Running,
     });
     let event = event_sub.recv().await.expect("receive running");
-    test_assert!(logger, matches!(event, Event::StateChanged { new_state: AppState::Running, .. }),
-        "Now Running");
+    test_assert!(
+        logger,
+        matches!(
+            event,
+            Event::StateChanged {
+                new_state: AppState::Running,
+                ..
+            }
+        ),
+        "Now Running"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Transitioning to ShuttingDown");
-    test_assert!(logger, AppState::Running.can_transition_to(AppState::ShuttingDown),
-        "Transition Running -> ShuttingDown is valid");
+    test_assert!(
+        logger,
+        AppState::Running.can_transition_to(AppState::ShuttingDown),
+        "Transition Running -> ShuttingDown is valid"
+    );
     handle.publish_event(Event::StateChanged {
         old_state: AppState::Running,
         new_state: AppState::ShuttingDown,
     });
     let event = event_sub.recv().await.expect("receive shutdown");
-    if let Event::StateChanged { old_state, new_state } = event {
-        test_assert!(logger, old_state == AppState::Running, "Old state is Running");
-        test_assert!(logger, new_state == AppState::ShuttingDown, "New state is ShuttingDown");
+    if let Event::StateChanged {
+        old_state,
+        new_state,
+    } = event
+    {
+        test_assert!(
+            logger,
+            old_state == AppState::Running,
+            "Old state is Running"
+        );
+        test_assert!(
+            logger,
+            new_state == AppState::ShuttingDown,
+            "New state is ShuttingDown"
+        );
         tracing::info!(
             old = %old_state,
             new = %new_state,
@@ -133,8 +160,11 @@ async fn test_running_to_shutting_down() {
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying ShuttingDown blocks commands");
-    test_assert!(logger, !AppState::ShuttingDown.can_accept_commands(),
-        "ShuttingDown state does not accept commands");
+    test_assert!(
+        logger,
+        !AppState::ShuttingDown.can_accept_commands(),
+        "ShuttingDown state does not accept commands"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -153,8 +183,11 @@ async fn test_idle_to_shutting_down() {
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying Idle -> ShuttingDown is valid");
-    test_assert!(logger, AppState::Idle.can_transition_to(AppState::ShuttingDown),
-        "Transition Idle -> ShuttingDown is valid");
+    test_assert!(
+        logger,
+        AppState::Idle.can_transition_to(AppState::ShuttingDown),
+        "Transition Idle -> ShuttingDown is valid"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Publishing transition event");
@@ -163,10 +196,17 @@ async fn test_idle_to_shutting_down() {
         new_state: AppState::ShuttingDown,
     });
     let event = event_sub.recv().await.expect("receive");
-    test_assert!(logger, matches!(event, Event::StateChanged {
-        old_state: AppState::Idle,
-        new_state: AppState::ShuttingDown
-    }), "Shutdown from Idle");
+    test_assert!(
+        logger,
+        matches!(
+            event,
+            Event::StateChanged {
+                old_state: AppState::Idle,
+                new_state: AppState::ShuttingDown
+            }
+        ),
+        "Shutdown from Idle"
+    );
     tracing::info!("Shutdown initiated from Idle state");
     test_step_ok!(logger);
 
@@ -180,8 +220,11 @@ async fn test_paused_to_shutting_down() {
     let mut logger = TestLogger::new("paused_to_shutting_down", 3);
 
     test_step!(logger, "Verifying Paused -> ShuttingDown is valid");
-    test_assert!(logger, AppState::Paused.can_transition_to(AppState::ShuttingDown),
-        "Transition Paused -> ShuttingDown is valid");
+    test_assert!(
+        logger,
+        AppState::Paused.can_transition_to(AppState::ShuttingDown),
+        "Transition Paused -> ShuttingDown is valid"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Creating context and publishing transition");
@@ -194,10 +237,17 @@ async fn test_paused_to_shutting_down() {
         new_state: AppState::ShuttingDown,
     });
     let event = event_sub.recv().await.expect("receive");
-    test_assert!(logger, matches!(event, Event::StateChanged {
-        old_state: AppState::Paused,
-        new_state: AppState::ShuttingDown
-    }), "Shutdown from Paused");
+    test_assert!(
+        logger,
+        matches!(
+            event,
+            Event::StateChanged {
+                old_state: AppState::Paused,
+                new_state: AppState::ShuttingDown
+            }
+        ),
+        "Shutdown from Paused"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Logging shutdown from paused state");
@@ -214,8 +264,11 @@ async fn test_error_to_shutting_down() {
     let mut logger = TestLogger::new("error_to_shutting_down", 3);
 
     test_step!(logger, "Verifying Error -> ShuttingDown is valid");
-    test_assert!(logger, AppState::Error.can_transition_to(AppState::ShuttingDown),
-        "Transition Error -> ShuttingDown is valid");
+    test_assert!(
+        logger,
+        AppState::Error.can_transition_to(AppState::ShuttingDown),
+        "Transition Error -> ShuttingDown is valid"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Creating context and publishing transition");
@@ -228,10 +281,17 @@ async fn test_error_to_shutting_down() {
         new_state: AppState::ShuttingDown,
     });
     let event = event_sub.recv().await.expect("receive");
-    test_assert!(logger, matches!(event, Event::StateChanged {
-        old_state: AppState::Error,
-        new_state: AppState::ShuttingDown
-    }), "Shutdown from Error");
+    test_assert!(
+        logger,
+        matches!(
+            event,
+            Event::StateChanged {
+                old_state: AppState::Error,
+                new_state: AppState::ShuttingDown
+            }
+        ),
+        "Shutdown from Error"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Logging recovery shutdown");
@@ -247,7 +307,10 @@ async fn test_error_to_shutting_down() {
 fn test_all_shutdown_transitions() {
     let mut logger = TestLogger::new("all_shutdown_transitions", 2);
 
-    test_step!(logger, "Checking all states that can transition to ShuttingDown");
+    test_step!(
+        logger,
+        "Checking all states that can transition to ShuttingDown"
+    );
     let states = [
         AppState::Idle,
         AppState::Starting,
@@ -259,8 +322,12 @@ fn test_all_shutdown_transitions() {
 
     for state in &states {
         let can_shutdown = state.can_transition_to(AppState::ShuttingDown);
-        test_assert!(logger, can_shutdown,
-            "{} can transition to ShuttingDown", state);
+        test_assert!(
+            logger,
+            can_shutdown,
+            "{} can transition to ShuttingDown",
+            state
+        );
         tracing::debug!(state = %state, can_shutdown, "Shutdown transition check");
     }
     test_step_ok!(logger, "All {} states can shutdown", states.len());
@@ -268,10 +335,16 @@ fn test_all_shutdown_transitions() {
     test_step!(logger, "Verifying ShuttingDown is terminal");
     // ShuttingDown should not transition to anything
     let shutdown_state = AppState::ShuttingDown;
-    test_assert!(logger, !shutdown_state.can_transition_to(AppState::Idle),
-        "ShuttingDown cannot transition to Idle");
-    test_assert!(logger, !shutdown_state.can_transition_to(AppState::Running),
-        "ShuttingDown cannot transition to Running");
+    test_assert!(
+        logger,
+        !shutdown_state.can_transition_to(AppState::Idle),
+        "ShuttingDown cannot transition to Idle"
+    );
+    test_assert!(
+        logger,
+        !shutdown_state.can_transition_to(AppState::Running),
+        "ShuttingDown cannot transition to Running"
+    );
     tracing::info!("ShuttingDown is a terminal state");
     test_step_ok!(logger);
 
@@ -293,18 +366,20 @@ fn test_display_shutdown() {
         frame_history_size: 5,
         ..Default::default()
     });
-    display.init(&DisplayId("test:shutdown".into())).expect("init");
+    display
+        .init(&DisplayId("test:shutdown".into()))
+        .expect("init");
     // Verify display is initialized by successfully rendering
     let test_frame = micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
-    test_assert!(logger, display.render(&test_frame).is_ok(), "Display initialized");
+    test_assert!(
+        logger,
+        display.render(&test_frame).is_ok(),
+        "Display initialized"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Rendering some frames before shutdown");
-    let frame = micround::process::ProcessedFrame::new(
-        vec![128u8; 1920 * 1080 * 4],
-        1920,
-        1080,
-    );
+    let frame = micround::process::ProcessedFrame::new(vec![128u8; 1920 * 1080 * 4], 1920, 1080);
     for _ in 0..3 {
         display.render(&frame).expect("render");
     }
@@ -320,7 +395,11 @@ fn test_display_shutdown() {
     let shutdown_time = shutdown_start.elapsed();
     // Verify shutdown by checking render fails
     let post_shutdown_render = display.render(&frame);
-    test_assert!(logger, post_shutdown_render.is_err(), "Display no longer initialized");
+    test_assert!(
+        logger,
+        post_shutdown_render.is_err(),
+        "Display no longer initialized"
+    );
     tracing::info!(
         shutdown_time_ms = shutdown_time.as_millis(),
         "Display shutdown complete"
@@ -342,15 +421,13 @@ fn test_display_restore() {
 
     test_step!(logger, "Setting up display simulator");
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig::default());
-    display.init(&DisplayId("test:restore".into())).expect("init");
+    display
+        .init(&DisplayId("test:restore".into()))
+        .expect("init");
     test_step_ok!(logger);
 
     test_step!(logger, "Rendering frames");
-    let frame = micround::process::ProcessedFrame::new(
-        vec![200u8; 1920 * 1080 * 4],
-        1920,
-        1080,
-    );
+    let frame = micround::process::ProcessedFrame::new(vec![200u8; 1920 * 1080 * 4], 1920, 1080);
     display.render(&frame).expect("render");
     test_step_ok!(logger);
 
@@ -392,19 +469,26 @@ async fn test_full_shutdown_flow() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
         frame_history_size: 10,
         ..Default::default()
     });
-    display.init(&DisplayId("test:0".into())).expect("init display");
+    display
+        .init(&DisplayId("test:0".into()))
+        .expect("init display");
     test_step_ok!(logger);
 
     test_step!(logger, "Creating application context");
@@ -436,9 +520,17 @@ async fn test_full_shutdown_flow() {
         new_state: AppState::ShuttingDown,
     });
     let event = event_sub.recv().await.expect("receive state");
-    test_assert!(logger, matches!(event, Event::StateChanged {
-        new_state: AppState::ShuttingDown, ..
-    }), "State changed to ShuttingDown");
+    test_assert!(
+        logger,
+        matches!(
+            event,
+            Event::StateChanged {
+                new_state: AppState::ShuttingDown,
+                ..
+            }
+        ),
+        "State changed to ShuttingDown"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Stopping capture");
@@ -454,14 +546,16 @@ async fn test_full_shutdown_flow() {
     display.shutdown();
     // Verify shutdown by checking render fails
     let verify_frame = micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Display shutdown");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Display shutdown"
+    );
     tracing::info!("Display resources released, wallpaper restored");
     test_step_ok!(logger);
 
     test_step!(logger, "Final verification");
-    tracing::info!(
-        "Shutdown complete - all resources cleaned up"
-    );
+    tracing::info!("Shutdown complete - all resources cleaned up");
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -507,8 +601,11 @@ async fn test_shutdown_with_capture_stopped_event() {
         device_id: device_id.clone(),
     });
     let event = event_sub.recv().await.expect("receive stopped");
-    test_assert!(logger, matches!(event, Event::CaptureStopped { .. }),
-        "CaptureStopped received");
+    test_assert!(
+        logger,
+        matches!(event, Event::CaptureStopped { .. }),
+        "CaptureStopped received"
+    );
     tracing::info!(device_id = %device_id, "Capture stopped during shutdown");
     test_step_ok!(logger);
 
@@ -538,12 +635,17 @@ fn test_capture_cleanup_on_shutdown() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 1280,
-        height: 720,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 1280,
+                height: 720,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_assert!(logger, capture.is_capturing(), "Capture running");
     test_step_ok!(logger);
@@ -583,20 +685,22 @@ fn test_display_cleanup_on_shutdown() {
         frame_history_size: 20,
         ..Default::default()
     });
-    display.init(&DisplayId("test:cleanup".into())).expect("init");
+    display
+        .init(&DisplayId("test:cleanup".into()))
+        .expect("init");
     test_step_ok!(logger);
 
     test_step!(logger, "Rendering frames");
-    let frame = micround::process::ProcessedFrame::new(
-        vec![100u8; 1920 * 1080 * 4],
-        1920,
-        1080,
-    );
+    let frame = micround::process::ProcessedFrame::new(vec![100u8; 1920 * 1080 * 4], 1920, 1080);
     for _ in 0..10 {
         display.render(&frame).expect("render");
     }
     let stats_before = display.stats();
-    test_assert!(logger, stats_before.frames_rendered == 10, "10 frames rendered");
+    test_assert!(
+        logger,
+        stats_before.frames_rendered == 10,
+        "10 frames rendered"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Shutdown and verify stats logged");
@@ -610,13 +714,20 @@ fn test_display_cleanup_on_shutdown() {
     display.shutdown();
     // Verify shutdown - render should fail
     let verify_frame = micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Display cleaned up");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Display cleaned up"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying post-shutdown state");
     // Frame count still accessible after shutdown
     let final_frame_count = display.frame_count();
-    tracing::info!(frame_count = final_frame_count, "Stats preserved for logging");
+    tracing::info!(
+        frame_count = final_frame_count,
+        "Stats preserved for logging"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -637,15 +748,27 @@ fn test_idempotent_shutdown() {
     let verify_frame = micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
 
     display.shutdown();
-    test_assert!(logger, display.render(&verify_frame).is_err(), "First shutdown worked");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "First shutdown worked"
+    );
 
     // Second shutdown should be safe
     display.shutdown();
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Second shutdown safe");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Second shutdown safe"
+    );
 
     // Third shutdown should be safe
     display.shutdown();
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Third shutdown safe");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Third shutdown safe"
+    );
 
     tracing::info!("Multiple shutdown calls completed safely");
     test_step_ok!(logger);
@@ -671,11 +794,15 @@ fn test_shutdown_timing() {
     test_step!(logger, "Setting up resources");
     let mut capture = SimulatorBackend::new(SimulatorConfig::default());
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings::default()).expect("open");
+    capture
+        .open(&devices[0].id, CaptureSettings::default())
+        .expect("open");
     capture.start().expect("start");
 
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig::default());
-    display.init(&DisplayId("test:timing".into())).expect("init");
+    display
+        .init(&DisplayId("test:timing".into()))
+        .expect("init");
     test_step_ok!(logger);
 
     test_step!(logger, "Timing capture stop");
@@ -691,7 +818,11 @@ fn test_shutdown_timing() {
     capture.close();
     let close_time = close_start.elapsed();
     logger.timing("device_close", close_time);
-    test_assert!(logger, close_time < Duration::from_secs(1), "Close under 1s");
+    test_assert!(
+        logger,
+        close_time < Duration::from_secs(1),
+        "Close under 1s"
+    );
     test_step_ok!(logger, "Device close: {:?}", close_time);
 
     test_step!(logger, "Timing display restore");
@@ -699,7 +830,11 @@ fn test_shutdown_timing() {
     display.restore(&AppConfig::default()).expect("restore");
     let restore_time = restore_start.elapsed();
     logger.timing("wallpaper_restore", restore_time);
-    test_assert!(logger, restore_time < Duration::from_secs(1), "Restore under 1s");
+    test_assert!(
+        logger,
+        restore_time < Duration::from_secs(1),
+        "Restore under 1s"
+    );
     test_step_ok!(logger, "Wallpaper restore: {:?}", restore_time);
 
     test_step!(logger, "Timing display shutdown");
@@ -707,7 +842,11 @@ fn test_shutdown_timing() {
     display.shutdown();
     let shutdown_time = shutdown_start.elapsed();
     logger.timing("display_shutdown", shutdown_time);
-    test_assert!(logger, shutdown_time < Duration::from_secs(1), "Shutdown under 1s");
+    test_assert!(
+        logger,
+        shutdown_time < Duration::from_secs(1),
+        "Shutdown under 1s"
+    );
 
     let total_time = stop_time + close_time + restore_time + shutdown_time;
     tracing::info!(
@@ -742,12 +881,17 @@ fn test_shutdown_during_active_capture() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 1920,
-        height: 1080,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 1920,
+                height: 1080,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
@@ -763,7 +907,11 @@ fn test_shutdown_during_active_capture() {
     test_step!(logger, "Initiating shutdown mid-capture");
     // Shutdown while potentially more frames could come
     capture.stop().expect("stop");
-    test_assert!(logger, !capture.is_capturing(), "Capture stopped mid-stream");
+    test_assert!(
+        logger,
+        !capture.is_capturing(),
+        "Capture stopped mid-stream"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying clean stop");
@@ -795,19 +943,26 @@ fn test_shutdown_with_pending_frames() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
         frame_history_size: 50,
         ..Default::default()
     });
-    display.init(&DisplayId("test:pending".into())).expect("init");
+    display
+        .init(&DisplayId("test:pending".into()))
+        .expect("init");
     test_step_ok!(logger);
 
     test_step!(logger, "Building up frames in pipeline");
@@ -872,7 +1027,11 @@ fn test_shutdown_without_capture() {
     display.shutdown();
     // Verify shutdown by checking render fails
     let verify_frame = micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Shutdown succeeded");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Shutdown succeeded"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying clean state");
@@ -892,12 +1051,20 @@ fn test_shutdown_uninitialized_display() {
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig::default());
     // Verify not initialized by checking render fails
     let verify_frame = micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Display not initialized");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Display not initialized"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Calling shutdown on uninitialized");
     display.shutdown(); // Should be safe
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Still uninitialized");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Still uninitialized"
+    );
     tracing::info!("Shutdown on uninitialized display is safe");
     test_step_ok!(logger);
 
@@ -914,10 +1081,10 @@ fn test_rapid_shutdown_restart() {
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig::default());
 
     for cycle in 0..5 {
-        display.init(&DisplayId(format!("test:cycle:{}", cycle))).expect("init");
-        let frame = micround::process::ProcessedFrame::new(
-            vec![50u8; 100 * 100 * 4], 100, 100
-        );
+        display
+            .init(&DisplayId(format!("test:cycle:{}", cycle)))
+            .expect("init");
+        let frame = micround::process::ProcessedFrame::new(vec![50u8; 100 * 100 * 4], 100, 100);
         display.render(&frame).expect("render");
         display.shutdown();
 
@@ -927,12 +1094,22 @@ fn test_rapid_shutdown_restart() {
 
     test_step!(logger, "Verifying final state");
     let verify_frame = micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Final state is shutdown");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Final state is shutdown"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "One more init to verify reusability");
-    display.init(&DisplayId("test:final".into())).expect("final init");
-    test_assert!(logger, display.render(&verify_frame).is_ok(), "Can reinitialize");
+    display
+        .init(&DisplayId("test:final".into()))
+        .expect("final init");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_ok(),
+        "Can reinitialize"
+    );
     display.shutdown();
     test_step_ok!(logger);
 
@@ -952,19 +1129,20 @@ fn test_config_preservation_on_shutdown() {
     test_step!(logger, "Creating non-default config");
     let config = AppConfig::default();
     // In a real scenario, this would have user settings
-    tracing::debug!(
-        "Config created with default settings for shutdown test"
-    );
+    tracing::debug!("Config created with default settings for shutdown test");
     test_step_ok!(logger);
 
     test_step!(logger, "Simulating config save on shutdown");
     // In production, config would be serialized here
     // For testing, we just verify the config is accessible
-    let serialized = format!("Config saved at shutdown - internal state preserved");
+    let serialized = "Config saved at shutdown - internal state preserved".to_string();
     tracing::info!(config_state = %serialized, "Config save simulation");
     test_step_ok!(logger);
 
-    test_step!(logger, "Verifying config accessible post-shutdown simulation");
+    test_step!(
+        logger,
+        "Verifying config accessible post-shutdown simulation"
+    );
     let _ = &config; // Config still accessible
     test_step_ok!(logger);
 
@@ -1004,12 +1182,17 @@ async fn test_full_lifecycle_with_shutdown() {
 
     // Phase 2: Capture start
     test_step!(logger, "PHASE 2: Starting capture");
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 1000.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
 
     handle.publish_event(Event::CaptureStarted {
@@ -1053,9 +1236,17 @@ async fn test_full_lifecycle_with_shutdown() {
         new_state: AppState::ShuttingDown,
     });
     let event = event_sub.recv().await.expect("state change");
-    test_assert!(logger, matches!(event, Event::StateChanged {
-        new_state: AppState::ShuttingDown, ..
-    }), "State is ShuttingDown");
+    test_assert!(
+        logger,
+        matches!(
+            event,
+            Event::StateChanged {
+                new_state: AppState::ShuttingDown,
+                ..
+            }
+        ),
+        "State is ShuttingDown"
+    );
     test_step_ok!(logger);
 
     // Phase 6: Stop capture
@@ -1097,7 +1288,11 @@ async fn test_full_lifecycle_with_shutdown() {
     test_assert!(logger, !capture.is_capturing(), "Capture released");
     // Verify display shutdown by checking render fails
     let verify_frame = micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
-    test_assert!(logger, display.render(&verify_frame).is_err(), "Display released");
+    test_assert!(
+        logger,
+        display.render(&verify_frame).is_err(),
+        "Display released"
+    );
     tracing::info!("Full application lifecycle complete - all resources cleaned up");
     test_step_ok!(logger);
 

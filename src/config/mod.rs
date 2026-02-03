@@ -1,6 +1,7 @@
 //! Configuration and persistence
 //!
 //! Handles loading, saving, and managing application settings.
+#![allow(dead_code)] // Configuration API
 //!
 //! # File Format
 //!
@@ -43,6 +44,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::logging::log_safe_path;
 use crate::core::{ConfigError, DeviceId, DisplayId, Flip, Rotation, ScalingMode};
 
 /// Current configuration schema version
@@ -92,8 +94,10 @@ impl AppConfig {
             });
         }
 
-        if self.camera.framerate <= 0.0 || self.camera.framerate > 240.0
-            || !self.camera.framerate.is_finite() {
+        if self.camera.framerate <= 0.0
+            || self.camera.framerate > 240.0
+            || !self.camera.framerate.is_finite()
+        {
             errors.push(ConfigValidationError {
                 field: "camera.framerate".into(),
                 message: "Framerate must be a finite number between 0 and 240".into(),
@@ -119,8 +123,10 @@ impl AppConfig {
         if self.camera.height == 0 {
             self.camera.height = 1080;
         }
-        if self.camera.framerate <= 0.0 || self.camera.framerate > 240.0
-            || !self.camera.framerate.is_finite() {
+        if self.camera.framerate <= 0.0
+            || self.camera.framerate > 240.0
+            || !self.camera.framerate.is_finite()
+        {
             self.camera.framerate = 30.0;
         }
         if !matches!(self.display.rotation, 0 | 90 | 180 | 270) {
@@ -157,6 +163,7 @@ impl Default for CameraConfig {
 /// Display-related configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct DisplayConfig {
     /// Target display ID (None = primary display)
     pub display_id: Option<DisplayId>,
@@ -168,18 +175,6 @@ pub struct DisplayConfig {
     pub flip_horizontal: bool,
     /// Vertical flip
     pub flip_vertical: bool,
-}
-
-impl Default for DisplayConfig {
-    fn default() -> Self {
-        Self {
-            display_id: None,
-            scaling_mode: ScalingMode::default(),
-            rotation: 0,
-            flip_horizontal: false,
-            flip_vertical: false,
-        }
-    }
 }
 
 impl DisplayConfig {
@@ -207,6 +202,7 @@ impl DisplayConfig {
 /// Startup behavior configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct StartupConfig {
     /// Launch at system login
     pub launch_at_login: bool,
@@ -214,16 +210,6 @@ pub struct StartupConfig {
     pub auto_start_feed: bool,
     /// Minimize to tray on startup (if auto-starting)
     pub minimize_on_start: bool,
-}
-
-impl Default for StartupConfig {
-    fn default() -> Self {
-        Self {
-            launch_at_login: false,
-            auto_start_feed: false,
-            minimize_on_start: false,
-        }
-    }
 }
 
 /// Internal state (managed by application, not user-editable)
@@ -347,30 +333,42 @@ pub fn save_config(config: &AppConfig) -> Result<(), ConfigError> {
     })?;
 
     // Serialize to TOML
-    let contents = toml::to_string_pretty(config).map_err(|e| {
-        ConfigError::WriteFailed(format!("Failed to serialize config: {}", e))
-    })?;
+    let contents = toml::to_string_pretty(config)
+        .map_err(|e| ConfigError::WriteFailed(format!("Failed to serialize config: {}", e)))?;
 
     // Write to temp file first (atomic write)
     let temp_path = dir.join("config.toml.tmp");
     {
-        let mut file = fs::File::create(&temp_path).map_err(|e| {
-            ConfigError::WriteFailed(format!("Failed to create temp file: {}", e))
-        })?;
-        file.write_all(contents.as_bytes()).map_err(|e| {
-            ConfigError::WriteFailed(format!("Failed to write temp file: {}", e))
-        })?;
-        file.sync_all().map_err(|e| {
-            ConfigError::WriteFailed(format!("Failed to sync temp file: {}", e))
-        })?;
+        let mut file = fs::File::create(&temp_path)
+            .map_err(|e| ConfigError::WriteFailed(format!("Failed to create temp file: {}", e)))?;
+
+        // Write and sync, cleaning up temp file on failure
+        if let Err(e) = file.write_all(contents.as_bytes()) {
+            let _ = fs::remove_file(&temp_path); // Best-effort cleanup
+            return Err(ConfigError::WriteFailed(format!(
+                "Failed to write temp file: {}",
+                e
+            )));
+        }
+        if let Err(e) = file.sync_all() {
+            let _ = fs::remove_file(&temp_path); // Best-effort cleanup
+            return Err(ConfigError::WriteFailed(format!(
+                "Failed to sync temp file: {}",
+                e
+            )));
+        }
     }
 
     // Rename temp to final (atomic on most filesystems)
-    fs::rename(&temp_path, &path).map_err(|e| {
-        ConfigError::WriteFailed(format!("Failed to rename config file: {}", e))
-    })?;
+    if let Err(e) = fs::rename(&temp_path, &path) {
+        let _ = fs::remove_file(&temp_path); // Best-effort cleanup
+        return Err(ConfigError::WriteFailed(format!(
+            "Failed to rename config file: {}",
+            e
+        )));
+    }
 
-    tracing::debug!(path = %path.display(), "Config saved");
+    tracing::debug!(path = %log_safe_path(&path), "Config saved");
     Ok(())
 }
 
@@ -504,39 +502,59 @@ mod tests {
 
     #[test]
     fn test_rotation_enum_conversion() {
-        let mut display = DisplayConfig::default();
-
-        display.rotation = 0;
+        let display = DisplayConfig {
+            rotation: 0,
+            ..Default::default()
+        };
         assert_eq!(display.rotation_enum(), Rotation::None);
 
-        display.rotation = 90;
+        let display = DisplayConfig {
+            rotation: 90,
+            ..Default::default()
+        };
         assert_eq!(display.rotation_enum(), Rotation::Clockwise90);
 
-        display.rotation = 180;
+        let display = DisplayConfig {
+            rotation: 180,
+            ..Default::default()
+        };
         assert_eq!(display.rotation_enum(), Rotation::Clockwise180);
 
-        display.rotation = 270;
+        let display = DisplayConfig {
+            rotation: 270,
+            ..Default::default()
+        };
         assert_eq!(display.rotation_enum(), Rotation::Clockwise270);
     }
 
     #[test]
     fn test_flip_enum_conversion() {
-        let mut display = DisplayConfig::default();
-
-        display.flip_horizontal = false;
-        display.flip_vertical = false;
+        let display = DisplayConfig {
+            flip_horizontal: false,
+            flip_vertical: false,
+            ..Default::default()
+        };
         assert_eq!(display.flip_enum(), Flip::None);
 
-        display.flip_horizontal = true;
-        display.flip_vertical = false;
+        let display = DisplayConfig {
+            flip_horizontal: true,
+            flip_vertical: false,
+            ..Default::default()
+        };
         assert_eq!(display.flip_enum(), Flip::Horizontal);
 
-        display.flip_horizontal = false;
-        display.flip_vertical = true;
+        let display = DisplayConfig {
+            flip_horizontal: false,
+            flip_vertical: true,
+            ..Default::default()
+        };
         assert_eq!(display.flip_enum(), Flip::Vertical);
 
-        display.flip_horizontal = true;
-        display.flip_vertical = true;
+        let display = DisplayConfig {
+            flip_horizontal: true,
+            flip_vertical: true,
+            ..Default::default()
+        };
         assert_eq!(display.flip_enum(), Flip::Both);
     }
 

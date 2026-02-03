@@ -1,0 +1,64 @@
+#!/bin/bash
+# pre-commit: Format check + CI-first reminder
+#
+# This hook runs before every commit to:
+# 1. Check formatting (fast, no compilation)
+# 2. Remind about CI-first workflow
+#
+# Installation: Run scripts/setup-hooks.sh
+
+set -e
+
+# Find real cargo (bypass cargo-guard for this check)
+find_real_cargo() {
+  local candidates=(
+    "$HOME/.cargo/bin/cargo"
+    "/usr/local/bin/cargo"
+    "/usr/bin/cargo"
+  )
+  for candidate in "${candidates[@]}"; do
+    if [ -x "$candidate" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  # Fallback
+  echo "cargo"
+}
+
+CARGO=$(find_real_cargo)
+
+# Check formatting (this is allowed - no compilation)
+echo "Checking code formatting..."
+if ! $CARGO fmt --check 2>/dev/null; then
+  echo ""
+  echo "=========================================="
+  echo "ERROR: Code is not formatted"
+  echo "=========================================="
+  echo ""
+  echo "Fix with:"
+  echo "  cargo fmt"
+  echo ""
+  echo "Then re-commit:"
+  echo "  git add -u && git commit"
+  echo ""
+  exit 1
+fi
+
+echo "Formatting OK"
+
+# CI-first reminder (only shown for agents)
+if [ "${CLAUDE_AGENT:-}" = "true" ]; then
+  echo ""
+  echo "------------------------------------------"
+  echo "REMINDER: CI-First Workflow"
+  echo "------------------------------------------"
+  echo ""
+  echo "After pushing, wait for CI:"
+  echo "  ci submit    # Push + create PR + wait"
+  echo ""
+  echo "Do NOT merge until all checks pass."
+  echo "------------------------------------------"
+fi
+
+exit 0

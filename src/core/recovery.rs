@@ -1,6 +1,7 @@
 //! Crash detection and recovery
 //!
 //! Detects unclean shutdown (crash) and recovers gracefully on next startup.
+#![allow(dead_code)] // Recovery infrastructure
 //! The user should never be left with a stuck frame as their wallpaper.
 //!
 //! # Detection Mechanism
@@ -22,7 +23,8 @@
 //! 4. Return recovery status for optional user notification
 
 use crate::config::{load_config, save_config, AppConfig};
-use crate::core::{ConfigError, messages};
+use crate::core::logging::log_safe_path;
+use crate::core::{messages, ConfigError};
 use crate::platform::wallpaper::restore_wallpaper_from_path;
 
 /// Result of crash detection check
@@ -51,7 +53,9 @@ impl StartupState {
     pub fn user_message(&self) -> Option<messages::UserMessage> {
         match self {
             Self::Clean | Self::FirstRun => None,
-            Self::RecoveredFromCrash { wallpaper_restored, .. } => {
+            Self::RecoveredFromCrash {
+                wallpaper_restored, ..
+            } => {
                 if *wallpaper_restored {
                     Some(messages::recovery::recovered_from_crash())
                 } else {
@@ -96,9 +100,7 @@ impl RecoveryManager {
         }
 
         // Crash detected!
-        tracing::warn!(
-            "Crash detected: previous session did not shut down cleanly"
-        );
+        tracing::warn!("Crash detected: previous session did not shut down cleanly");
 
         // Attempt to restore wallpaper
         let wallpaper_restored = self.try_restore_wallpaper();
@@ -112,7 +114,11 @@ impl RecoveryManager {
 
         Ok(StartupState::RecoveredFromCrash {
             wallpaper_restored,
-            restored_wallpaper_path: if wallpaper_restored { restored_path } else { None },
+            restored_wallpaper_path: if wallpaper_restored {
+                restored_path
+            } else {
+                None
+            },
         })
     }
 
@@ -141,7 +147,10 @@ impl RecoveryManager {
     pub fn store_original_wallpaper(&mut self, path: &str) -> Result<(), ConfigError> {
         self.config.internal.original_wallpaper_path = Some(path.to_string());
         save_config(&self.config)?;
-        tracing::debug!(path = %path, "Original wallpaper path stored");
+        tracing::debug!(
+            path = %log_safe_path(std::path::Path::new(path)),
+            "Original wallpaper path stored"
+        );
         Ok(())
     }
 
@@ -171,7 +180,10 @@ impl RecoveryManager {
     /// Try to restore the original wallpaper
     fn try_restore_wallpaper(&self) -> bool {
         if let Some(ref path) = self.config.internal.original_wallpaper_path {
-            tracing::info!(path = %path, "Attempting to restore original wallpaper");
+            tracing::info!(
+                path = %log_safe_path(std::path::Path::new(path)),
+                "Attempting to restore original wallpaper"
+            );
             match restore_wallpaper_from_path(path) {
                 Ok(()) => {
                     tracing::info!("Original wallpaper restored successfully");
@@ -206,22 +218,30 @@ pub fn init_recovery() -> Result<RecoveryManager, ConfigError> {
 /// On Unix-like systems (Linux, macOS), this installs handlers for:
 /// - SIGTERM: Graceful termination
 /// - SIGINT: Ctrl+C
+/// - SIGHUP: Hangup (may trigger restart)
 ///
 /// Returns a tokio channel receiver that will receive signals.
+/// Signal handlers that fail to install are logged but don't cause panics,
+/// allowing the application to continue running in restricted environments.
 #[cfg(unix)]
 pub async fn install_signal_handlers() -> tokio::sync::mpsc::Receiver<SignalKind> {
     use tokio::signal::unix::{signal, SignalKind as TokioSignalKind};
 
     let (tx, rx) = tokio::sync::mpsc::channel(1);
 
-    // SIGTERM handler
+    // SIGTERM handler - graceful shutdown fails silently if installation fails
     {
         let tx = tx.clone();
         tokio::spawn(async move {
-            let mut sigterm = signal(TokioSignalKind::terminate())
-                .expect("Failed to install SIGTERM handler");
-            sigterm.recv().await;
-            let _ = tx.send(SignalKind::Terminate).await;
+            match signal(TokioSignalKind::terminate()) {
+                Ok(mut sigterm) => {
+                    sigterm.recv().await;
+                    let _ = tx.send(SignalKind::Terminate).await;
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to install SIGTERM handler: {}", e);
+                }
+            }
         });
     }
 
@@ -229,10 +249,15 @@ pub async fn install_signal_handlers() -> tokio::sync::mpsc::Receiver<SignalKind
     {
         let tx = tx.clone();
         tokio::spawn(async move {
-            let mut sigint = signal(TokioSignalKind::interrupt())
-                .expect("Failed to install SIGINT handler");
-            sigint.recv().await;
-            let _ = tx.send(SignalKind::Interrupt).await;
+            match signal(TokioSignalKind::interrupt()) {
+                Ok(mut sigint) => {
+                    sigint.recv().await;
+                    let _ = tx.send(SignalKind::Interrupt).await;
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to install SIGINT handler: {}", e);
+                }
+            }
         });
     }
 
@@ -240,10 +265,15 @@ pub async fn install_signal_handlers() -> tokio::sync::mpsc::Receiver<SignalKind
     {
         let tx = tx.clone();
         tokio::spawn(async move {
-            let mut sighup = signal(TokioSignalKind::hangup())
-                .expect("Failed to install SIGHUP handler");
-            sighup.recv().await;
-            let _ = tx.send(SignalKind::Hangup).await;
+            match signal(TokioSignalKind::hangup()) {
+                Ok(mut sighup) => {
+                    sighup.recv().await;
+                    let _ = tx.send(SignalKind::Hangup).await;
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to install SIGHUP handler: {}", e);
+                }
+            }
         });
     }
 
@@ -252,6 +282,8 @@ pub async fn install_signal_handlers() -> tokio::sync::mpsc::Receiver<SignalKind
 }
 
 /// Install signal handlers for graceful shutdown on Windows
+///
+/// Installs Ctrl+C handler. Failures are logged but don't cause panics.
 #[cfg(windows)]
 pub async fn install_signal_handlers() -> tokio::sync::mpsc::Receiver<SignalKind> {
     let (tx, rx) = tokio::sync::mpsc::channel(1);
@@ -260,8 +292,14 @@ pub async fn install_signal_handlers() -> tokio::sync::mpsc::Receiver<SignalKind
     {
         let tx = tx.clone();
         tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.expect("Failed to install Ctrl+C handler");
-            let _ = tx.send(SignalKind::Terminate).await;
+            match tokio::signal::ctrl_c().await {
+                Ok(()) => {
+                    let _ = tx.send(SignalKind::Terminate).await;
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to install Ctrl+C handler: {}", e);
+                }
+            }
         });
     }
 

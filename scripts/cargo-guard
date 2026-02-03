@@ -1,0 +1,94 @@
+#!/bin/bash
+# cargo-guard: Blocks local compilation for agents
+#
+# Only active when CLAUDE_AGENT=true. When inactive, passes through to real cargo.
+#
+# ALLOWED (zero compilation):
+#   fmt, --version, --help, help, metadata
+#
+# BLOCKED (everything else):
+#   build, test, check, clippy, run, bench, doc, etc.
+
+set -euo pipefail
+
+# Find real cargo binary (handle both system and rustup installations)
+find_real_cargo() {
+  # If we're being called via alias, we need to find the actual cargo
+  # Check common locations in order of preference
+  local candidates=(
+    "$HOME/.cargo/bin/cargo"
+    "/usr/local/bin/cargo"
+    "/usr/bin/cargo"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [ -x "$candidate" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  # Last resort: use command -v but filter out ourselves
+  local found
+  found=$(command -v cargo 2>/dev/null || true)
+  if [ -n "$found" ] && [ "$found" != "$0" ]; then
+    echo "$found"
+    return 0
+  fi
+
+  echo "ERROR: Could not find cargo binary" >&2
+  return 1
+}
+
+REAL_CARGO=$(find_real_cargo)
+
+# If not an agent session, pass through to real cargo
+if [ "${CLAUDE_AGENT:-}" != "true" ]; then
+  exec "$REAL_CARGO" "$@"
+fi
+
+# Extract the subcommand (handle flags like --version)
+subcmd="${1:-}"
+
+# Allowlist of safe commands (zero compilation)
+case "$subcmd" in
+  fmt|--version|--help|help|metadata)
+    # These are safe - pass through
+    exec "$REAL_CARGO" "$@"
+    ;;
+  "")
+    # No subcommand - show help (safe)
+    exec "$REAL_CARGO" "$@"
+    ;;
+  *)
+    # Everything else is blocked
+    cat >&2 <<'EOF'
+========================================
+ERROR: Local builds are DISABLED
+========================================
+
+As an agent, you must NOT run compilation commands locally.
+
+All building and testing happens through GitHub Actions CI to ensure:
+  - Cross-platform correctness (Linux, Windows, macOS)
+  - No local resource consumption
+  - Reproducible builds
+
+BLOCKED commands: build, test, check, clippy, run, bench, doc
+
+Instead, use the CI workflow:
+  ci submit    Push + create PR + wait for CI
+  ci status    Check CI status
+  ci logs      View failure logs
+  ci merge     Merge when green
+
+ALLOWED locally:
+  cargo fmt    Format code (zero compilation)
+  ci fmt       Format + stage changes
+
+See AGENTS.md for the complete CI-first workflow.
+========================================
+EOF
+    exit 1
+    ;;
+esac

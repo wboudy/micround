@@ -11,9 +11,9 @@
 mod common;
 
 use common::test_logger::*;
+use std::env;
 use std::fs;
 use std::path::Path;
-use std::env;
 
 // ============================================================================
 // V4L2 Device Access Tests
@@ -262,9 +262,9 @@ fn test_x11_root_window_access() {
 #[ignore = "requires X11 display"]
 #[cfg(feature = "linux")]
 fn test_x11_renderer_init() {
+    use micround::core::DisplayId;
     use micround::render::linux::X11Renderer;
     use micround::render::WallpaperRenderer;
-    use micround::core::DisplayId;
 
     let mut logger = TestLogger::new("x11_renderer_init", 3);
 
@@ -319,13 +319,19 @@ fn test_wayland_session_detection() {
     }
 
     test_step!(logger, "Determining session type");
-    let is_wayland = session_type.as_ref().map(|s| s == "wayland").unwrap_or(false)
+    let is_wayland = session_type
+        .as_ref()
+        .map(|s| s == "wayland")
+        .unwrap_or(false)
         || wayland_display.is_ok();
-    let is_x11 = session_type.as_ref().map(|s| s == "x11").unwrap_or(false)
-        || env::var("DISPLAY").is_ok();
+    let is_x11 =
+        session_type.as_ref().map(|s| s == "x11").unwrap_or(false) || env::var("DISPLAY").is_ok();
 
     if is_wayland && is_x11 {
-        test_step_ok!(logger, "Running under XWayland (both Wayland and X11 available)");
+        test_step_ok!(
+            logger,
+            "Running under XWayland (both Wayland and X11 available)"
+        );
     } else if is_wayland {
         test_step_ok!(logger, "Running under pure Wayland");
     } else if is_x11 {

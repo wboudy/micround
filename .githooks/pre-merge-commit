@@ -1,0 +1,81 @@
+#!/bin/bash
+# pre-merge-commit: BLOCKS merge unless CI is green
+#
+# This hook prevents local merges of PRs that have not passed CI.
+# It is a BACKSTOP - the primary enforcement is `ci merge` and GitHub branch protection.
+#
+# When this hook fires:
+#   - `git merge` (local merge command) - YES
+#   - `gh pr merge` (GitHub CLI) - NO (server-side)
+#   - `ci merge` (our tool) - NO (uses gh pr merge)
+#
+# Installation: Run scripts/setup-hooks.sh
+
+set -e
+
+# Colors for output
+if [ -t 1 ]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[0;33m'
+  NC='\033[0m'
+else
+  RED=''
+  GREEN=''
+  YELLOW=''
+  NC=''
+fi
+
+# Check gh CLI availability
+if ! command -v gh &>/dev/null; then
+  echo -e "${YELLOW}WARNING: gh CLI not available, skipping CI check${NC}"
+  echo "Install from: https://cli.github.com/"
+  exit 0
+fi
+
+# Check if gh is authenticated
+if ! gh auth status &>/dev/null 2>&1; then
+  echo -e "${YELLOW}WARNING: gh CLI not authenticated, skipping CI check${NC}"
+  echo "Run: gh auth login"
+  exit 0
+fi
+
+# Check if we are on a PR branch
+PR_NUMBER=$(gh pr view --json number --jq ".number" 2>/dev/null || echo "")
+
+if [ -z "$PR_NUMBER" ]; then
+  # Not a PR branch - allow merge (might be local branch merge)
+  # This is expected for branches without open PRs
+  exit 0
+fi
+
+echo "Checking CI status for PR #$PR_NUMBER..."
+
+# Use gh pr checks exit code to determine status
+# Exit code 0 = all passed, non-zero = failing or pending
+if ! gh pr checks &>/dev/null; then
+  CHECKS_OUTPUT=$(gh pr checks 2>/dev/null || echo "Unable to fetch checks")
+
+  echo ""
+  echo -e "${RED}=========================================="
+  echo "MERGE BLOCKED: CI checks not passing"
+  echo "==========================================${NC}"
+  echo ""
+  echo "$CHECKS_OUTPUT"
+  echo ""
+  echo "You cannot merge until all CI checks pass."
+  echo ""
+  echo "Use the CI workflow instead:"
+  echo "  ci status   View current check status"
+  echo "  ci logs     View failed logs"
+  echo "  ci wait     Wait for CI to complete"
+  echo "  ci merge    Merge when green (recommended)"
+  echo ""
+  echo "See AGENTS.md for the complete CI-first workflow."
+  echo ""
+  exit 1
+fi
+
+# All checks passed
+echo -e "${GREEN}CI checks: ALL PASSED${NC}"
+exit 0

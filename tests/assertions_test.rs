@@ -5,8 +5,8 @@
 mod common;
 
 use common::assertions::*;
-use micround::core::{PixelFormat, ErrorSeverity};
 use micround::capture::CameraState;
+use micround::core::{ErrorSeverity, PixelFormat};
 use std::time::Duration;
 
 // ============================================================================
@@ -89,10 +89,10 @@ fn test_full_camera_lifecycle() {
         CameraState::Opening,
         CameraState::Ready,
         CameraState::Capturing,
-        CameraState::Ready,      // stop
-        CameraState::Capturing,  // restart
-        CameraState::Ready,      // stop again
-        CameraState::Available,  // close
+        CameraState::Ready,        // stop
+        CameraState::Capturing,    // restart
+        CameraState::Ready,        // stop again
+        CameraState::Available,    // close
         CameraState::Disconnected, // unplug
     ];
 
@@ -106,7 +106,7 @@ fn test_error_recovery_path() {
     let recovery_path = vec![
         CameraState::Capturing,
         CameraState::Error(error_info.clone()),
-        CameraState::Opening,  // retry
+        CameraState::Opening, // retry
         CameraState::Ready,
         CameraState::Capturing,
     ];

@@ -566,8 +566,10 @@ mod tests {
 
     #[test]
     fn test_hotkey_config_reset() {
-        let mut config = HotkeyConfig::default();
-        config.enabled = false;
+        let mut config = HotkeyConfig {
+            enabled: false,
+            ..Default::default()
+        };
         config.set_binding(HotkeyId::ToggleFeed, "Custom".to_string());
 
         config.reset_to_defaults();

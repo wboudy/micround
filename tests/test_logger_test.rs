@@ -11,7 +11,7 @@ fn test_logger_full_workflow() {
 
     // Step 1: Setup
     test_step!(logger, "Setting up test environment");
-    let data = vec![1, 2, 3, 4, 5];
+    let data = [1, 2, 3, 4, 5];
     test_step_ok!(logger, "Created {} test items", data.len());
 
     // Step 2: Process

@@ -336,12 +336,12 @@ impl TestLogger {
     /// Start a new step
     pub fn step(&mut self, description: &str) {
         // Complete previous step if any
-        if self.step_start.is_some() && !self.steps.is_empty() {
-            let last = self.steps.last_mut().unwrap();
-            if matches!(last.status, StepStatus::InProgress) {
-                let duration = self.step_start.unwrap().elapsed();
-                last.duration = duration;
-                last.status = StepStatus::Ok(String::new());
+        if let Some(start) = self.step_start {
+            if let Some(last) = self.steps.last_mut() {
+                if matches!(last.status, StepStatus::InProgress) {
+                    last.duration = start.elapsed();
+                    last.status = StepStatus::Ok(String::new());
+                }
             }
         }
 

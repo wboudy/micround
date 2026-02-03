@@ -692,11 +692,11 @@ mod tests {
 
         // p50 should be around 50ms
         let p50 = hist.p50();
-        assert!(p50 >= 49.0 && p50 <= 51.0, "p50={}", p50);
+        assert!((49.0..=51.0).contains(&p50), "p50={}", p50);
 
         // p95 should be around 95ms
         let p95 = hist.p95();
-        assert!(p95 >= 94.0 && p95 <= 96.0, "p95={}", p95);
+        assert!((94.0..=96.0).contains(&p95), "p95={}", p95);
     }
 
     #[test]

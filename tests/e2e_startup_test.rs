@@ -11,14 +11,13 @@
 mod common;
 
 use std::time::Duration;
-use tempfile::TempDir;
 
 use common::test_logger::*;
 use micround::capture::{
     simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
 };
-use micround::config::{config_path, load_config, save_config, AppConfig};
+use micround::config::AppConfig;
 use micround::core::{AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event};
 use micround::render::{
     simulator::{DisplaySimulator, DisplaySimulatorConfig},
@@ -75,7 +74,7 @@ fn test_startup_full_initialization_sequence() {
         pattern: FramePattern::Checkerboard { size: 32 },
         ..Default::default()
     };
-    let mut capture = SimulatorBackend::new(capture_config);
+    let capture = SimulatorBackend::new(capture_config);
     test_assert!(
         logger,
         !capture.is_capturing(),
@@ -109,7 +108,7 @@ fn test_startup_full_initialization_sequence() {
     // Step 6: Create application context
     test_step!(logger, "Creating application context");
     let (ctx, _cmd_rx) = AppContext::new();
-    let handle = ctx.handle();
+    let _handle = ctx.handle();
     test_assert!(logger, true, "AppContext created successfully");
     test_step_ok!(logger, "Application context ready");
 
@@ -659,7 +658,7 @@ fn test_startup_timing_performance() {
     test_step_ok!(logger, "Backends created in {:?}", backend_time);
 
     test_step!(logger, "Timing device enumeration");
-    let mut capture = SimulatorBackend::new_default();
+    let capture = SimulatorBackend::new_default();
     let start = Instant::now();
     let _devices = capture.enumerate_devices();
     let enum_time = start.elapsed();

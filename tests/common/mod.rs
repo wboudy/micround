@@ -11,6 +11,9 @@
 //! use common::test_logger::*;
 //! ```
 
+// Test utilities are re-exported for convenience; not all are used in every test file
+#![allow(unused_imports)]
+
 pub mod assertions;
 pub mod test_logger;
 

@@ -12,6 +12,7 @@
 
 // Test utilities may not all be used in every test file
 #![allow(dead_code)]
+#![allow(unused_imports)]
 
 use std::fmt;
 use std::time::{Duration, Instant};

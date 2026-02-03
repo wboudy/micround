@@ -273,15 +273,9 @@ pub mod linux {
 
 /// A simple handler that collects events into a Vec for testing
 #[cfg(test)]
+#[derive(Default)]
 pub struct CollectingHandler {
     pub events: Vec<CameraEvent>,
-}
-
-#[cfg(test)]
-impl Default for CollectingHandler {
-    fn default() -> Self {
-        Self { events: Vec::new() }
-    }
 }
 
 #[cfg(test)]

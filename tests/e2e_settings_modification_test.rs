@@ -10,8 +10,6 @@
 
 mod common;
 
-use std::time::Duration;
-
 use common::test_logger::*;
 use micround::capture::{
     simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
@@ -141,15 +139,13 @@ fn test_rapid_scaling_changes() {
 
     test_step!(logger, "Processing frames with alternating scaling modes");
     let modes = [ScalingMode::Fill, ScalingMode::Fit, ScalingMode::Stretch];
-    let mut frame_count = 0;
 
-    for _ in 0..9 {
+    for (frame_count, _) in (0..9).enumerate() {
         let frame = capture.next_frame().expect("frame");
         let mode = modes[frame_count % 3];
         let config = ProcessorConfig::new(1920, 1080).with_scaling(mode);
         let processed = process_frame(&frame, &config).expect("process");
         display.render(&processed).expect("render");
-        frame_count += 1;
     }
 
     test_assert!(logger, display.frame_count() == 9, "All 9 frames rendered");

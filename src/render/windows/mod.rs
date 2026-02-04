@@ -22,16 +22,28 @@
 //! 3. Parent our window to this WorkerW
 //! 4. Render to our window - appears as wallpaper
 //!
+//! # Rendering Backend
+//!
+//! Uses Direct3D 11 for GPU-accelerated rendering with:
+//! - FLIP model swap chain for low latency
+//! - Double buffering for smooth playback
+//! - Falls back to GDI if D3D11 unavailable
+//!
 //! # Risk Note
 //!
 //! This relies on undocumented Windows internals. The WorkerW technique
 //! has been stable since Windows 8 but could potentially break with
 //! future Windows updates.
 
+pub mod d3d11;
+
 use crate::config::AppConfig;
 use crate::core::{DisplayId, RenderError};
 use crate::process::ProcessedFrame;
 use crate::render::WallpaperRenderer;
+
+#[cfg(all(target_os = "windows", feature = "windows"))]
+use self::d3d11::D3D11Renderer;
 
 #[cfg(all(target_os = "windows", feature = "windows"))]
 use windows::{
@@ -87,13 +99,21 @@ pub struct WindowsRenderer {
     #[cfg(all(target_os = "windows", feature = "windows"))]
     render_window: Option<HWND>,
 
-    /// Double-buffer bitmap for smooth rendering
+    /// Direct3D 11 renderer (preferred, GPU-accelerated)
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    d3d11_renderer: Option<D3D11Renderer>,
+
+    /// Double-buffer bitmap for GDI fallback rendering
     #[cfg(all(target_os = "windows", feature = "windows"))]
     back_buffer: Option<HBITMAP>,
 
-    /// Memory DC for double-buffering
+    /// Memory DC for GDI fallback double-buffering
     #[cfg(all(target_os = "windows", feature = "windows"))]
     mem_dc: Option<HDC>,
+
+    /// Whether to use D3D11 (true) or GDI fallback (false)
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    use_d3d11: bool,
 
     /// Current display width
     width: u32,
@@ -119,9 +139,13 @@ impl WindowsRenderer {
             #[cfg(all(target_os = "windows", feature = "windows"))]
             render_window: None,
             #[cfg(all(target_os = "windows", feature = "windows"))]
+            d3d11_renderer: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
             back_buffer: None,
             #[cfg(all(target_os = "windows", feature = "windows"))]
             mem_dc: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            use_d3d11: true, // Prefer D3D11 by default
             width: 0,
             height: 0,
             initialized: false,
@@ -440,15 +464,35 @@ impl WallpaperRenderer for WindowsRenderer {
             let window = self.create_render_window(workerw)?;
             self.render_window = Some(window);
 
-            // Step 5: Create double-buffering resources
-            self.create_back_buffer(window)?;
+            // Step 5: Try to initialize D3D11 for GPU-accelerated rendering
+            if self.use_d3d11 {
+                match D3D11Renderer::new(window, self.width, self.height) {
+                    Ok(d3d11) => {
+                        self.d3d11_renderer = Some(d3d11);
+                        tracing::info!(
+                            "Windows D3D11 renderer initialized: {}x{}",
+                            self.width,
+                            self.height
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("D3D11 initialization failed, falling back to GDI: {}", e);
+                        self.use_d3d11 = false;
+                    }
+                }
+            }
+
+            // Step 6: If D3D11 failed or disabled, create GDI back buffer
+            if !self.use_d3d11 {
+                self.create_back_buffer(window)?;
+                tracing::info!(
+                    "Windows GDI renderer initialized: {}x{}",
+                    self.width,
+                    self.height
+                );
+            }
 
             self.initialized = true;
-            tracing::info!(
-                "Windows WorkerW renderer initialized: {}x{}",
-                self.width,
-                self.height
-            );
 
             Ok(())
         }
@@ -466,6 +510,38 @@ impl WallpaperRenderer for WindowsRenderer {
 
         #[cfg(all(target_os = "windows", feature = "windows"))]
         {
+            // Try D3D11 first (GPU-accelerated)
+            if self.use_d3d11 {
+                if let Some(ref d3d11) = self.d3d11_renderer {
+                    // Check for device removal (GPU reset, driver crash, etc.)
+                    if d3d11.check_device_removed() {
+                        tracing::warn!("D3D11 device removed, attempting recovery...");
+                        self.d3d11_renderer = None;
+
+                        // Try to recreate D3D11 renderer
+                        if let Some(window) = self.render_window {
+                            match D3D11Renderer::new(window, self.width, self.height) {
+                                Ok(new_d3d11) => {
+                                    self.d3d11_renderer = Some(new_d3d11);
+                                    tracing::info!("D3D11 device recovered successfully");
+                                }
+                                Err(e) => {
+                                    tracing::error!("D3D11 recovery failed, falling back to GDI: {}", e);
+                                    self.use_d3d11 = false;
+                                    // Initialize GDI fallback
+                                    self.create_back_buffer(window)?;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(ref d3d11) = self.d3d11_renderer {
+                    return d3d11.render(frame);
+                }
+            }
+
+            // GDI fallback
             return self.render_frame_to_window(frame);
         }
 
@@ -488,7 +564,10 @@ impl WallpaperRenderer for WindowsRenderer {
     fn shutdown(&mut self) {
         #[cfg(all(target_os = "windows", feature = "windows"))]
         {
-            // Clean up back buffer resources
+            // Clean up D3D11 renderer first (releases swap chain, etc.)
+            self.d3d11_renderer = None;
+
+            // Clean up GDI back buffer resources
             self.cleanup_back_buffer();
 
             // Destroy our window
@@ -503,7 +582,7 @@ impl WallpaperRenderer for WindowsRenderer {
         }
 
         self.initialized = false;
-        tracing::info!("Windows WorkerW renderer shutdown complete");
+        tracing::info!("Windows renderer shutdown complete");
     }
 }
 

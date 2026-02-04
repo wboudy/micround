@@ -11,6 +11,9 @@
 //! use common::test_logger::*;
 //! ```
 
+// Test utilities may not all be used in every test file
+#![allow(dead_code)]
+
 pub mod assertions;
 pub mod test_logger;
 

@@ -356,13 +356,13 @@ impl WallpaperRenderer for DisplaySimulator {
         }
 
         // Validate dimensions if strict mode
-        if self.config.strict_dimensions {
-            if frame.width != self.config.width || frame.height != self.config.height {
-                return Err(RenderError::Platform(format!(
-                    "Frame dimensions {}x{} don't match display {}x{}",
-                    frame.width, frame.height, self.config.width, self.config.height
-                )));
-            }
+        if self.config.strict_dimensions
+            && (frame.width != self.config.width || frame.height != self.config.height)
+        {
+            return Err(RenderError::Platform(format!(
+                "Frame dimensions {}x{} don't match display {}x{}",
+                frame.width, frame.height, self.config.width, self.config.height
+            )));
         }
 
         // Simulate render latency

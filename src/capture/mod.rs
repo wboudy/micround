@@ -34,20 +34,10 @@ pub mod simulator;
 
 use crate::core::{CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat};
 
-pub use capture_loop::{
-    start_capture_loop, CaptureLoopError, CaptureLoopHandle, CaptureMetrics, CaptureState,
-    FrameReceiver, MetricsSnapshot,
-};
+pub use capture_loop::{start_capture_loop, CaptureLoopHandle, FrameReceiver, MetricsSnapshot};
 pub use enumerator::*;
-pub use hotplug::{
-    start_hotplug_monitor, ChannelHandler, HotplugConfig, HotplugMonitorHandle, TokioChannelHandler,
-};
-pub use manager::{CameraHandle, CaptureManager, DeviceEvent};
-pub use negotiation::{filter_acceptable_capabilities, negotiate_format};
-pub use state::{
-    shared_camera_state, shared_camera_state_available, CameraErrorInfo, CameraState,
-    CameraStateManager, SharedCameraState, StateTransition, TransitionReason,
-};
+pub use manager::CaptureManager;
+pub use state::{shared_camera_state, CameraErrorInfo, CameraState, SharedCameraState};
 
 /// Trait for platform-specific capture implementations
 pub trait CaptureBackend: Send {

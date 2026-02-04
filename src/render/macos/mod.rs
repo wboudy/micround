@@ -86,8 +86,10 @@ pub struct MacOSRenderer {
     image_view: Option<*mut c_void>,
 
     /// Current display width
+    #[allow(dead_code)] // Used only with macos feature
     width: u32,
     /// Current display height
+    #[allow(dead_code)] // Used only with macos feature
     height: u32,
 
     /// Whether the renderer is initialized

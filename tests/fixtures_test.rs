@@ -6,7 +6,6 @@ mod fixtures;
 
 use fixtures::frames::*;
 use fixtures::*;
-use micround::core::PixelFormat;
 
 // ============================================================================
 // Frame Fixture Tests

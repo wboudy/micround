@@ -13,9 +13,6 @@
 mod common;
 
 use std::fs;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use micround::capture::simulator::{FramePattern, SimulatorBackend, SimulatorConfig};

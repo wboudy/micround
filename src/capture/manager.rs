@@ -160,12 +160,15 @@ impl CaptureManager {
         };
 
         #[cfg(not(target_os = "linux"))]
+        #[allow(clippy::diverging_sub_expression)]
         let (backend, enumerator): (Box<dyn CaptureBackend>, Box<dyn CameraEnumerator>) = {
             return Err(CaptureError::Platform(
                 "Capture backend not implemented for this platform".into(),
             ));
         };
 
+        // Note: Code below is unreachable on non-Linux until platform backends are wired up
+        #[allow(unreachable_code)]
         let (frame_tx, _) = broadcast::channel(FRAME_BROADCAST_CAPACITY);
         let (device_tx, _) = broadcast::channel(DEVICE_EVENT_CAPACITY);
 

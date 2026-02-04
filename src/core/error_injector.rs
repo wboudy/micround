@@ -42,8 +42,10 @@ use std::time::{Duration, Instant};
 use crate::core::{CaptureError, ConfigError, MicroundError, PlatformError, RenderError};
 
 /// Trigger conditions for error injection
+#[derive(Default)]
 pub enum InjectionTrigger {
     /// Never inject errors
+    #[default]
     Never,
     /// Always inject errors
     Always,
@@ -78,14 +80,8 @@ impl std::fmt::Debug for InjectionTrigger {
     }
 }
 
-impl Default for InjectionTrigger {
-    fn default() -> Self {
-        Self::Never
-    }
-}
-
 /// Type of error to inject
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ErrorType {
     /// Camera/capture related errors
     Capture(CaptureErrorKind),
@@ -96,13 +92,8 @@ pub enum ErrorType {
     /// Platform-specific errors
     Platform(PlatformErrorKind),
     /// Generic application errors
+    #[default]
     Generic,
-}
-
-impl Default for ErrorType {
-    fn default() -> Self {
-        Self::Generic
-    }
 }
 
 /// Specific capture error types (maps to CaptureError variants)
@@ -301,7 +292,7 @@ impl ErrorInjector {
         let should_inject = match &self.trigger {
             InjectionTrigger::Never => false,
             InjectionTrigger::Always => true,
-            InjectionTrigger::EveryN(n) => *n > 0 && operation % *n == 0,
+            InjectionTrigger::EveryN(n) => *n > 0 && operation.is_multiple_of(*n),
             InjectionTrigger::Probability(p) => {
                 let hash = self.deterministic_random(operation);
                 hash < *p
@@ -634,13 +625,13 @@ mod tests {
 
         let results: Vec<bool> = (0..10).map(|_| injector.should_inject()).collect();
         // Operations 1-10, inject at 2, 5, 7
-        assert_eq!(results[0], false); // op 1
-        assert_eq!(results[1], true); // op 2
-        assert_eq!(results[2], false); // op 3
-        assert_eq!(results[3], false); // op 4
-        assert_eq!(results[4], true); // op 5
-        assert_eq!(results[5], false); // op 6
-        assert_eq!(results[6], true); // op 7
+        assert!(!results[0]); // op 1
+        assert!(results[1]); // op 2
+        assert!(!results[2]); // op 3
+        assert!(!results[3]); // op 4
+        assert!(results[4]); // op 5
+        assert!(!results[5]); // op 6
+        assert!(results[6]); // op 7
     }
 
     #[test]

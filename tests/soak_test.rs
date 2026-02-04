@@ -27,7 +27,7 @@
 mod common;
 
 use std::collections::VecDeque;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};

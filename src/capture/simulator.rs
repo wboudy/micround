@@ -374,7 +374,7 @@ impl SimulatorBackend {
         for y in 0..height {
             for x in 0..width {
                 let idx = ((y * width + x) * 4) as usize;
-                let checker = ((x / check_size) + (y / check_size)) % 2 == 0;
+                let checker = ((x / check_size) + (y / check_size)).is_multiple_of(2);
                 let v = if checker { 255u8 } else { 0u8 };
                 data[idx] = v;
                 data[idx + 1] = v;

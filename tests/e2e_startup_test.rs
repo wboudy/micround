@@ -75,7 +75,7 @@ fn test_startup_full_initialization_sequence() {
         pattern: FramePattern::Checkerboard { size: 32 },
         ..Default::default()
     };
-    let mut capture = SimulatorBackend::new(capture_config);
+    let capture = SimulatorBackend::new(capture_config);
     test_assert!(
         logger,
         !capture.is_capturing(),

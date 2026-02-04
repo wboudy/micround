@@ -161,6 +161,7 @@ impl Default for CameraConfig {
 /// Display-related configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct DisplayConfig {
     /// Target display ID (None = primary display)
     pub display_id: Option<DisplayId>,
@@ -172,18 +173,6 @@ pub struct DisplayConfig {
     pub flip_horizontal: bool,
     /// Vertical flip
     pub flip_vertical: bool,
-}
-
-impl Default for DisplayConfig {
-    fn default() -> Self {
-        Self {
-            display_id: None,
-            scaling_mode: ScalingMode::default(),
-            rotation: 0,
-            flip_horizontal: false,
-            flip_vertical: false,
-        }
-    }
 }
 
 impl DisplayConfig {
@@ -211,6 +200,7 @@ impl DisplayConfig {
 /// Startup behavior configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct StartupConfig {
     /// Launch at system login
     pub launch_at_login: bool,
@@ -218,16 +208,6 @@ pub struct StartupConfig {
     pub auto_start_feed: bool,
     /// Minimize to tray on startup (if auto-starting)
     pub minimize_on_start: bool,
-}
-
-impl Default for StartupConfig {
-    fn default() -> Self {
-        Self {
-            launch_at_login: false,
-            auto_start_feed: false,
-            minimize_on_start: false,
-        }
-    }
 }
 
 /// Internal state (managed by application, not user-editable)
@@ -502,6 +482,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_rotation_enum_conversion() {
         let mut display = DisplayConfig::default();
 
@@ -519,6 +500,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_flip_enum_conversion() {
         let mut display = DisplayConfig::default();
 

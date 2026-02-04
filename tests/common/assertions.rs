@@ -695,7 +695,7 @@ pub fn create_checkerboard_frame(
         for x in 0..width {
             let block_x = x / block_size;
             let block_y = y / block_size;
-            let value = if (block_x + block_y) % 2 == 0 { 255 } else { 0 };
+            let value = if (block_x + block_y).is_multiple_of(2) { 255 } else { 0 };
 
             for _ in 0..bytes_per_pixel {
                 data.push(value);
@@ -737,7 +737,7 @@ mod tests {
 
         #[test]
         fn test_similar_frames_have_high_psnr() {
-            let mut frame_a = create_test_frame(100, 100, PixelFormat::Rgba32, 128);
+            let frame_a = create_test_frame(100, 100, PixelFormat::Rgba32, 128);
             let mut frame_b = frame_a.data.clone();
 
             // Add small noise to frame_b

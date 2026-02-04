@@ -1,3 +1,6 @@
+// Allow unused imports - linter auto-adds tracing macros for future use
+#![allow(unused_imports)]
+
 //! Global keyboard shortcuts
 //!
 //! Provides cross-platform global hotkey support using the `global-hotkey` crate.
@@ -564,6 +567,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_hotkey_config_reset() {
         let mut config = HotkeyConfig::default();
         config.enabled = false;

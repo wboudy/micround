@@ -282,12 +282,14 @@ pub fn temp_dir() -> PathBuf {
 }
 
 /// Helper trait for pipeline-style transformations
+#[allow(dead_code)]
 trait Pipe: Sized {
     fn pipe<R>(self, f: impl FnOnce(Self) -> R) -> R {
         f(self)
     }
 }
 
+#[allow(dead_code)]
 impl<T> Pipe for T {}
 
 // ============================================================================

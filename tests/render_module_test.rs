@@ -3,7 +3,6 @@
 //! Tests for the render module's WallpaperRenderer trait, DisplaySimulator,
 //! and related types. Uses the simulator for headless testing.
 
-use std::thread;
 use std::time::Duration;
 
 // Test-only common utilities
@@ -16,11 +15,9 @@ use common::assertions::{assert_completes_within, timed};
 // Test Imports
 // ============================================================================
 
-use micround::core::{DisplayId, RenderError};
+use micround::core::DisplayId;
 use micround::process::ProcessedFrame;
-use micround::render::simulator::{
-    CapturedFrame, DisplaySimulator, DisplaySimulatorConfig, RenderStats,
-};
+use micround::render::simulator::{DisplaySimulator, DisplaySimulatorConfig, RenderStats};
 use micround::render::WallpaperRenderer;
 
 // ============================================================================

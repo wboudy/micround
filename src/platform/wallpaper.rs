@@ -26,10 +26,9 @@
 
 use crate::core::PlatformError;
 use std::path::PathBuf;
-use std::process::Command;
 
 /// Information about a wallpaper configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct WallpaperInfo {
     /// Path to the wallpaper image file (None if solid color)
     pub path: Option<String>,
@@ -41,18 +40,6 @@ pub struct WallpaperInfo {
     pub desktop_env: Option<String>,
     /// Per-monitor settings (display ID -> path)
     pub per_monitor: Vec<(String, String)>,
-}
-
-impl Default for WallpaperInfo {
-    fn default() -> Self {
-        Self {
-            path: None,
-            style: None,
-            color: None,
-            desktop_env: None,
-            per_monitor: Vec::new(),
-        }
-    }
 }
 
 impl WallpaperInfo {

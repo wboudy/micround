@@ -10,13 +10,13 @@
 //! - **macOS**: SMAppService / LaunchAgent (TODO)
 
 use std::io;
-use std::path::PathBuf;
 
 /// Application name for autostart entries (reserved for future platform support)
 #[allow(dead_code)]
 const APP_NAME: &str = "micround";
 
 /// Desktop entry filename for Linux
+#[allow(dead_code)]
 const DESKTOP_FILE_NAME: &str = "micround.desktop";
 
 // ============================================================================
@@ -355,8 +355,6 @@ mod macos {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
-    use tempfile::TempDir;
 
     #[test]
     fn test_autostart_error_display() {

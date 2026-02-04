@@ -53,9 +53,10 @@ use crate::core::{CaptureError, DeviceId, NegotiatedFormat};
 // ============================================================================
 
 /// State of an individual camera device
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CameraState {
     /// Device is not connected or not detected
+    #[default]
     Disconnected,
     /// Device is enumerated and available but not open
     Available,
@@ -139,12 +140,6 @@ impl CameraState {
             Self::Capturing => "Capturing",
             Self::Error(_) => "Error",
         }
-    }
-}
-
-impl Default for CameraState {
-    fn default() -> Self {
-        Self::Disconnected
     }
 }
 
@@ -288,6 +283,7 @@ pub struct CameraStateManager {
     /// Callback for state changes
     /// Uses Arc to allow cloning the callback out of the lock before invoking,
     /// which prevents deadlock if the callback tries to modify state.
+    #[allow(clippy::type_complexity)]
     on_state_change: RwLock<Option<Arc<dyn Fn(&StateTransition) + Send + Sync>>>,
 }
 

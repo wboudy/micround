@@ -6,12 +6,11 @@
 //! Run with: cargo test --test integration_event_bus_test
 
 use micround::core::{
-    AppContext, AppHandle, AppState, CaptureError, CaptureSettings, Command, DeviceId, DisplayId,
+    AppContext, AppState, CaptureError, CaptureSettings, Command, DeviceId, DisplayId,
     ErrorContext, Event, EventBus, Flip, FrameDropReason, MicroundError, Rotation, ScalingMode,
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 
 // ============================================================================

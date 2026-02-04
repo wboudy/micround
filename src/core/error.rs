@@ -125,6 +125,7 @@ impl fmt::Display for ErrorContext {
 
 /// Top-level error type for Micround application
 #[derive(Error, Debug, Clone)]
+#[allow(clippy::result_large_err)]
 pub enum MicroundError {
     #[error("Capture error: {source}")]
     Capture {
@@ -574,6 +575,7 @@ pub type ConfigResult<T> = std::result::Result<T, ConfigError>;
 // ============================================================================
 
 /// Extension trait for adding context to errors
+#[allow(clippy::result_large_err)]
 pub trait ErrorExt<T> {
     /// Add context to an error
     fn with_context(self, context: ErrorContext) -> Result<T>;

@@ -336,12 +336,13 @@ impl TestLogger {
     /// Start a new step
     pub fn step(&mut self, description: &str) {
         // Complete previous step if any
-        if self.step_start.is_some() && !self.steps.is_empty() {
-            let last = self.steps.last_mut().unwrap();
-            if matches!(last.status, StepStatus::InProgress) {
-                let duration = self.step_start.unwrap().elapsed();
-                last.duration = duration;
-                last.status = StepStatus::Ok(String::new());
+        if let Some(step_start) = self.step_start {
+            if let Some(last) = self.steps.last_mut() {
+                if matches!(last.status, StepStatus::InProgress) {
+                    let duration = step_start.elapsed();
+                    last.duration = duration;
+                    last.status = StepStatus::Ok(String::new());
+                }
             }
         }
 
@@ -601,7 +602,7 @@ impl TestLogger {
     }
 
     /// Finish with explicit failure
-    pub fn finish_failed(mut self, reason: &str) -> TestResult {
+    pub fn finish_failed(self, reason: &str) -> TestResult {
         self.error(reason);
         let total_duration = self.start_time.elapsed();
 
@@ -744,8 +745,6 @@ macro_rules! test_timed {
 // ============================================================================
 // Re-export macros
 // ============================================================================
-
-pub use crate::{test_assert, test_assert_eq, test_step, test_step_err, test_step_ok, test_timed};
 
 // ============================================================================
 // Tests

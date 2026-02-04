@@ -70,7 +70,7 @@ impl GpuContext {
                 force_fallback_adapter: false,
             })
             .await
-            .ok_or_else(|| GpuError::NoAdapter)?;
+            .ok_or(GpuError::NoAdapter)?;
 
         let adapter_info = adapter.get_info();
 
@@ -719,8 +719,8 @@ impl ScalePipeline {
             pass.set_bind_group(0, &bind_group, &[]);
 
             // Dispatch workgroups (8x8 threads per workgroup)
-            let workgroups_x = (dst_width + 7) / 8;
-            let workgroups_y = (dst_height + 7) / 8;
+            let workgroups_x = dst_width.div_ceil(8);
+            let workgroups_y = dst_height.div_ceil(8);
             pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
         }
 
@@ -880,6 +880,7 @@ impl TransformPipeline {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute(
         &self,
         context: &GpuContext,
@@ -963,8 +964,8 @@ impl TransformPipeline {
             pass.set_bind_group(0, &bind_group, &[]);
 
             // Dispatch workgroups (8x8 threads per workgroup)
-            let workgroups_x = (out_width + 7) / 8;
-            let workgroups_y = (out_height + 7) / 8;
+            let workgroups_x = out_width.div_ceil(8);
+            let workgroups_y = out_height.div_ceil(8);
             pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
         }
 

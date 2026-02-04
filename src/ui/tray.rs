@@ -30,7 +30,7 @@ use muda::{accelerator::Accelerator, Menu, MenuEvent, MenuItem, PredefinedMenuIt
 use tracing::{debug, error, info, warn};
 use tray_icon::{menu::MenuId, TrayIcon as TrayIconInner, TrayIconBuilder, TrayIconEvent};
 
-use crate::core::events::{AppHandle, AppState, Command, Event};
+use crate::core::events::{AppHandle, AppState, Command};
 
 // ============================================================================
 // Menu Item IDs
@@ -255,7 +255,7 @@ impl TrayController {
         // Build the tray icon
         let tray_icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
-            .with_tooltip(&initial_state.tooltip())
+            .with_tooltip(initial_state.tooltip())
             .with_icon(icon)
             .build()
             .map_err(|e| TrayError::Creation(e.to_string()))?;
@@ -307,7 +307,7 @@ impl TrayController {
         // Update status text
         self.menu_items
             .status_item
-            .set_text(&self.state.status_text());
+            .set_text(self.state.status_text());
 
         // Update enabled state of menu items
         self.menu_items
@@ -326,7 +326,7 @@ impl TrayController {
 
         // Update visibility based on state
         // Show Start when stopped, Stop when running
-        let is_running = matches!(
+        let _is_running = matches!(
             self.state.app_state,
             AppState::Running | AppState::Paused | AppState::Reconnecting | AppState::Starting
         );

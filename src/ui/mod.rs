@@ -10,7 +10,7 @@
 pub mod tray;
 
 #[cfg(feature = "tray")]
-pub use tray::{TrayController, TrayError, TrayState, TrayMenuId, IconState, process_events};
+pub use tray::{process_events, IconState, TrayController, TrayError, TrayMenuId, TrayState};
 
 /// System tray state (stub for when tray feature is disabled)
 #[cfg(not(feature = "tray"))]

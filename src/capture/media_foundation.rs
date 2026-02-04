@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use crate::capture::enumerator::{fourcc_to_format, format_to_fourcc, CameraEnumerator};
+use crate::capture::enumerator::{format_to_fourcc, fourcc_to_format, CameraEnumerator};
 use crate::capture::{negotiate_format, CaptureBackend};
 use crate::core::{
     CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame,
@@ -22,14 +22,13 @@ use windows::{
     core::{Interface, GUID, HSTRING, PWSTR},
     Win32::{
         Media::MediaFoundation::{
-            IMFActivate, IMFAttributes, IMFMediaBuffer, IMFMediaSource, IMFMediaType,
-            IMFSample, IMFSourceReader, MFCreateAttributes, MFCreateSourceReaderFromMediaSource,
+            IMFActivate, IMFAttributes, IMFMediaBuffer, IMFMediaSource, IMFMediaType, IMFSample,
+            IMFSourceReader, MFCreateAttributes, MFCreateSourceReaderFromMediaSource,
             MFEnumDeviceSources, MFMediaType_Video, MFShutdown, MFStartup,
             MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
-            MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
-            MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
-            MF_READWRITE_DISABLE_CONVERTERS, MF_SOURCE_READER_ASYNC_CALLBACK,
-            MF_SOURCE_READER_FIRST_VIDEO_STREAM, MF_VERSION,
+            MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE,
+            MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE, MF_READWRITE_DISABLE_CONVERTERS,
+            MF_SOURCE_READER_ASYNC_CALLBACK, MF_SOURCE_READER_FIRST_VIDEO_STREAM, MF_VERSION,
         },
         System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED},
     },
@@ -183,11 +182,12 @@ impl MFEnumerator {
             // Enumerate all media types
             let mut type_index = 0u32;
             loop {
-                let media_type: IMFMediaType =
-                    match reader.GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32, type_index) {
-                        Ok(t) => t,
-                        Err(_) => break, // No more types
-                    };
+                let media_type: IMFMediaType = match reader
+                    .GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32, type_index)
+                {
+                    Ok(t) => t,
+                    Err(_) => break, // No more types
+                };
 
                 // Get format GUID
                 let mut subtype = GUID::zeroed();
@@ -195,13 +195,19 @@ impl MFEnumerator {
                     if let Some(format) = Self::guid_to_format(&subtype) {
                         // Get frame size
                         let mut frame_size: u64 = 0;
-                        if media_type.GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size).is_ok() {
+                        if media_type
+                            .GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size)
+                            .is_ok()
+                        {
                             let width = (frame_size >> 32) as u32;
                             let height = frame_size as u32;
 
                             // Get frame rate
                             let mut frame_rate: u64 = 0;
-                            let fps = if media_type.GetUINT64(&MF_MT_FRAME_RATE, &mut frame_rate).is_ok() {
+                            let fps = if media_type
+                                .GetUINT64(&MF_MT_FRAME_RATE, &mut frame_rate)
+                                .is_ok()
+                            {
                                 let numerator = (frame_rate >> 32) as f32;
                                 let denominator = frame_rate as u32 as f32;
                                 if denominator > 0.0 {
@@ -272,7 +278,10 @@ impl CameraEnumerator for MFEnumerator {
     }
 
     fn is_available(&self, id: &DeviceId) -> bool {
-        self.devices.get(&id.0).map(|d| d.is_available).unwrap_or(false)
+        self.devices
+            .get(&id.0)
+            .map(|d| d.is_available)
+            .unwrap_or(false)
     }
 
     fn refresh(&mut self) -> Result<(), CaptureError> {
@@ -290,8 +299,9 @@ impl CameraEnumerator for MFEnumerator {
             unsafe {
                 // Create attributes for video capture devices
                 let mut attributes: Option<IMFAttributes> = None;
-                MFCreateAttributes(&mut attributes, 1)
-                    .map_err(|e| CaptureError::Platform(format!("MFCreateAttributes failed: {}", e)))?;
+                MFCreateAttributes(&mut attributes, 1).map_err(|e| {
+                    CaptureError::Platform(format!("MFCreateAttributes failed: {}", e))
+                })?;
 
                 let attributes = attributes.ok_or_else(|| {
                     CaptureError::Platform("MFCreateAttributes returned None".into())
@@ -309,8 +319,9 @@ impl CameraEnumerator for MFEnumerator {
                 let mut devices: *mut Option<IMFActivate> = ptr::null_mut();
                 let mut count: u32 = 0;
 
-                MFEnumDeviceSources(&attributes, &mut devices, &mut count)
-                    .map_err(|e| CaptureError::Platform(format!("MFEnumDeviceSources failed: {}", e)))?;
+                MFEnumDeviceSources(&attributes, &mut devices, &mut count).map_err(|e| {
+                    CaptureError::Platform(format!("MFEnumDeviceSources failed: {}", e))
+                })?;
 
                 if count == 0 || devices.is_null() {
                     return Ok(());
@@ -323,7 +334,8 @@ impl CameraEnumerator for MFEnumerator {
                     if let Some(activate) = activate_opt {
                         // Get friendly name
                         let mut name_len: u32 = 0;
-                        let _ = activate.GetStringLength(&MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &mut name_len);
+                        let _ = activate
+                            .GetStringLength(&MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &mut name_len);
 
                         let name = if name_len > 0 {
                             let mut buffer = vec![0u16; (name_len + 1) as usize];
@@ -348,14 +360,15 @@ impl CameraEnumerator for MFEnumerator {
                         let device_id = format!("mf:{}", index);
 
                         // Try to activate and get capabilities
-                        let capabilities = if let Ok(source) = activate.ActivateObject::<IMFMediaSource>() {
-                            let caps = Self::query_capabilities(&source);
-                            // Deactivate to release resources
-                            let _ = activate.ShutdownObject();
-                            caps
-                        } else {
-                            Vec::new()
-                        };
+                        let capabilities =
+                            if let Ok(source) = activate.ActivateObject::<IMFMediaSource>() {
+                                let caps = Self::query_capabilities(&source);
+                                // Deactivate to release resources
+                                let _ = activate.ShutdownObject();
+                                caps
+                            } else {
+                                Vec::new()
+                            };
 
                         let camera = CameraDevice {
                             id: DeviceId(device_id.clone()),
@@ -490,8 +503,9 @@ impl CaptureBackend for MFBackend {
             let mut devices: *mut Option<IMFActivate> = ptr::null_mut();
             let mut count: u32 = 0;
 
-            MFEnumDeviceSources(&attributes, &mut devices, &mut count)
-                .map_err(|e| CaptureError::Platform(format!("MFEnumDeviceSources failed: {}", e)))?;
+            MFEnumDeviceSources(&attributes, &mut devices, &mut count).map_err(|e| {
+                CaptureError::Platform(format!("MFEnumDeviceSources failed: {}", e))
+            })?;
 
             if index >= count as usize {
                 return Err(CaptureError::DeviceNotFound(device_id.0.clone()));
@@ -503,21 +517,19 @@ impl CaptureBackend for MFBackend {
                 .ok_or_else(|| CaptureError::DeviceNotFound(device_id.0.clone()))?;
 
             // Activate the media source
-            let source: IMFMediaSource = activate
-                .ActivateObject()
-                .map_err(|e| {
-                    if e.code().0 as u32 == 0x80070005 {
-                        // E_ACCESSDENIED
-                        CaptureError::PermissionDenied(
-                            "Camera access denied. Check Windows camera privacy settings.".into(),
-                        )
-                    } else if e.code().0 as u32 == 0x8007000E {
-                        // E_OUTOFMEMORY (often means busy)
-                        CaptureError::DeviceBusy
-                    } else {
-                        CaptureError::Platform(format!("ActivateObject failed: {}", e))
-                    }
-                })?;
+            let source: IMFMediaSource = activate.ActivateObject().map_err(|e| {
+                if e.code().0 as u32 == 0x80070005 {
+                    // E_ACCESSDENIED
+                    CaptureError::PermissionDenied(
+                        "Camera access denied. Check Windows camera privacy settings.".into(),
+                    )
+                } else if e.code().0 as u32 == 0x8007000E {
+                    // E_OUTOFMEMORY (often means busy)
+                    CaptureError::DeviceBusy
+                } else {
+                    CaptureError::Platform(format!("ActivateObject failed: {}", e))
+                }
+            })?;
 
             // Get capabilities for format negotiation
             let capabilities = self
@@ -549,7 +561,9 @@ impl CaptureBackend for MFBackend {
                 let mut frame_size: u64 = 0;
                 let mut subtype = GUID::zeroed();
 
-                if media_type.GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size).is_ok()
+                if media_type
+                    .GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size)
+                    .is_ok()
                     && media_type.GetGUID(&MF_MT_SUBTYPE, &mut subtype).is_ok()
                 {
                     let width = (frame_size >> 32) as u32;
@@ -705,9 +719,9 @@ impl CaptureBackend for MFBackend {
             let sample = sample.unwrap();
 
             // Get buffer from sample
-            let buffer: IMFMediaBuffer = sample
-                .ConvertToContiguousBuffer()
-                .map_err(|e| CaptureError::Platform(format!("ConvertToContiguousBuffer failed: {}", e)))?;
+            let buffer: IMFMediaBuffer = sample.ConvertToContiguousBuffer().map_err(|e| {
+                CaptureError::Platform(format!("ConvertToContiguousBuffer failed: {}", e))
+            })?;
 
             // Lock and copy data
             let mut data_ptr: *mut u8 = ptr::null_mut();
@@ -715,7 +729,11 @@ impl CaptureBackend for MFBackend {
             let mut current_length: u32 = 0;
 
             buffer
-                .Lock(&mut data_ptr, Some(&mut max_length), Some(&mut current_length))
+                .Lock(
+                    &mut data_ptr,
+                    Some(&mut max_length),
+                    Some(&mut current_length),
+                )
                 .map_err(|e| CaptureError::Platform(format!("Buffer Lock failed: {}", e)))?;
 
             let data = std::slice::from_raw_parts(data_ptr, current_length as usize).to_vec();
@@ -812,7 +830,10 @@ mod tests {
         let settings = CaptureSettings::default();
 
         let format = backend.open(&device.id, settings).unwrap();
-        println!("Opened: {}x{} {:?}", format.width, format.height, format.format);
+        println!(
+            "Opened: {}x{} {:?}",
+            format.width, format.height, format.format
+        );
 
         backend.start().unwrap();
 

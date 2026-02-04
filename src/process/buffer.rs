@@ -107,12 +107,15 @@ impl PoolStats {
     fn record_acquire(&self) {
         self.acquisitions.fetch_add(1, Ordering::Relaxed);
         let current = self.in_use.fetch_add(1, Ordering::Relaxed) + 1;
-        
+
         // Update peak if needed
         let mut peak = self.peak_in_use.load(Ordering::Relaxed);
         while current > peak {
             match self.peak_in_use.compare_exchange_weak(
-                peak, current, Ordering::Relaxed, Ordering::Relaxed
+                peak,
+                current,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
             ) {
                 Ok(_) => break,
                 Err(p) => peak = p,
@@ -200,6 +203,9 @@ impl BufferSlot {
 
     /// Get mutable access to data
     /// SAFETY: Caller must ensure exclusive access (in_use flag set)
+    /// Note: This intentionally takes &self because access is controlled by the atomic
+    /// in_use flag, not Rust's borrow checker. The UnsafeCell provides interior mutability.
+    #[allow(clippy::mut_from_ref)]
     unsafe fn data_mut(&self) -> &mut [u8] {
         &mut *self.data.get()
     }
@@ -211,7 +217,11 @@ impl BufferSlot {
     }
 
     fn try_acquire(&self) -> bool {
-        if self.in_use.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+        if self
+            .in_use
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
             *self.acquired_at.lock().unwrap() = Some(Instant::now());
             true
         } else {
@@ -308,7 +318,10 @@ impl FrameBufferPool {
 
     /// Get the number of available (not in use) buffers
     pub fn available(&self) -> usize {
-        self.slots.iter().filter(|s| !s.in_use.load(Ordering::Relaxed)).count()
+        self.slots
+            .iter()
+            .filter(|s| !s.in_use.load(Ordering::Relaxed))
+            .count()
     }
 
     /// Check for buffers held too long and log warnings

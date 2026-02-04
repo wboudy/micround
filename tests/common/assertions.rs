@@ -10,15 +10,15 @@
 //! - **State Assertions**: State machine transition validation
 //! - **Error Assertions**: Severity and message content checks
 
-use std::time::{Duration, Instant};
 use std::fmt;
+use std::time::{Duration, Instant};
 
 // Re-export types we need for assertions
-pub use micround::core::{
-    Frame, PixelFormat, ErrorSeverity, MicroundError,
-    CaptureError, RenderError, ConfigError, PlatformError,
-};
 pub use micround::capture::CameraState;
+pub use micround::core::{
+    CaptureError, ConfigError, ErrorSeverity, Frame, MicroundError, PixelFormat, PlatformError,
+    RenderError,
+};
 
 // ============================================================================
 // Frame Comparison Utilities
@@ -68,13 +68,16 @@ pub fn frame_psnr(a: &Frame, b: &Frame) -> Result<f32, FrameCompareError> {
     }
 
     // Calculate MSE (Mean Squared Error)
-    let mse: f64 = a.data.iter()
+    let mse: f64 = a
+        .data
+        .iter()
         .zip(b.data.iter())
         .map(|(&x, &y)| {
             let diff = (x as f64) - (y as f64);
             diff * diff
         })
-        .sum::<f64>() / a.data.len() as f64;
+        .sum::<f64>()
+        / a.data.len() as f64;
 
     // If MSE is 0, frames are identical (infinite PSNR)
     if mse < f64::EPSILON {
@@ -106,9 +109,7 @@ pub fn assert_frames_similar(a: &Frame, b: &Frame, tolerance_db: f32) {
                     PSNR: {:.2} dB (threshold: {:.2} dB)\n\
                     Frame A: {}x{} {:?}\n\
                     Frame B: {}x{} {:?}",
-                    psnr, tolerance_db,
-                    a.width, a.height, a.format,
-                    b.width, b.height, b.format
+                    psnr, tolerance_db, a.width, a.height, a.format, b.width, b.height, b.format
                 );
             }
             // Log success for debugging
@@ -146,8 +147,12 @@ pub fn assert_frame_metadata_eq(a: &Frame, b: &Frame) {
             Frame A: {}x{} {:?}\n\
             Frame B: {}x{} {:?}",
             errors.join("\n  "),
-            a.width, a.height, a.format,
-            b.width, b.height, b.format
+            a.width,
+            a.height,
+            a.format,
+            b.width,
+            b.height,
+            b.format
         );
     }
 
@@ -166,7 +171,8 @@ pub fn assert_frames_identical(a: &Frame, b: &Frame) {
     if a.data.len() != b.data.len() {
         panic!(
             "Frame data length mismatch: {} vs {} bytes",
-            a.data.len(), b.data.len()
+            a.data.len(),
+            b.data.len()
         );
     }
 
@@ -176,24 +182,35 @@ pub fn assert_frames_identical(a: &Frame, b: &Frame) {
             panic!(
                 "Frame data differs at byte {}: 0x{:02x} != 0x{:02x}\n\
                 Frame dimensions: {}x{} {:?}",
-                i, x, y,
-                a.width, a.height, a.format
+                i, x, y, a.width, a.height, a.format
             );
         }
     }
 
     eprintln!(
         "[ASSERT] Frames identical: {}x{} {:?}, {} bytes ✓",
-        a.width, a.height, a.format, a.data.len()
+        a.width,
+        a.height,
+        a.format,
+        a.data.len()
     );
 }
 
 /// Frame comparison error
 #[derive(Debug, Clone)]
 pub enum FrameCompareError {
-    DimensionMismatch { a_dims: (u32, u32), b_dims: (u32, u32) },
-    FormatMismatch { a_format: PixelFormat, b_format: PixelFormat },
-    DataLengthMismatch { a_len: usize, b_len: usize },
+    DimensionMismatch {
+        a_dims: (u32, u32),
+        b_dims: (u32, u32),
+    },
+    FormatMismatch {
+        a_format: PixelFormat,
+        b_format: PixelFormat,
+    },
+    DataLengthMismatch {
+        a_len: usize,
+        b_len: usize,
+    },
     EmptyFrame,
 }
 
@@ -201,8 +218,11 @@ impl fmt::Display for FrameCompareError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DimensionMismatch { a_dims, b_dims } => {
-                write!(f, "Dimension mismatch: {}x{} vs {}x{}",
-                    a_dims.0, a_dims.1, b_dims.0, b_dims.1)
+                write!(
+                    f,
+                    "Dimension mismatch: {}x{} vs {}x{}",
+                    a_dims.0, a_dims.1, b_dims.0, b_dims.1
+                )
             }
             Self::FormatMismatch { a_format, b_format } => {
                 write!(f, "Format mismatch: {:?} vs {:?}", a_format, b_format)
@@ -323,7 +343,10 @@ where
     let max = durations.last().copied().unwrap_or(Duration::ZERO);
     let sum: Duration = durations.iter().sum();
     let mean = sum / iterations as u32;
-    let median = durations.get(iterations / 2).copied().unwrap_or(Duration::ZERO);
+    let median = durations
+        .get(iterations / 2)
+        .copied()
+        .unwrap_or(Duration::ZERO);
 
     let stats = TimingStats {
         min,
@@ -381,7 +404,8 @@ pub fn assert_timing_within(stats: &TimingStats, max_mean: Duration, max_p50: Du
 pub fn is_valid_camera_transition(from: &CameraState, to: &CameraState) -> bool {
     use CameraState::*;
 
-    matches!((from, to),
+    matches!(
+        (from, to),
         // From Disconnected
         (Disconnected, Available) |
 
@@ -426,10 +450,7 @@ pub fn assert_valid_camera_transition(from: &CameraState, to: &CameraState) {
         );
     }
 
-    eprintln!(
-        "[ASSERT] Valid transition: {:?} -> {:?} ✓",
-        from, to
-    );
+    eprintln!("[ASSERT] Valid transition: {:?} -> {:?} ✓", from, to);
 }
 
 /// Assert that a sequence of state transitions is valid
@@ -449,7 +470,8 @@ pub fn assert_valid_camera_transition_sequence(states: &[CameraState]) {
                 Invalid: {:?} -> {:?}",
                 i,
                 &states[..=i],
-                from, to
+                from,
+                to
             );
         }
     }
@@ -498,10 +520,7 @@ where
         );
     }
 
-    eprintln!(
-        "[ASSERT] Error contains {:?} ✓",
-        text
-    );
+    eprintln!("[ASSERT] Error contains {:?} ✓", text);
 }
 
 /// Assert that a user message contains expected text
@@ -519,10 +538,7 @@ where
         );
     }
 
-    eprintln!(
-        "[ASSERT] User message contains {:?} ✓",
-        text
-    );
+    eprintln!("[ASSERT] User message contains {:?} ✓", text);
 }
 
 /// Trait for types that have a severity method
@@ -608,7 +624,7 @@ pub fn create_test_frame(width: u32, height: u32, format: PixelFormat, color: u8
         PixelFormat::Rgba32 => 4,
         PixelFormat::Rgb24 => 3,
         PixelFormat::Yuyv => 2,
-        PixelFormat::Nv12 => 1, // Y plane only for solid color
+        PixelFormat::Nv12 => 1,  // Y plane only for solid color
         PixelFormat::Mjpeg => 1, // Would need actual MJPEG data
         PixelFormat::Unknown => 1,
     };
@@ -660,7 +676,12 @@ pub fn create_gradient_frame(width: u32, height: u32, format: PixelFormat) -> Fr
 }
 
 /// Create a test frame with a checkerboard pattern
-pub fn create_checkerboard_frame(width: u32, height: u32, format: PixelFormat, block_size: u32) -> Frame {
+pub fn create_checkerboard_frame(
+    width: u32,
+    height: u32,
+    format: PixelFormat,
+    block_size: u32,
+) -> Frame {
     let bytes_per_pixel = match format {
         PixelFormat::Rgba32 => 4,
         PixelFormat::Rgb24 => 3,
@@ -708,7 +729,10 @@ mod tests {
         fn test_identical_frames_have_infinite_psnr() {
             let frame = create_test_frame(100, 100, PixelFormat::Rgba32, 128);
             let psnr = frame_psnr(&frame, &frame).unwrap();
-            assert!(psnr.is_infinite(), "PSNR of identical frames should be infinite");
+            assert!(
+                psnr.is_infinite(),
+                "PSNR of identical frames should be infinite"
+            );
         }
 
         #[test]
@@ -731,7 +755,11 @@ mod tests {
             };
 
             let psnr = frame_psnr(&frame_a, &frame_b).unwrap();
-            assert!(psnr > 40.0, "Small differences should have PSNR > 40 dB, got {}", psnr);
+            assert!(
+                psnr > 40.0,
+                "Small differences should have PSNR > 40 dB, got {}",
+                psnr
+            );
         }
 
         #[test]
@@ -740,7 +768,10 @@ mod tests {
             let frame_b = create_test_frame(200, 100, PixelFormat::Rgba32, 128);
 
             let result = frame_psnr(&frame_a, &frame_b);
-            assert!(matches!(result, Err(FrameCompareError::DimensionMismatch { .. })));
+            assert!(matches!(
+                result,
+                Err(FrameCompareError::DimensionMismatch { .. })
+            ));
         }
 
         #[test]
@@ -749,7 +780,10 @@ mod tests {
             let frame_b = create_test_frame(100, 100, PixelFormat::Rgb24, 128);
 
             let result = frame_psnr(&frame_a, &frame_b);
-            assert!(matches!(result, Err(FrameCompareError::FormatMismatch { .. })));
+            assert!(matches!(
+                result,
+                Err(FrameCompareError::FormatMismatch { .. })
+            ));
         }
 
         #[test]
@@ -783,9 +817,7 @@ mod tests {
 
         #[test]
         fn test_assert_completes_within_fast_operation() {
-            let result = assert_completes_within(Duration::from_secs(1), || {
-                42
-            });
+            let result = assert_completes_within(Duration::from_secs(1), || 42);
             assert_eq!(result, 42);
         }
 
@@ -827,22 +859,49 @@ mod tests {
         #[test]
         fn test_valid_transitions() {
             // Normal happy path
-            assert!(is_valid_camera_transition(&CameraState::Disconnected, &CameraState::Available));
-            assert!(is_valid_camera_transition(&CameraState::Available, &CameraState::Opening));
-            assert!(is_valid_camera_transition(&CameraState::Opening, &CameraState::Ready));
-            assert!(is_valid_camera_transition(&CameraState::Ready, &CameraState::Capturing));
-            assert!(is_valid_camera_transition(&CameraState::Capturing, &CameraState::Ready));
-            assert!(is_valid_camera_transition(&CameraState::Ready, &CameraState::Available));
+            assert!(is_valid_camera_transition(
+                &CameraState::Disconnected,
+                &CameraState::Available
+            ));
+            assert!(is_valid_camera_transition(
+                &CameraState::Available,
+                &CameraState::Opening
+            ));
+            assert!(is_valid_camera_transition(
+                &CameraState::Opening,
+                &CameraState::Ready
+            ));
+            assert!(is_valid_camera_transition(
+                &CameraState::Ready,
+                &CameraState::Capturing
+            ));
+            assert!(is_valid_camera_transition(
+                &CameraState::Capturing,
+                &CameraState::Ready
+            ));
+            assert!(is_valid_camera_transition(
+                &CameraState::Ready,
+                &CameraState::Available
+            ));
         }
 
         #[test]
         fn test_invalid_transitions() {
             // Can't jump straight to capturing
-            assert!(!is_valid_camera_transition(&CameraState::Available, &CameraState::Capturing));
+            assert!(!is_valid_camera_transition(
+                &CameraState::Available,
+                &CameraState::Capturing
+            ));
             // Can't go backwards to Opening
-            assert!(!is_valid_camera_transition(&CameraState::Capturing, &CameraState::Opening));
+            assert!(!is_valid_camera_transition(
+                &CameraState::Capturing,
+                &CameraState::Opening
+            ));
             // Can't go from Disconnected to Ready
-            assert!(!is_valid_camera_transition(&CameraState::Disconnected, &CameraState::Ready));
+            assert!(!is_valid_camera_transition(
+                &CameraState::Disconnected,
+                &CameraState::Ready
+            ));
         }
 
         #[test]

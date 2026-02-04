@@ -81,26 +81,38 @@ fn test_nsscreen_main_screen() {
     // Define NSRect with proper Encode implementation
     #[repr(C)]
     #[derive(Debug, Clone, Copy)]
-    struct NSPoint { x: f64, y: f64 }
+    struct NSPoint {
+        x: f64,
+        y: f64,
+    }
 
     unsafe impl Encode for NSPoint {
-        const ENCODING: Encoding = Encoding::Struct("CGPoint", &[Encoding::Double, Encoding::Double]);
+        const ENCODING: Encoding =
+            Encoding::Struct("CGPoint", &[Encoding::Double, Encoding::Double]);
     }
 
     #[repr(C)]
     #[derive(Debug, Clone, Copy)]
-    struct NSSize { width: f64, height: f64 }
+    struct NSSize {
+        width: f64,
+        height: f64,
+    }
 
     unsafe impl Encode for NSSize {
-        const ENCODING: Encoding = Encoding::Struct("CGSize", &[Encoding::Double, Encoding::Double]);
+        const ENCODING: Encoding =
+            Encoding::Struct("CGSize", &[Encoding::Double, Encoding::Double]);
     }
 
     #[repr(C)]
     #[derive(Debug, Clone, Copy)]
-    struct NSRect { origin: NSPoint, size: NSSize }
+    struct NSRect {
+        origin: NSPoint,
+        size: NSSize,
+    }
 
     unsafe impl Encode for NSRect {
-        const ENCODING: Encoding = Encoding::Struct("CGRect", &[NSPoint::ENCODING, NSSize::ENCODING]);
+        const ENCODING: Encoding =
+            Encoding::Struct("CGRect", &[NSPoint::ENCODING, NSSize::ENCODING]);
     }
 
     let mut logger = TestLogger::new("nsscreen_main_screen", 3);
@@ -186,7 +198,11 @@ fn test_nsscreen_all_screens() {
 
             test_step!(logger, "Checking for multi-display setup");
             if count > 1 {
-                test_step_ok!(logger, "Multi-display configuration detected ({} screens)", count);
+                test_step_ok!(
+                    logger,
+                    "Multi-display configuration detected ({} screens)",
+                    count
+                );
             } else {
                 test_step_ok!(logger, "Single display configuration");
             }
@@ -228,7 +244,12 @@ fn test_avfoundation_camera_enumeration() {
     test_step!(logger, "Validating device info");
     for device in &devices {
         test_assert!(logger, !device.id.0.is_empty(), "Device has ID");
-        test_assert!(logger, !device.name.is_empty(), "Device has name: {}", device.name);
+        test_assert!(
+            logger,
+            !device.name.is_empty(),
+            "Device has name: {}",
+            device.name
+        );
     }
 
     if devices.is_empty() {
@@ -255,8 +276,16 @@ fn test_avfoundation_backend_creation() {
     test_step_ok!(logger, "Backend created successfully");
 
     test_step!(logger, "Checking initial state");
-    test_assert!(logger, !backend.is_capturing(), "Backend is not capturing initially");
-    test_assert!(logger, backend.current_format().is_none(), "No format set initially");
+    test_assert!(
+        logger,
+        !backend.is_capturing(),
+        "Backend is not capturing initially"
+    );
+    test_assert!(
+        logger,
+        backend.current_format().is_none(),
+        "No format set initially"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -327,7 +356,11 @@ fn test_macos_renderer_render_without_init() {
     test_step!(logger, "Attempting render without init");
     let frame = ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
     let result = renderer.render(&frame);
-    test_assert!(logger, result.is_err(), "Render returns error when not initialized");
+    test_assert!(
+        logger,
+        result.is_err(),
+        "Render returns error when not initialized"
+    );
     test_step_ok!(logger, "Correctly returned error");
 
     let result = logger.finish();
@@ -339,9 +372,9 @@ fn test_macos_renderer_render_without_init() {
 #[ignore = "requires macOS desktop session"]
 #[cfg(feature = "macos")]
 fn test_macos_renderer_init() {
+    use micround::core::DisplayId;
     use micround::render::macos::MacOSRenderer;
     use micround::render::WallpaperRenderer;
-    use micround::core::DisplayId;
 
     let mut logger = TestLogger::new("macos_renderer_init", 4);
 
@@ -357,9 +390,8 @@ fn test_macos_renderer_init() {
 
             test_step!(logger, "Verifying initialization via render attempt");
             // If init succeeded, rendering should also work (doesn't access private fields)
-            let test_frame = micround::process::ProcessedFrame::new(
-                vec![0u8; 100 * 100 * 4], 100, 100
-            );
+            let test_frame =
+                micround::process::ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
             let render_result = renderer.render(&test_frame);
             test_assert!(logger, render_result.is_ok(), "Can render after init");
             test_step_ok!(logger, "Render test passed");
@@ -368,7 +400,11 @@ fn test_macos_renderer_init() {
             renderer.shutdown();
             // Verify shutdown by attempting render (should fail)
             let render_after_shutdown = renderer.render(&test_frame);
-            test_assert!(logger, render_after_shutdown.is_err(), "Render fails after shutdown");
+            test_assert!(
+                logger,
+                render_after_shutdown.is_err(),
+                "Render fails after shutdown"
+            );
             test_step_ok!(logger);
         }
         Err(e) => {
@@ -389,10 +425,10 @@ fn test_macos_renderer_init() {
 #[ignore = "requires macOS desktop session"]
 #[cfg(feature = "macos")]
 fn test_macos_renderer_full_cycle() {
-    use micround::render::macos::MacOSRenderer;
-    use micround::render::WallpaperRenderer;
     use micround::core::DisplayId;
     use micround::process::ProcessedFrame;
+    use micround::render::macos::MacOSRenderer;
+    use micround::render::WallpaperRenderer;
 
     let mut logger = TestLogger::new("macos_renderer_full_cycle", 5);
 
@@ -415,10 +451,10 @@ fn test_macos_renderer_full_cycle() {
     for y in 0..height {
         for x in 0..width {
             let idx = (y * width + x) * 4;
-            data[idx] = (x * 255 / width) as u8;     // R gradient
+            data[idx] = (x * 255 / width) as u8; // R gradient
             data[idx + 1] = (y * 255 / height) as u8; // G gradient
-            data[idx + 2] = 128;                      // B constant
-            data[idx + 3] = 255;                      // A opaque
+            data[idx + 2] = 128; // B constant
+            data[idx + 3] = 255; // A opaque
         }
     }
     let frame = ProcessedFrame::new(data, width as u32, height as u32);
@@ -465,7 +501,11 @@ fn test_macos_renderer_full_cycle() {
     // Verify shutdown by attempting render (should fail)
     let final_frame = ProcessedFrame::new(vec![0u8; 100 * 100 * 4], 100, 100);
     let render_after_shutdown = renderer.render(&final_frame);
-    test_assert!(logger, render_after_shutdown.is_err(), "Render fails after shutdown");
+    test_assert!(
+        logger,
+        render_after_shutdown.is_err(),
+        "Render fails after shutdown"
+    );
     test_step_ok!(logger, "Renderer shut down cleanly");
 
     let result = logger.finish();
@@ -520,7 +560,11 @@ fn test_collection_behavior_flags() {
     test_assert!(logger, can_join_all_spaces == 1, "canJoinAllSpaces = 1");
     test_assert!(logger, stationary == 16, "stationary = 16");
     test_assert!(logger, ignores_cycle == 64, "ignoresCycle = 64");
-    test_assert!(logger, full_screen_auxiliary == 256, "fullScreenAuxiliary = 256");
+    test_assert!(
+        logger,
+        full_screen_auxiliary == 256,
+        "fullScreenAuxiliary = 256"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying combined behavior");
@@ -567,9 +611,18 @@ fn test_macos_version_detection() {
                 // AVFoundation requires macOS 10.7+, NSScreen APIs are older
                 test_assert!(logger, major >= 10, "Major version >= 10");
                 if major == 10 {
-                    test_assert!(logger, minor >= 7, "If macOS 10.x, minor >= 7 for AVFoundation");
+                    test_assert!(
+                        logger,
+                        minor >= 7,
+                        "If macOS 10.x, minor >= 7 for AVFoundation"
+                    );
                 }
-                test_step_ok!(logger, "Version {}.{} supports all required APIs", major, minor);
+                test_step_ok!(
+                    logger,
+                    "Version {}.{} supports all required APIs",
+                    major,
+                    minor
+                );
             } else {
                 test_step_ok!(logger, "Could not parse version, assuming compatible");
             }

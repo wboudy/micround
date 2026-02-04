@@ -23,20 +23,14 @@
 //! └─────────────────┘
 //! ```
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
-use muda::{
-    accelerator::Accelerator,
-    Menu, MenuEvent, MenuItem, PredefinedMenuItem,
-};
-use tray_icon::{
-    TrayIcon as TrayIconInner, TrayIconBuilder, TrayIconEvent,
-    menu::MenuId,
-};
+use muda::{accelerator::Accelerator, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tracing::{debug, error, info, warn};
+use tray_icon::{menu::MenuId, TrayIcon as TrayIconInner, TrayIconBuilder, TrayIconEvent};
 
-use crate::core::events::{AppHandle, Command, Event, AppState};
+use crate::core::events::{AppHandle, AppState, Command, Event};
 
 // ============================================================================
 // Menu Item IDs
@@ -190,7 +184,10 @@ impl TrayState {
 
     /// Check if feed can be stopped
     pub fn can_stop(&self) -> bool {
-        matches!(self.app_state, AppState::Running | AppState::Paused | AppState::Reconnecting)
+        matches!(
+            self.app_state,
+            AppState::Running | AppState::Paused | AppState::Reconnecting
+        )
     }
 
     /// Check if display can be paused
@@ -290,14 +287,16 @@ impl TrayController {
         }
 
         // Update tooltip
-        self.tray_icon.set_tooltip(Some(&self.state.tooltip()))
+        self.tray_icon
+            .set_tooltip(Some(&self.state.tooltip()))
             .unwrap_or_else(|e| warn!(error = %e, "Failed to update tooltip"));
     }
 
     /// Update the tray icon for a given state
     fn update_icon(&mut self, icon_state: IconState) -> Result<(), TrayError> {
         let icon = load_icon_for_state(icon_state)?;
-        self.tray_icon.set_icon(Some(icon))
+        self.tray_icon
+            .set_icon(Some(icon))
             .map_err(|e| TrayError::Icon(e.to_string()))?;
         debug!(?icon_state, "Tray icon updated");
         Ok(())
@@ -306,14 +305,24 @@ impl TrayController {
     /// Refresh menu items based on current state
     fn refresh_menu(&self) {
         // Update status text
-        self.menu_items.status_item.set_text(&self.state.status_text());
+        self.menu_items
+            .status_item
+            .set_text(&self.state.status_text());
 
         // Update enabled state of menu items
-        self.menu_items.start_item.set_enabled(self.state.can_start());
+        self.menu_items
+            .start_item
+            .set_enabled(self.state.can_start());
         self.menu_items.stop_item.set_enabled(self.state.can_stop());
-        self.menu_items.pause_item.set_enabled(self.state.can_pause());
-        self.menu_items.resume_item.set_enabled(self.state.can_resume());
-        self.menu_items.snapshot_item.set_enabled(self.state.can_snapshot());
+        self.menu_items
+            .pause_item
+            .set_enabled(self.state.can_pause());
+        self.menu_items
+            .resume_item
+            .set_enabled(self.state.can_resume());
+        self.menu_items
+            .snapshot_item
+            .set_enabled(self.state.can_snapshot());
 
         // Update visibility based on state
         // Show Start when stopped, Stop when running
@@ -359,7 +368,10 @@ impl TrayController {
                 }
                 TrayMenuId::Snapshot => {
                     // Default to clipboard
-                    if let Err(e) = self.app_handle.try_send_command(Command::TakeSnapshot { to_clipboard: true }) {
+                    if let Err(e) = self
+                        .app_handle
+                        .try_send_command(Command::TakeSnapshot { to_clipboard: true })
+                    {
                         error!(error = %e, "Failed to send TakeSnapshot command");
                     }
                 }
@@ -383,7 +395,11 @@ impl TrayController {
     /// Handle a tray icon event (click, double-click, etc.)
     pub fn handle_tray_event(&self, event: &TrayIconEvent) {
         match event {
-            TrayIconEvent::Click { button, button_state, .. } => {
+            TrayIconEvent::Click {
+                button,
+                button_state,
+                ..
+            } => {
                 debug!(?button, ?button_state, "Tray icon clicked");
                 // Left click could toggle feed or open settings
                 // For now, just log
@@ -562,8 +578,7 @@ fn load_tray_icon() -> Result<tray_icon::Icon, TrayError> {
 /// Load an icon for a specific state
 pub fn load_icon_for_state(state: IconState) -> Result<tray_icon::Icon, TrayError> {
     let icon_rgba = generate_state_icon(state);
-    tray_icon::Icon::from_rgba(icon_rgba, 32, 32)
-        .map_err(|e| TrayError::Icon(e.to_string()))
+    tray_icon::Icon::from_rgba(icon_rgba, 32, 32).map_err(|e| TrayError::Icon(e.to_string()))
 }
 
 /// Generate an icon for a specific state (32x32 RGBA)
@@ -581,19 +596,19 @@ fn generate_state_icon(state: IconState) -> Vec<u8> {
     // State-based colors
     let (inner_color, border_color): ([u8; 4], [u8; 4]) = match state {
         IconState::Idle => {
-            ([140, 140, 140, 255], [100, 100, 100, 255])  // Gray
+            ([140, 140, 140, 255], [100, 100, 100, 255]) // Gray
         }
         IconState::Running => {
-            ([50, 205, 50, 255], [34, 139, 34, 255])      // Green
+            ([50, 205, 50, 255], [34, 139, 34, 255]) // Green
         }
         IconState::Paused => {
-            ([255, 191, 0, 255], [218, 165, 32, 255])     // Amber/Gold
+            ([255, 191, 0, 255], [218, 165, 32, 255]) // Amber/Gold
         }
         IconState::Error => {
-            ([220, 53, 69, 255], [185, 28, 44, 255])      // Red
+            ([220, 53, 69, 255], [185, 28, 44, 255]) // Red
         }
         IconState::Reconnecting => {
-            ([0, 123, 255, 255], [0, 86, 179, 255])       // Blue
+            ([0, 123, 255, 255], [0, 86, 179, 255]) // Blue
         }
     };
 
@@ -649,7 +664,6 @@ fn generate_state_icon(state: IconState) -> Vec<u8> {
 
     data
 }
-
 
 // ============================================================================
 // Error Types
@@ -797,7 +811,10 @@ mod tests {
         assert_eq!(IconState::from(AppState::Running), IconState::Running);
         assert_eq!(IconState::from(AppState::Paused), IconState::Paused);
         assert_eq!(IconState::from(AppState::Error), IconState::Error);
-        assert_eq!(IconState::from(AppState::Reconnecting), IconState::Reconnecting);
+        assert_eq!(
+            IconState::from(AppState::Reconnecting),
+            IconState::Reconnecting
+        );
     }
 
     #[test]
@@ -811,7 +828,12 @@ mod tests {
             IconState::Reconnecting,
         ] {
             let icon = generate_state_icon(state);
-            assert_eq!(icon.len(), 32 * 32 * 4, "Icon for {:?} has wrong size", state);
+            assert_eq!(
+                icon.len(),
+                32 * 32 * 4,
+                "Icon for {:?} has wrong size",
+                state
+            );
 
             // Verify RGBA format (check first pixel has 4 bytes)
             assert!(icon.len() >= 4);
@@ -829,8 +851,17 @@ mod tests {
         let center_idx = (16 * 32 + 16) * 4;
 
         // Idle is gray, Running is green, Error is red - should differ
-        assert_ne!(idle[center_idx..center_idx+3], running[center_idx..center_idx+3]);
-        assert_ne!(running[center_idx..center_idx+3], error[center_idx..center_idx+3]);
-        assert_ne!(idle[center_idx..center_idx+3], error[center_idx..center_idx+3]);
+        assert_ne!(
+            idle[center_idx..center_idx + 3],
+            running[center_idx..center_idx + 3]
+        );
+        assert_ne!(
+            running[center_idx..center_idx + 3],
+            error[center_idx..center_idx + 3]
+        );
+        assert_ne!(
+            idle[center_idx..center_idx + 3],
+            error[center_idx..center_idx + 3]
+        );
     }
 }

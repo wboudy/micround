@@ -149,7 +149,9 @@ impl MacOSRenderer {
                 let window: *const AnyObject = msg_send![window_class, alloc];
 
                 if window.is_null() {
-                    return Err(RenderError::SurfaceCreation("Failed to allocate NSWindow".into()));
+                    return Err(RenderError::SurfaceCreation(
+                        "Failed to allocate NSWindow".into(),
+                    ));
                 }
 
                 // Initialize with borderless style
@@ -162,7 +164,9 @@ impl MacOSRenderer {
                 ];
 
                 if window.is_null() {
-                    return Err(RenderError::SurfaceCreation("Failed to initialize NSWindow".into()));
+                    return Err(RenderError::SurfaceCreation(
+                        "Failed to initialize NSWindow".into(),
+                    ));
                 }
 
                 // Set window level to desktop
@@ -206,13 +210,17 @@ impl MacOSRenderer {
                 let image_view: *const AnyObject = msg_send![image_view_class, alloc];
 
                 if image_view.is_null() {
-                    return Err(RenderError::SurfaceCreation("Failed to allocate NSImageView".into()));
+                    return Err(RenderError::SurfaceCreation(
+                        "Failed to allocate NSImageView".into(),
+                    ));
                 }
 
                 let image_view: *const AnyObject = msg_send![image_view, initWithFrame: frame];
 
                 if image_view.is_null() {
-                    return Err(RenderError::SurfaceCreation("Failed to initialize NSImageView".into()));
+                    return Err(RenderError::SurfaceCreation(
+                        "Failed to initialize NSImageView".into(),
+                    ));
                 }
 
                 // Configure image view
@@ -229,7 +237,10 @@ impl MacOSRenderer {
 
     /// Create an NSImage from RGBA frame data
     #[cfg(all(target_os = "macos", feature = "macos"))]
-    fn create_image_from_frame(&self, frame: &ProcessedFrame) -> Result<*const AnyObject, RenderError> {
+    fn create_image_from_frame(
+        &self,
+        frame: &ProcessedFrame,
+    ) -> Result<*const AnyObject, RenderError> {
         unsafe {
             autoreleasepool(|_| {
                 // Create NSBitmapImageRep from the RGBA data
@@ -238,7 +249,9 @@ impl MacOSRenderer {
                 // Allocate bitmap
                 let bitmap: *const AnyObject = msg_send![bitmap_class, alloc];
                 if bitmap.is_null() {
-                    return Err(RenderError::FrameProcessing("Failed to allocate NSBitmapImageRep".into()));
+                    return Err(RenderError::FrameProcessing(
+                        "Failed to allocate NSBitmapImageRep".into(),
+                    ));
                 }
 
                 // Initialize bitmap with our frame data
@@ -259,14 +272,18 @@ impl MacOSRenderer {
                 ];
 
                 if bitmap.is_null() {
-                    return Err(RenderError::FrameProcessing("Failed to initialize NSBitmapImageRep".into()));
+                    return Err(RenderError::FrameProcessing(
+                        "Failed to initialize NSBitmapImageRep".into(),
+                    ));
                 }
 
                 // Copy our frame data to the bitmap with bounds validation
                 let bitmap_data: *mut u8 = msg_send![bitmap, bitmapData];
                 if bitmap_data.is_null() {
                     let _: () = msg_send![bitmap, release];
-                    return Err(RenderError::FrameProcessing("Bitmap data pointer is null".into()));
+                    return Err(RenderError::FrameProcessing(
+                        "Bitmap data pointer is null".into(),
+                    ));
                 }
 
                 // Validate frame data size matches expected bitmap size
@@ -275,29 +292,28 @@ impl MacOSRenderer {
                     let _: () = msg_send![bitmap, release];
                     return Err(RenderError::FrameProcessing(format!(
                         "Frame data size mismatch: expected {} bytes, got {}",
-                        expected_size, frame.data.len()
+                        expected_size,
+                        frame.data.len()
                     )));
                 }
 
                 // Safe to copy now - we verified frame has sufficient data
-                std::ptr::copy_nonoverlapping(
-                    frame.data.as_ptr(),
-                    bitmap_data,
-                    expected_size,
-                );
+                std::ptr::copy_nonoverlapping(frame.data.as_ptr(), bitmap_data, expected_size);
 
                 // Create NSImage and add the bitmap representation
                 let image_class = class!(NSImage);
                 let size = NSSize {
                     width: frame.width as f64,
-                    height: frame.height as f64
+                    height: frame.height as f64,
                 };
                 let image: *const AnyObject = msg_send![image_class, alloc];
                 let image: *const AnyObject = msg_send![image, initWithSize: size];
 
                 if image.is_null() {
                     let _: () = msg_send![bitmap, release];
-                    return Err(RenderError::FrameProcessing("Failed to create NSImage".into()));
+                    return Err(RenderError::FrameProcessing(
+                        "Failed to create NSImage".into(),
+                    ));
                 }
 
                 let _: () = msg_send![image, addRepresentation: bitmap];
@@ -388,7 +404,8 @@ impl WallpaperRenderer for MacOSRenderer {
 
         #[cfg(all(target_os = "macos", feature = "macos"))]
         {
-            let image_view = self.image_view
+            let image_view = self
+                .image_view
                 .ok_or_else(|| RenderError::Platform("No image view".into()))?;
 
             unsafe {
@@ -437,7 +454,9 @@ impl WallpaperRenderer for MacOSRenderer {
         {
             // Release the image view
             if let Some(view) = self.image_view.take() {
-                unsafe { Self::release_obj(view); }
+                unsafe {
+                    Self::release_obj(view);
+                }
             }
 
             // Close and release the window
@@ -569,10 +588,10 @@ mod tests {
         for y in 0..height {
             for x in 0..width {
                 let idx = (y * width + x) * 4;
-                data[idx] = (x * 255 / width) as u8;     // R
+                data[idx] = (x * 255 / width) as u8; // R
                 data[idx + 1] = (y * 255 / height) as u8; // G
-                data[idx + 2] = 128;                      // B
-                data[idx + 3] = 255;                      // A
+                data[idx + 2] = 128; // B
+                data[idx + 3] = 255; // A
             }
         }
 

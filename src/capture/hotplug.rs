@@ -146,8 +146,7 @@ fn hotplug_thread_main<E, H>(
     mut known_devices: HashSet<DeviceId>,
     config: HotplugConfig,
     stop_signal: Arc<AtomicBool>,
-)
-where
+) where
     E: CameraEnumerator,
     H: CameraEventHandler,
 {

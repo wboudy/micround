@@ -8,7 +8,7 @@
 //! 1. Flip (horizontal/vertical/both)
 //! 2. Rotate (0°/90°/180°/270° clockwise)
 
-use crate::core::{Rotation, Flip};
+use crate::core::{Flip, Rotation};
 use crate::process::decode::DecodedFrame;
 
 /// Result of a transform operation
@@ -53,14 +53,10 @@ pub fn transform_frame(
 
     // Apply flip first
     let flipped = apply_flip(&source.data, source.width, source.height, flip);
-    
+
     // Then apply rotation
-    let (rotated, out_width, out_height) = apply_rotation(
-        &flipped,
-        source.width,
-        source.height,
-        rotation,
-    );
+    let (rotated, out_width, out_height) =
+        apply_rotation(&flipped, source.width, source.height, rotation);
 
     Ok(TransformedFrame {
         data: rotated,
@@ -80,12 +76,7 @@ fn apply_flip(data: &[u8], width: u32, height: u32, flip: Flip) -> Vec<u8> {
 }
 
 /// Apply rotation transformation
-fn apply_rotation(
-    data: &[u8],
-    width: u32,
-    height: u32,
-    rotation: Rotation,
-) -> (Vec<u8>, u32, u32) {
+fn apply_rotation(data: &[u8], width: u32, height: u32, rotation: Rotation) -> (Vec<u8>, u32, u32) {
     match rotation {
         Rotation::None => (data.to_vec(), width, height),
         Rotation::Clockwise90 => rotate_90(data, width, height),
@@ -201,13 +192,17 @@ mod tests {
         for y in 0..height {
             for x in 0..width {
                 let idx = ((y * width + x) * 4) as usize;
-                data[idx] = x as u8;     // R = x position
+                data[idx] = x as u8; // R = x position
                 data[idx + 1] = y as u8; // G = y position
-                data[idx + 2] = 0;       // B = 0
-                data[idx + 3] = 255;     // A = 255
+                data[idx + 2] = 0; // B = 0
+                data[idx + 3] = 255; // A = 255
             }
         }
-        DecodedFrame { data, width, height }
+        DecodedFrame {
+            data,
+            width,
+            height,
+        }
     }
 
     /// Get pixel value at position (returns (R, G, B, A))
@@ -291,7 +286,7 @@ mod tests {
 
         let transformed = result.unwrap();
         // 90° clockwise: dimensions swap
-        assert_eq!(transformed.width, 3);  // Was height
+        assert_eq!(transformed.width, 3); // Was height
         assert_eq!(transformed.height, 4); // Was width
 
         // Original (0,0) goes to (2, 0) in new orientation
@@ -339,16 +334,28 @@ mod tests {
     fn test_round_trip_rotation() {
         // Rotating 4 times should return to original
         let source = make_test_frame(4, 3);
-        
+
         let r1 = transform_frame(&source, Flip::None, Rotation::Clockwise90).unwrap();
-        let frame1 = DecodedFrame { data: r1.data, width: r1.width, height: r1.height };
-        
+        let frame1 = DecodedFrame {
+            data: r1.data,
+            width: r1.width,
+            height: r1.height,
+        };
+
         let r2 = transform_frame(&frame1, Flip::None, Rotation::Clockwise90).unwrap();
-        let frame2 = DecodedFrame { data: r2.data, width: r2.width, height: r2.height };
-        
+        let frame2 = DecodedFrame {
+            data: r2.data,
+            width: r2.width,
+            height: r2.height,
+        };
+
         let r3 = transform_frame(&frame2, Flip::None, Rotation::Clockwise90).unwrap();
-        let frame3 = DecodedFrame { data: r3.data, width: r3.width, height: r3.height };
-        
+        let frame3 = DecodedFrame {
+            data: r3.data,
+            width: r3.width,
+            height: r3.height,
+        };
+
         let r4 = transform_frame(&frame3, Flip::None, Rotation::Clockwise90).unwrap();
 
         assert_eq!(r4.width, source.width);
@@ -360,10 +367,14 @@ mod tests {
     fn test_round_trip_horizontal_flip() {
         // Flipping horizontally twice should return to original
         let source = make_test_frame(4, 3);
-        
+
         let r1 = transform_frame(&source, Flip::Horizontal, Rotation::None).unwrap();
-        let frame1 = DecodedFrame { data: r1.data, width: r1.width, height: r1.height };
-        
+        let frame1 = DecodedFrame {
+            data: r1.data,
+            width: r1.width,
+            height: r1.height,
+        };
+
         let r2 = transform_frame(&frame1, Flip::Horizontal, Rotation::None).unwrap();
 
         assert_eq!(r2.data, source.data);
@@ -373,10 +384,14 @@ mod tests {
     fn test_round_trip_vertical_flip() {
         // Flipping vertically twice should return to original
         let source = make_test_frame(4, 3);
-        
+
         let r1 = transform_frame(&source, Flip::Vertical, Rotation::None).unwrap();
-        let frame1 = DecodedFrame { data: r1.data, width: r1.width, height: r1.height };
-        
+        let frame1 = DecodedFrame {
+            data: r1.data,
+            width: r1.width,
+            height: r1.height,
+        };
+
         let r2 = transform_frame(&frame1, Flip::Vertical, Rotation::None).unwrap();
 
         assert_eq!(r2.data, source.data);
@@ -395,9 +410,16 @@ mod tests {
 
     #[test]
     fn test_invalid_dimensions() {
-        let source = DecodedFrame { data: vec![], width: 0, height: 100 };
+        let source = DecodedFrame {
+            data: vec![],
+            width: 0,
+            height: 100,
+        };
         let result = transform_frame(&source, Flip::None, Rotation::None);
-        assert!(matches!(result, Err(TransformError::InvalidDimensions { .. })));
+        assert!(matches!(
+            result,
+            Err(TransformError::InvalidDimensions { .. })
+        ));
     }
 
     #[test]
@@ -405,13 +427,23 @@ mod tests {
         // Test all 4 rotations × 2 flip states (no flip vs horizontal)
         let source = make_test_frame(4, 3);
         let flips = [Flip::None, Flip::Horizontal, Flip::Vertical, Flip::Both];
-        let rotations = [Rotation::None, Rotation::Clockwise90, Rotation::Clockwise180, Rotation::Clockwise270];
+        let rotations = [
+            Rotation::None,
+            Rotation::Clockwise90,
+            Rotation::Clockwise180,
+            Rotation::Clockwise270,
+        ];
 
         for flip in &flips {
             for rotation in &rotations {
                 let result = transform_frame(&source, *flip, *rotation);
-                assert!(result.is_ok(), "Failed for flip={:?}, rotation={:?}", flip, rotation);
-                
+                assert!(
+                    result.is_ok(),
+                    "Failed for flip={:?}, rotation={:?}",
+                    flip,
+                    rotation
+                );
+
                 let transformed = result.unwrap();
                 // Verify dimensions are correct
                 match rotation {

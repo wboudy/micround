@@ -8,16 +8,16 @@ use std::time::Duration;
 use anyhow::Result;
 use tracing::{info, warn, Level};
 
-mod core;
-mod platform;
 mod capture;
+mod config;
+mod core;
+mod engine;
+mod platform;
 mod process;
 mod render;
 mod ui;
-mod config;
-mod engine;
 
-use core::events::{AppContext, Command, Event, AppState};
+use core::events::{AppContext, AppState, Command, Event};
 use engine::DisplayEngine;
 
 fn main() -> Result<()> {

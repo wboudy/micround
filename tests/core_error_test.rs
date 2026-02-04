@@ -48,14 +48,20 @@ fn test_error_severity_copy() {
 #[test]
 fn test_error_severity_display() {
     assert_eq!(format!("{}", ErrorSeverity::Recoverable), "recoverable");
-    assert_eq!(format!("{}", ErrorSeverity::UserActionable), "user-actionable");
+    assert_eq!(
+        format!("{}", ErrorSeverity::UserActionable),
+        "user-actionable"
+    );
     assert_eq!(format!("{}", ErrorSeverity::Fatal), "fatal");
 }
 
 #[test]
 fn test_error_severity_debug() {
     assert_eq!(format!("{:?}", ErrorSeverity::Recoverable), "Recoverable");
-    assert_eq!(format!("{:?}", ErrorSeverity::UserActionable), "UserActionable");
+    assert_eq!(
+        format!("{:?}", ErrorSeverity::UserActionable),
+        "UserActionable"
+    );
     assert_eq!(format!("{:?}", ErrorSeverity::Fatal), "Fatal");
 }
 
@@ -261,7 +267,9 @@ fn test_capture_error_display_formatting() {
 #[test]
 fn test_capture_error_with_context() {
     let err = CaptureError::NoCameras;
-    let ctx = ErrorContext::new().component("capture").operation("enumerate");
+    let ctx = ErrorContext::new()
+        .component("capture")
+        .operation("enumerate");
 
     let micround_err = err.with_context(ctx);
 
@@ -575,11 +583,20 @@ fn test_micround_error_severity_from_capture() {
     let tests = vec![
         (CaptureError::Timeout(100), ErrorSeverity::Recoverable),
         (CaptureError::Disconnected, ErrorSeverity::Recoverable),
-        (CaptureError::DeviceNotFound("x".into()), ErrorSeverity::UserActionable),
+        (
+            CaptureError::DeviceNotFound("x".into()),
+            ErrorSeverity::UserActionable,
+        ),
         (CaptureError::DeviceBusy, ErrorSeverity::UserActionable),
         (CaptureError::NoCameras, ErrorSeverity::UserActionable),
-        (CaptureError::PermissionDenied("x".into()), ErrorSeverity::UserActionable),
-        (CaptureError::FormatNegotiationFailed("x".into()), ErrorSeverity::UserActionable),
+        (
+            CaptureError::PermissionDenied("x".into()),
+            ErrorSeverity::UserActionable,
+        ),
+        (
+            CaptureError::FormatNegotiationFailed("x".into()),
+            ErrorSeverity::UserActionable,
+        ),
         (CaptureError::Platform("x".into()), ErrorSeverity::Fatal),
     ];
 
@@ -600,10 +617,22 @@ fn test_micround_error_severity_from_capture() {
 #[test]
 fn test_micround_error_severity_from_render() {
     let tests = vec![
-        (RenderError::FrameProcessing("x".into()), ErrorSeverity::Recoverable),
-        (RenderError::DisplayNotFound("x".into()), ErrorSeverity::UserActionable),
-        (RenderError::WallpaperIntegration("x".into()), ErrorSeverity::UserActionable),
-        (RenderError::SurfaceCreation("x".into()), ErrorSeverity::Fatal),
+        (
+            RenderError::FrameProcessing("x".into()),
+            ErrorSeverity::Recoverable,
+        ),
+        (
+            RenderError::DisplayNotFound("x".into()),
+            ErrorSeverity::UserActionable,
+        ),
+        (
+            RenderError::WallpaperIntegration("x".into()),
+            ErrorSeverity::UserActionable,
+        ),
+        (
+            RenderError::SurfaceCreation("x".into()),
+            ErrorSeverity::Fatal,
+        ),
         (RenderError::Gpu("x".into()), ErrorSeverity::Fatal),
         (RenderError::Platform("x".into()), ErrorSeverity::Fatal),
     ];
@@ -625,10 +654,22 @@ fn test_micround_error_severity_from_render() {
 #[test]
 fn test_micround_error_severity_from_config() {
     let tests = vec![
-        (ConfigError::NotFound("x".into()), ErrorSeverity::Recoverable),
-        (ConfigError::ReadFailed("x".into()), ErrorSeverity::UserActionable),
-        (ConfigError::WriteFailed("x".into()), ErrorSeverity::UserActionable),
-        (ConfigError::Invalid("x".into()), ErrorSeverity::UserActionable),
+        (
+            ConfigError::NotFound("x".into()),
+            ErrorSeverity::Recoverable,
+        ),
+        (
+            ConfigError::ReadFailed("x".into()),
+            ErrorSeverity::UserActionable,
+        ),
+        (
+            ConfigError::WriteFailed("x".into()),
+            ErrorSeverity::UserActionable,
+        ),
+        (
+            ConfigError::Invalid("x".into()),
+            ErrorSeverity::UserActionable,
+        ),
     ];
 
     for (source, expected_severity) in tests {
@@ -743,14 +784,29 @@ fn test_error_context_order_preserved() {
 #[test]
 fn test_capture_error_all_variants_display() {
     let errors = vec![
-        (CaptureError::DeviceNotFound("cam".into()), "Camera device not found: cam"),
+        (
+            CaptureError::DeviceNotFound("cam".into()),
+            "Camera device not found: cam",
+        ),
         (CaptureError::DeviceBusy, "Camera device is busy"),
-        (CaptureError::FormatNegotiationFailed("no match".into()), "Failed to negotiate capture format: no match"),
-        (CaptureError::Timeout(100), "Capture timeout: no frame received within 100ms"),
-        (CaptureError::PermissionDenied("video0".into()), "Permission denied: video0"),
+        (
+            CaptureError::FormatNegotiationFailed("no match".into()),
+            "Failed to negotiate capture format: no match",
+        ),
+        (
+            CaptureError::Timeout(100),
+            "Capture timeout: no frame received within 100ms",
+        ),
+        (
+            CaptureError::PermissionDenied("video0".into()),
+            "Permission denied: video0",
+        ),
         (CaptureError::Disconnected, "Camera was disconnected"),
         (CaptureError::NoCameras, "No cameras available"),
-        (CaptureError::Platform("io error".into()), "Platform error: io error"),
+        (
+            CaptureError::Platform("io error".into()),
+            "Platform error: io error",
+        ),
     ];
 
     for (err, expected_substring) in errors {
@@ -767,11 +823,23 @@ fn test_capture_error_all_variants_display() {
 #[test]
 fn test_render_error_all_variants_display() {
     let errors = vec![
-        (RenderError::SurfaceCreation("egl".into()), "Failed to create render surface: egl"),
-        (RenderError::DisplayNotFound("HDMI".into()), "Display not found: HDMI"),
+        (
+            RenderError::SurfaceCreation("egl".into()),
+            "Failed to create render surface: egl",
+        ),
+        (
+            RenderError::DisplayNotFound("HDMI".into()),
+            "Display not found: HDMI",
+        ),
         (RenderError::Gpu("memory".into()), "GPU error: memory"),
-        (RenderError::WallpaperIntegration("wayland".into()), "Wallpaper integration failed: wayland"),
-        (RenderError::FrameProcessing("decode".into()), "Frame processing failed: decode"),
+        (
+            RenderError::WallpaperIntegration("wayland".into()),
+            "Wallpaper integration failed: wayland",
+        ),
+        (
+            RenderError::FrameProcessing("decode".into()),
+            "Frame processing failed: decode",
+        ),
         (RenderError::Platform("x11".into()), "Platform error: x11"),
     ];
 
@@ -789,10 +857,22 @@ fn test_render_error_all_variants_display() {
 #[test]
 fn test_config_error_all_variants_display() {
     let errors = vec![
-        (ConfigError::ReadFailed("permission".into()), "Failed to read config file: permission"),
-        (ConfigError::WriteFailed("disk full".into()), "Failed to write config file: disk full"),
-        (ConfigError::Invalid("bad toml".into()), "Invalid configuration: bad toml"),
-        (ConfigError::NotFound("path/to/file".into()), "Config file not found at: path/to/file"),
+        (
+            ConfigError::ReadFailed("permission".into()),
+            "Failed to read config file: permission",
+        ),
+        (
+            ConfigError::WriteFailed("disk full".into()),
+            "Failed to write config file: disk full",
+        ),
+        (
+            ConfigError::Invalid("bad toml".into()),
+            "Invalid configuration: bad toml",
+        ),
+        (
+            ConfigError::NotFound("path/to/file".into()),
+            "Config file not found at: path/to/file",
+        ),
     ];
 
     for (err, expected_substring) in errors {
@@ -809,11 +889,26 @@ fn test_config_error_all_variants_display() {
 #[test]
 fn test_platform_error_all_variants_display() {
     let errors = vec![
-        (PlatformError::Unsupported("feature".into()), "Operation not supported on this platform: feature"),
-        (PlatformError::CommandFailed("cmd".into()), "Platform command failed: cmd"),
-        (PlatformError::InvalidState("state".into()), "Invalid platform state: state"),
-        (PlatformError::ResourceNotFound("res".into()), "Resource not found: res"),
-        (PlatformError::PermissionDenied("perm".into()), "Permission denied: perm"),
+        (
+            PlatformError::Unsupported("feature".into()),
+            "Operation not supported on this platform: feature",
+        ),
+        (
+            PlatformError::CommandFailed("cmd".into()),
+            "Platform command failed: cmd",
+        ),
+        (
+            PlatformError::InvalidState("state".into()),
+            "Invalid platform state: state",
+        ),
+        (
+            PlatformError::ResourceNotFound("res".into()),
+            "Resource not found: res",
+        ),
+        (
+            PlatformError::PermissionDenied("perm".into()),
+            "Permission denied: perm",
+        ),
     ];
 
     for (err, expected_substring) in errors {

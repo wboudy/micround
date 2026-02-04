@@ -9,9 +9,8 @@
 //! - **Windows**: Registry HKCU\...\Run (TODO)
 //! - **macOS**: SMAppService / LaunchAgent (TODO)
 
-use std::path::PathBuf;
 use std::io;
-
+use std::path::PathBuf;
 
 /// Application name for autostart entries (reserved for future platform support)
 #[allow(dead_code)]
@@ -174,8 +173,8 @@ pub fn set_autostart(enabled: bool) -> AutostartResult<()> {
 #[cfg(target_os = "linux")]
 mod linux {
     use super::*;
-    use std::fs;
     use std::env;
+    use std::fs;
 
     /// Get the XDG autostart directory
     fn autostart_dir() -> AutostartResult<PathBuf> {
@@ -183,9 +182,9 @@ mod linux {
         let config_dir = env::var("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|_| {
-                dirs::home_dir()
-                    .map(|h| h.join(".config"))
-                    .ok_or_else(|| AutostartError::PathError("Cannot determine home directory".into()))
+                dirs::home_dir().map(|h| h.join(".config")).ok_or_else(|| {
+                    AutostartError::PathError("Cannot determine home directory".into())
+                })
             })?;
 
         Ok(config_dir.join("autostart"))
@@ -296,21 +295,21 @@ mod windows {
     pub fn is_enabled() -> AutostartResult<bool> {
         // TODO: Read from registry
         Err(AutostartError::NotSupported(
-            "Windows autostart not yet implemented".into()
+            "Windows autostart not yet implemented".into(),
         ))
     }
 
     pub fn enable() -> AutostartResult<()> {
         // TODO: Write to registry
         Err(AutostartError::NotSupported(
-            "Windows autostart not yet implemented".into()
+            "Windows autostart not yet implemented".into(),
         ))
     }
 
     pub fn disable() -> AutostartResult<()> {
         // TODO: Remove from registry
         Err(AutostartError::NotSupported(
-            "Windows autostart not yet implemented".into()
+            "Windows autostart not yet implemented".into(),
         ))
     }
 }
@@ -330,21 +329,21 @@ mod macos {
     pub fn is_enabled() -> AutostartResult<bool> {
         // TODO: Check SMAppService or LaunchAgent
         Err(AutostartError::NotSupported(
-            "macOS autostart not yet implemented".into()
+            "macOS autostart not yet implemented".into(),
         ))
     }
 
     pub fn enable() -> AutostartResult<()> {
         // TODO: Register with SMAppService or create LaunchAgent
         Err(AutostartError::NotSupported(
-            "macOS autostart not yet implemented".into()
+            "macOS autostart not yet implemented".into(),
         ))
     }
 
     pub fn disable() -> AutostartResult<()> {
         // TODO: Unregister SMAppService or remove LaunchAgent
         Err(AutostartError::NotSupported(
-            "macOS autostart not yet implemented".into()
+            "macOS autostart not yet implemented".into(),
         ))
     }
 }
@@ -356,8 +355,8 @@ mod macos {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::env;
+    use tempfile::TempDir;
 
     #[test]
     fn test_autostart_error_display() {

@@ -29,13 +29,13 @@
 //! ```
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::capture::CaptureBackend;
 use crate::core::{
-    CameraCapability, CameraDevice, CaptureError, CaptureSettings,
-    DeviceId, Frame, NegotiatedFormat, PixelFormat,
+    CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame,
+    NegotiatedFormat, PixelFormat,
 };
 
 /// Frame pattern to generate
@@ -288,7 +288,8 @@ impl SimulatorBackend {
             }
         }
 
-        let timestamp_ns = self.start_time
+        let timestamp_ns = self
+            .start_time
             .map(|t| t.elapsed().as_nanos() as u64)
             .unwrap_or(0);
 
@@ -737,9 +738,9 @@ mod tests {
 
         // Second bar should be yellow (pixels 10-19)
         let idx = 10 * 4;
-        assert_eq!(frame.data[idx], 255);     // R
+        assert_eq!(frame.data[idx], 255); // R
         assert_eq!(frame.data[idx + 1], 255); // G
-        assert_eq!(frame.data[idx + 2], 0);   // B
+        assert_eq!(frame.data[idx + 2], 0); // B
 
         backend.stop().unwrap();
     }
@@ -749,7 +750,11 @@ mod tests {
         let config = SimulatorConfig {
             width: 10,
             height: 10,
-            pattern: FramePattern::SolidColor { r: 100, g: 150, b: 200 },
+            pattern: FramePattern::SolidColor {
+                r: 100,
+                g: 150,
+                b: 200,
+            },
             fps: 1000,
             ..Default::default()
         };
@@ -829,13 +834,13 @@ mod tests {
     fn test_invalid_device_id() {
         let mut backend = SimulatorBackend::new_default();
 
-        let result = backend.open(
-            &DeviceId("invalid:0".into()),
-            CaptureSettings::default(),
-        );
+        let result = backend.open(&DeviceId("invalid:0".into()), CaptureSettings::default());
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), CaptureError::DeviceNotFound(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            CaptureError::DeviceNotFound(_)
+        ));
     }
 
     #[test]

@@ -13,7 +13,7 @@
 use crate::core::ScalingMode;
 use crate::process::decode::DecodedFrame;
 
-use image::{ImageBuffer, Rgba, imageops::FilterType};
+use image::{imageops::FilterType, ImageBuffer, Rgba};
 
 /// Result of a scaling operation
 pub struct ScaledFrame {
@@ -40,12 +40,22 @@ pub struct Region {
 
 impl Region {
     pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     /// Create a region covering the full dimensions
     pub fn full(width: u32, height: u32) -> Self {
-        Self { x: 0, y: 0, width, height }
+        Self {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        }
     }
 }
 
@@ -152,28 +162,20 @@ fn scale_fit(
     dst_height: u32,
     config: &ScaleConfig,
 ) -> Result<ScaledFrame, ScaleError> {
-    let (scale_w, scale_h) = calculate_fit_scale(
-        source.width, source.height,
-        dst_width, dst_height,
-    );
+    let (scale_w, scale_h) =
+        calculate_fit_scale(source.width, source.height, dst_width, dst_height);
 
     // Calculate scaled dimensions
     let scaled_width = ((source.width as f64) * scale_w).round() as u32;
     let scaled_height = ((source.height as f64) * scale_h).round() as u32;
 
     // Scale the source image
-    let src_img = ImageBuffer::<Rgba<u8>, _>::from_raw(
-        source.width,
-        source.height,
-        source.data.clone(),
-    ).ok_or_else(|| ScaleError::ImageError("Failed to create source image".into()))?;
+    let src_img =
+        ImageBuffer::<Rgba<u8>, _>::from_raw(source.width, source.height, source.data.clone())
+            .ok_or_else(|| ScaleError::ImageError("Failed to create source image".into()))?;
 
-    let scaled = image::imageops::resize(
-        &src_img,
-        scaled_width,
-        scaled_height,
-        config.filter.into(),
-    );
+    let scaled =
+        image::imageops::resize(&src_img, scaled_width, scaled_height, config.filter.into());
 
     // Create output with background
     let mut output = vec![0u8; (dst_width * dst_height * 4) as usize];
@@ -210,28 +212,20 @@ fn scale_fill(
     dst_height: u32,
     config: &ScaleConfig,
 ) -> Result<ScaledFrame, ScaleError> {
-    let (scale_w, scale_h) = calculate_fill_scale(
-        source.width, source.height,
-        dst_width, dst_height,
-    );
+    let (scale_w, scale_h) =
+        calculate_fill_scale(source.width, source.height, dst_width, dst_height);
 
     // Calculate dimensions needed to cover the target
     let scaled_width = ((source.width as f64) * scale_w).round() as u32;
     let scaled_height = ((source.height as f64) * scale_h).round() as u32;
 
     // Scale the source image
-    let src_img = ImageBuffer::<Rgba<u8>, _>::from_raw(
-        source.width,
-        source.height,
-        source.data.clone(),
-    ).ok_or_else(|| ScaleError::ImageError("Failed to create source image".into()))?;
+    let src_img =
+        ImageBuffer::<Rgba<u8>, _>::from_raw(source.width, source.height, source.data.clone())
+            .ok_or_else(|| ScaleError::ImageError("Failed to create source image".into()))?;
 
-    let scaled = image::imageops::resize(
-        &src_img,
-        scaled_width,
-        scaled_height,
-        config.filter.into(),
-    );
+    let scaled =
+        image::imageops::resize(&src_img, scaled_width, scaled_height, config.filter.into());
 
     // Calculate crop region (center the crop)
     let crop_x = scaled_width.saturating_sub(dst_width) / 2;
@@ -271,18 +265,11 @@ fn scale_stretch(
     dst_height: u32,
     config: &ScaleConfig,
 ) -> Result<ScaledFrame, ScaleError> {
-    let src_img = ImageBuffer::<Rgba<u8>, _>::from_raw(
-        source.width,
-        source.height,
-        source.data.clone(),
-    ).ok_or_else(|| ScaleError::ImageError("Failed to create source image".into()))?;
+    let src_img =
+        ImageBuffer::<Rgba<u8>, _>::from_raw(source.width, source.height, source.data.clone())
+            .ok_or_else(|| ScaleError::ImageError("Failed to create source image".into()))?;
 
-    let scaled = image::imageops::resize(
-        &src_img,
-        dst_width,
-        dst_height,
-        config.filter.into(),
-    );
+    let scaled = image::imageops::resize(&src_img, dst_width, dst_height, config.filter.into());
 
     Ok(ScaledFrame {
         data: scaled.into_raw(),
@@ -304,19 +291,20 @@ fn scale_center(
     fill_background(&mut output, dst_width, dst_height, config.background);
 
     // Calculate positioning
-    let (src_x, src_y, src_w, src_h, dst_x, dst_y) = if source.width <= dst_width && source.height <= dst_height {
-        // Source fits, center it
-        let offset_x = (dst_width - source.width) / 2;
-        let offset_y = (dst_height - source.height) / 2;
-        (0, 0, source.width, source.height, offset_x, offset_y)
-    } else {
-        // Source larger, crop center
-        let crop_x = source.width.saturating_sub(dst_width) / 2;
-        let crop_y = source.height.saturating_sub(dst_height) / 2;
-        let copy_w = source.width.min(dst_width);
-        let copy_h = source.height.min(dst_height);
-        (crop_x, crop_y, copy_w, copy_h, 0, 0)
-    };
+    let (src_x, src_y, src_w, src_h, dst_x, dst_y) =
+        if source.width <= dst_width && source.height <= dst_height {
+            // Source fits, center it
+            let offset_x = (dst_width - source.width) / 2;
+            let offset_y = (dst_height - source.height) / 2;
+            (0, 0, source.width, source.height, offset_x, offset_y)
+        } else {
+            // Source larger, crop center
+            let crop_x = source.width.saturating_sub(dst_width) / 2;
+            let crop_y = source.height.saturating_sub(dst_height) / 2;
+            let copy_w = source.width.min(dst_width);
+            let copy_h = source.height.min(dst_height);
+            (crop_x, crop_y, copy_w, copy_h, 0, 0)
+        };
 
     // Copy the region
     for row in 0..src_h.min(dst_height) {
@@ -324,7 +312,9 @@ fn scale_center(
         let dst_row_start = ((dst_y + row) * dst_width + dst_x) as usize * 4;
         let row_bytes = src_w.min(dst_width - dst_x) as usize * 4;
 
-        if src_row_start + row_bytes <= source.data.len() && dst_row_start + row_bytes <= output.len() {
+        if src_row_start + row_bytes <= source.data.len()
+            && dst_row_start + row_bytes <= output.len()
+        {
             output[dst_row_start..dst_row_start + row_bytes]
                 .copy_from_slice(&source.data[src_row_start..src_row_start + row_bytes]);
         }
@@ -438,20 +428,27 @@ mod tests {
         for y in 0..height {
             for x in 0..width {
                 let idx = ((y * width + x) * 4) as usize;
-                data[idx] = (x % 256) as u8;     // R
+                data[idx] = (x % 256) as u8; // R
                 data[idx + 1] = (y % 256) as u8; // G
-                data[idx + 2] = 128;             // B
-                data[idx + 3] = 255;             // A
+                data[idx + 2] = 128; // B
+                data[idx + 3] = 255; // A
             }
         }
-        DecodedFrame { data, width, height }
+        DecodedFrame {
+            data,
+            width,
+            height,
+        }
     }
 
     #[test]
     fn test_scale_fit_wider_source() {
         // 16:9 source → 4:3 target (letterbox on top/bottom)
         let source = make_test_frame(160, 90);
-        let config = ScaleConfig { mode: ScalingMode::Fit, ..Default::default() };
+        let config = ScaleConfig {
+            mode: ScalingMode::Fit,
+            ..Default::default()
+        };
 
         let result = scale_frame(&source, 120, 90, &config);
         assert!(result.is_ok());
@@ -466,7 +463,10 @@ mod tests {
     fn test_scale_fit_taller_source() {
         // 4:3 source → 16:9 target (letterbox on sides)
         let source = make_test_frame(120, 90);
-        let config = ScaleConfig { mode: ScalingMode::Fit, ..Default::default() };
+        let config = ScaleConfig {
+            mode: ScalingMode::Fit,
+            ..Default::default()
+        };
 
         let result = scale_frame(&source, 160, 90, &config);
         assert!(result.is_ok());
@@ -479,7 +479,10 @@ mod tests {
     #[test]
     fn test_scale_fill() {
         let source = make_test_frame(160, 90);
-        let config = ScaleConfig { mode: ScalingMode::Fill, ..Default::default() };
+        let config = ScaleConfig {
+            mode: ScalingMode::Fill,
+            ..Default::default()
+        };
 
         let result = scale_frame(&source, 120, 90, &config);
         assert!(result.is_ok());
@@ -494,7 +497,10 @@ mod tests {
     #[test]
     fn test_scale_stretch() {
         let source = make_test_frame(100, 100);
-        let config = ScaleConfig { mode: ScalingMode::Stretch, ..Default::default() };
+        let config = ScaleConfig {
+            mode: ScalingMode::Stretch,
+            ..Default::default()
+        };
 
         let result = scale_frame(&source, 200, 100, &config);
         assert!(result.is_ok());
@@ -508,7 +514,10 @@ mod tests {
     #[test]
     fn test_scale_center_smaller_source() {
         let source = make_test_frame(50, 50);
-        let config = ScaleConfig { mode: ScalingMode::Center, ..Default::default() };
+        let config = ScaleConfig {
+            mode: ScalingMode::Center,
+            ..Default::default()
+        };
 
         let result = scale_frame(&source, 100, 100, &config);
         assert!(result.is_ok());
@@ -528,7 +537,10 @@ mod tests {
     #[test]
     fn test_scale_center_larger_source() {
         let source = make_test_frame(200, 200);
-        let config = ScaleConfig { mode: ScalingMode::Center, ..Default::default() };
+        let config = ScaleConfig {
+            mode: ScalingMode::Center,
+            ..Default::default()
+        };
 
         let result = scale_frame(&source, 100, 100, &config);
         assert!(result.is_ok());
@@ -545,11 +557,18 @@ mod tests {
 
     #[test]
     fn test_invalid_source_dimensions() {
-        let source = DecodedFrame { data: vec![], width: 0, height: 100 };
+        let source = DecodedFrame {
+            data: vec![],
+            width: 0,
+            height: 100,
+        };
         let config = ScaleConfig::default();
 
         let result = scale_frame(&source, 100, 100, &config);
-        assert!(matches!(result, Err(ScaleError::InvalidSourceDimensions { .. })));
+        assert!(matches!(
+            result,
+            Err(ScaleError::InvalidSourceDimensions { .. })
+        ));
     }
 
     #[test]
@@ -558,7 +577,10 @@ mod tests {
         let config = ScaleConfig::default();
 
         let result = scale_frame(&source, 0, 100, &config);
-        assert!(matches!(result, Err(ScaleError::InvalidTargetDimensions { .. })));
+        assert!(matches!(
+            result,
+            Err(ScaleError::InvalidTargetDimensions { .. })
+        ));
     }
 
     #[test]
@@ -615,8 +637,17 @@ mod tests {
 
     #[test]
     fn test_filter_conversion() {
-        assert!(matches!(FilterType::from(ScaleFilter::Nearest), FilterType::Nearest));
-        assert!(matches!(FilterType::from(ScaleFilter::Bilinear), FilterType::Triangle));
-        assert!(matches!(FilterType::from(ScaleFilter::Lanczos), FilterType::Lanczos3));
+        assert!(matches!(
+            FilterType::from(ScaleFilter::Nearest),
+            FilterType::Nearest
+        ));
+        assert!(matches!(
+            FilterType::from(ScaleFilter::Bilinear),
+            FilterType::Triangle
+        ));
+        assert!(matches!(
+            FilterType::from(ScaleFilter::Lanczos),
+            FilterType::Lanczos3
+        ));
     }
 }

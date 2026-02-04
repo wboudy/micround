@@ -12,25 +12,20 @@
 //! ```
 
 #[cfg(all(target_os = "windows", feature = "windows"))]
-use windows::{
-    Win32::{
-        Foundation::HWND,
-        Graphics::{
-            Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL},
-            Direct3D11::{
-                D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView,
-                ID3D11Texture2D, D3D11_BIND_SHADER_RESOURCE,
-                D3D11_BOX, D3D11_CPU_ACCESS_WRITE, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-                D3D11_CREATE_DEVICE_DEBUG, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_WRITE_DISCARD,
-                D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC,
-                D3D11_USAGE_DYNAMIC,
-            },
-            Dxgi::{
-                CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1,
-                DXGI_PRESENT, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1,
-                DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT,
-            },
-            Dxgi::Common::{DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC},
+use windows::Win32::{
+    Foundation::HWND,
+    Graphics::{
+        Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_11_0},
+        Direct3D11::{
+            D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11RenderTargetView,
+            ID3D11Texture2D, D3D11_BIND_SHADER_RESOURCE, D3D11_BOX, D3D11_CPU_ACCESS_WRITE,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_DEBUG, D3D11_MAPPED_SUBRESOURCE,
+            D3D11_MAP_WRITE_DISCARD, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DYNAMIC,
+        },
+        Dxgi::Common::{DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC},
+        Dxgi::{
+            CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1, DXGI_PRESENT, DXGI_SCALING_STRETCH,
+            DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT,
         },
     },
 };
@@ -79,9 +74,9 @@ impl D3D11Renderer {
             };
 
             D3D11CreateDevice(
-                None,                    // Default adapter
+                None, // Default adapter
                 D3D_DRIVER_TYPE_HARDWARE,
-                None,                    // No software device
+                None, // No software device
                 flags,
                 Some(&feature_levels),
                 D3D11_SDK_VERSION,
@@ -91,8 +86,10 @@ impl D3D11Renderer {
             )
             .map_err(|e| RenderError::Platform(format!("D3D11CreateDevice failed: {}", e)))?;
 
-            let device = device.ok_or_else(|| RenderError::Platform("D3D11 device is None".into()))?;
-            let context = context.ok_or_else(|| RenderError::Platform("D3D11 context is None".into()))?;
+            let device =
+                device.ok_or_else(|| RenderError::Platform("D3D11 device is None".into()))?;
+            let context =
+                context.ok_or_else(|| RenderError::Platform("D3D11 context is None".into()))?;
 
             tracing::debug!("Created D3D11 device, feature level: {:?}", feature_level);
 
@@ -121,9 +118,15 @@ impl D3D11Renderer {
             // Create swap chain for HWND
             let swap_chain = factory
                 .CreateSwapChainForHwnd(&device, hwnd, &swap_chain_desc, None, None)
-                .map_err(|e| RenderError::Platform(format!("CreateSwapChainForHwnd failed: {}", e)))?;
+                .map_err(|e| {
+                    RenderError::Platform(format!("CreateSwapChainForHwnd failed: {}", e))
+                })?;
 
-            tracing::debug!("Created DXGI swap chain ({}x{}) with FLIP_DISCARD", width, height);
+            tracing::debug!(
+                "Created DXGI swap chain ({}x{}) with FLIP_DISCARD",
+                width,
+                height
+            );
 
             // Get back buffer and create render target view
             let back_buffer: ID3D11Texture2D = swap_chain
@@ -132,7 +135,9 @@ impl D3D11Renderer {
 
             let render_target = device
                 .CreateRenderTargetView(&back_buffer, None)
-                .map_err(|e| RenderError::Platform(format!("CreateRenderTargetView failed: {}", e)))?;
+                .map_err(|e| {
+                    RenderError::Platform(format!("CreateRenderTargetView failed: {}", e))
+                })?;
 
             // Create staging texture for uploading CPU data
             let staging_desc = D3D11_TEXTURE2D_DESC {
@@ -151,12 +156,16 @@ impl D3D11Renderer {
                 MiscFlags: 0,
             };
 
-            let staging_texture = device
-                .CreateTexture2D(&staging_desc, None)
-                .map_err(|e| RenderError::Platform(format!("CreateTexture2D (staging) failed: {}", e)))?;
+            let staging_texture = device.CreateTexture2D(&staging_desc, None).map_err(|e| {
+                RenderError::Platform(format!("CreateTexture2D (staging) failed: {}", e))
+            })?;
 
-            tracing::info!("D3D11 renderer initialized: {}x{} @ feature level {:?}",
-                width, height, feature_level);
+            tracing::info!(
+                "D3D11 renderer initialized: {}x{} @ feature level {:?}",
+                width,
+                height,
+                feature_level
+            );
 
             Ok(Self {
                 device,
@@ -177,7 +186,13 @@ impl D3D11Renderer {
             // Map the staging texture for CPU write
             let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
             self.context
-                .Map(&self.staging_texture, 0, D3D11_MAP_WRITE_DISCARD, 0, Some(&mut mapped))
+                .Map(
+                    &self.staging_texture,
+                    0,
+                    D3D11_MAP_WRITE_DISCARD,
+                    0,
+                    Some(&mut mapped),
+                )
                 .map_err(|e| RenderError::Platform(format!("Map staging texture failed: {}", e)))?;
 
             // Copy frame data (convert RGBA to BGRA as we copy)
@@ -196,7 +211,9 @@ impl D3D11Renderer {
                 let dst_row = &mut dst[y * dst_pitch..y * dst_pitch + src_pitch.min(dst_pitch)];
 
                 // Copy with RGBA -> BGRA conversion
-                for (chunk_dst, chunk_src) in dst_row.chunks_exact_mut(4).zip(src_row.chunks_exact(4)) {
+                for (chunk_dst, chunk_src) in
+                    dst_row.chunks_exact_mut(4).zip(src_row.chunks_exact(4))
+                {
                     chunk_dst[0] = chunk_src[2]; // B
                     chunk_dst[1] = chunk_src[1]; // G
                     chunk_dst[2] = chunk_src[0]; // R
@@ -207,7 +224,8 @@ impl D3D11Renderer {
             self.context.Unmap(&self.staging_texture, 0);
 
             // Get back buffer for copy destination
-            let back_buffer: ID3D11Texture2D = self.swap_chain
+            let back_buffer: ID3D11Texture2D = self
+                .swap_chain
                 .GetBuffer(0)
                 .map_err(|e| RenderError::Platform(format!("GetBuffer failed: {}", e)))?;
 
@@ -257,8 +275,13 @@ impl D3D11Renderer {
         }
 
         unsafe {
-            tracing::debug!("D3D11 resize: {}x{} -> {}x{}",
-                self.width, self.height, new_width, new_height);
+            tracing::debug!(
+                "D3D11 resize: {}x{} -> {}x{}",
+                self.width,
+                self.height,
+                new_width,
+                new_height
+            );
 
             // Step 1: Create new staging texture first (doesn't require releasing old resources)
             let staging_desc = D3D11_TEXTURE2D_DESC {
@@ -277,16 +300,19 @@ impl D3D11Renderer {
                 MiscFlags: 0,
             };
 
-            let new_staging_texture = self.device
-                .CreateTexture2D(&staging_desc, None)
-                .map_err(|e| RenderError::Platform(format!("CreateTexture2D after resize failed: {}", e)))?;
+            let new_staging_texture =
+                self.device
+                    .CreateTexture2D(&staging_desc, None)
+                    .map_err(|e| {
+                        RenderError::Platform(format!("CreateTexture2D after resize failed: {}", e))
+                    })?;
 
             // Step 2: Now we need to resize the swap chain, which requires releasing
             // the render target first. Take ownership of the old render target.
             let old_render_target = std::mem::replace(
                 &mut self.render_target,
                 // Temporarily clone to maintain valid state during resize
-                self.render_target.clone()
+                self.render_target.clone(),
             );
             // Drop the old reference to release the back buffer
             drop(old_render_target);
@@ -303,13 +329,19 @@ impl D3D11Renderer {
                 .map_err(|e| RenderError::Platform(format!("ResizeBuffers failed: {}", e)))?;
 
             // Step 4: Recreate render target view from new back buffer
-            let back_buffer: ID3D11Texture2D = self.swap_chain
-                .GetBuffer(0)
-                .map_err(|e| RenderError::Platform(format!("GetBuffer after resize failed: {}", e)))?;
+            let back_buffer: ID3D11Texture2D = self.swap_chain.GetBuffer(0).map_err(|e| {
+                RenderError::Platform(format!("GetBuffer after resize failed: {}", e))
+            })?;
 
-            let new_render_target = self.device
+            let new_render_target = self
+                .device
                 .CreateRenderTargetView(&back_buffer, None)
-                .map_err(|e| RenderError::Platform(format!("CreateRenderTargetView after resize failed: {}", e)))?;
+                .map_err(|e| {
+                    RenderError::Platform(format!(
+                        "CreateRenderTargetView after resize failed: {}",
+                        e
+                    ))
+                })?;
 
             // Step 5: All resources created successfully - commit the changes
             self.render_target = new_render_target;
@@ -345,15 +377,21 @@ pub struct D3D11Renderer {
 #[cfg(not(all(target_os = "windows", feature = "windows")))]
 impl D3D11Renderer {
     pub fn new(_hwnd: (), _width: u32, _height: u32) -> Result<Self, RenderError> {
-        Err(RenderError::Platform("D3D11 not available on this platform".into()))
+        Err(RenderError::Platform(
+            "D3D11 not available on this platform".into(),
+        ))
     }
 
     pub fn render(&self, _frame: &ProcessedFrame) -> Result<(), RenderError> {
-        Err(RenderError::Platform("D3D11 not available on this platform".into()))
+        Err(RenderError::Platform(
+            "D3D11 not available on this platform".into(),
+        ))
     }
 
     pub fn resize(&mut self, _width: u32, _height: u32) -> Result<(), RenderError> {
-        Err(RenderError::Platform("D3D11 not available on this platform".into()))
+        Err(RenderError::Platform(
+            "D3D11 not available on this platform".into(),
+        ))
     }
 
     pub fn dimensions(&self) -> (u32, u32) {

@@ -51,21 +51,20 @@ use windows::{
     Win32::{
         Foundation::{BOOL, HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::Gdi::{
-            BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC,
-            DeleteObject, EndPaint, GetDC, ReleaseDC, SelectObject, SetDIBitsToDevice,
-            BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, PAINTSTRUCT,
-            RGBQUAD, SRCCOPY,
+            BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject,
+            EndPaint, GetDC, ReleaseDC, SelectObject, SetDIBitsToDevice, BITMAPINFO,
+            BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, PAINTSTRUCT, RGBQUAD, SRCCOPY,
         },
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows,
             FindWindowExW, FindWindowW, GetClassNameW, GetClientRect, GetWindowLongPtrW,
-            PeekMessageW, RegisterClassExW, SendMessageTimeoutW, SetParent,
-            SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW,
-            CS_VREDRAW, CW_USEDEFAULT, GWLP_USERDATA, HWND_BOTTOM, MSG, PM_REMOVE,
-            SMTO_NORMAL, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
-            WINDOW_EX_STYLE, WM_DESTROY, WM_PAINT, WNDCLASSEXW, WS_CHILD, WS_EX_LAYERED,
-            WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
+            PeekMessageW, RegisterClassExW, SendMessageTimeoutW, SetParent, SetWindowLongPtrW,
+            SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
+            GWLP_USERDATA, HWND_BOTTOM, MSG, PM_REMOVE, SMTO_NORMAL, SWP_NOACTIVATE, SWP_NOMOVE,
+            SWP_NOSIZE, SWP_NOZORDER, SW_SHOW, WINDOW_EX_STYLE, WM_DESTROY, WM_PAINT, WNDCLASSEXW,
+            WS_CHILD, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
+            WS_POPUP, WS_VISIBLE,
         },
     },
 };
@@ -285,7 +284,12 @@ impl WindowsRenderer {
             let window = CreateWindowExW(
                 WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
                 PCWSTR::from_raw(class_name.as_ptr()),
-                PCWSTR::from_raw("Micround Wallpaper\0".encode_utf16().collect::<Vec<_>>().as_ptr()),
+                PCWSTR::from_raw(
+                    "Micround Wallpaper\0"
+                        .encode_utf16()
+                        .collect::<Vec<_>>()
+                        .as_ptr(),
+                ),
                 WS_CHILD | WS_VISIBLE,
                 0,
                 0,
@@ -334,8 +338,7 @@ impl WindowsRenderer {
             }
 
             // Create compatible bitmap
-            let bitmap =
-                CreateCompatibleBitmap(hdc, self.width as i32, self.height as i32);
+            let bitmap = CreateCompatibleBitmap(hdc, self.width as i32, self.height as i32);
             if bitmap.0 == 0 {
                 DeleteDC(mem_dc);
                 ReleaseDC(window, hdc);
@@ -534,7 +537,10 @@ impl WallpaperRenderer for WindowsRenderer {
                                     tracing::info!("D3D11 device recovered successfully");
                                 }
                                 Err(e) => {
-                                    tracing::error!("D3D11 recovery failed, falling back to GDI: {}", e);
+                                    tracing::error!(
+                                        "D3D11 recovery failed, falling back to GDI: {}",
+                                        e
+                                    );
                                     self.use_d3d11 = false;
                                     // Initialize GDI fallback
                                     self.create_back_buffer(window)?;
@@ -756,7 +762,10 @@ mod tests {
         // Initialize
         let result = renderer.init(&DisplayId("test".to_string()));
         if result.is_err() {
-            eprintln!("Windows init failed (may need desktop session): {:?}", result);
+            eprintln!(
+                "Windows init failed (may need desktop session): {:?}",
+                result
+            );
             return;
         }
 

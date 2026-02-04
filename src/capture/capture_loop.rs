@@ -24,8 +24,8 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc;
 
-use crate::core::{CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat};
 use crate::capture::CaptureBackend;
+use crate::core::{CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat};
 
 /// Capacity of the frame delivery channel
 /// Small to minimize latency, but enough to handle brief processing delays
@@ -138,9 +138,9 @@ impl CaptureLoopHandle {
     pub fn join(mut self) -> Result<(), CaptureError> {
         self.stop();
         if let Some(handle) = self.thread_handle.take() {
-            handle.join().map_err(|_| {
-                CaptureError::Platform("Capture thread panicked".into())
-            })?
+            handle
+                .join()
+                .map_err(|_| CaptureError::Platform("Capture thread panicked".into()))?
         } else {
             Ok(())
         }
@@ -214,13 +214,21 @@ pub fn start_capture_loop(
     // Open the camera and get negotiated format
     let format = match backend.open(&device_id, settings) {
         Ok(f) => f,
-        Err(e) => return Err(CaptureLoopError { error: e, backend: Some(backend) }),
+        Err(e) => {
+            return Err(CaptureLoopError {
+                error: e,
+                backend: Some(backend),
+            })
+        }
     };
 
     // Start capture
     if let Err(e) = backend.start() {
         backend.close();
-        return Err(CaptureLoopError { error: e, backend: Some(backend) });
+        return Err(CaptureLoopError {
+            error: e,
+            backend: Some(backend),
+        });
     }
 
     // Create frame channel
@@ -241,9 +249,8 @@ pub fn start_capture_loop(
     // exhaustion (thread limit exceeded), which is unrecoverable anyway.
     let thread_handle = match thread::Builder::new()
         .name("micround-capture".into())
-        .spawn(move || {
-            capture_thread_main(backend, tx, stop_signal_clone, metrics_clone)
-        }) {
+        .spawn(move || capture_thread_main(backend, tx, stop_signal_clone, metrics_clone))
+    {
         Ok(handle) => handle,
         Err(e) => {
             // Backend is lost here, but this is extremely rare (thread limit exceeded)

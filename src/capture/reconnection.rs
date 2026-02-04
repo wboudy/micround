@@ -37,9 +37,9 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use crate::capture::enumerator::{CameraEvent, CameraEventHandler};
+use crate::capture::CaptureManager;
 use crate::core::events::{Event, EventBus};
 use crate::core::{CaptureError, CaptureSettings, DeviceId, NegotiatedFormat};
-use crate::capture::CaptureManager;
 
 // ============================================================================
 // Reconnection State
@@ -66,10 +66,7 @@ pub enum ReconnectionState {
 impl ReconnectionState {
     /// Check if actively trying to reconnect
     pub fn is_reconnecting(&self) -> bool {
-        matches!(
-            self,
-            Self::WaitingForDevice { .. } | Self::Reconnecting
-        )
+        matches!(self, Self::WaitingForDevice { .. } | Self::Reconnecting)
     }
 
     /// Check if user intervention is needed
@@ -149,9 +146,7 @@ impl DeviceMatchStrategy {
                 name: match_name,
                 width,
                 height,
-            } => {
-                name == match_name && caps.iter().any(|(w, h)| w == width && h == height)
-            }
+            } => name == match_name && caps.iter().any(|(w, h)| w == width && h == height),
             Self::Any => true,
         }
     }
@@ -278,7 +273,8 @@ impl ReconnectionManager {
         };
 
         // Publish event
-        self.event_bus.publish(Event::CameraDisconnected { device_id });
+        self.event_bus
+            .publish(Event::CameraDisconnected { device_id });
     }
 
     /// Handle a camera connected event during reconnection
@@ -330,7 +326,11 @@ impl ReconnectionManager {
         manager: &CaptureManager,
         device_id: &DeviceId,
     ) -> Result<NegotiatedFormat, CaptureError> {
-        let settings = self.capture_settings.read().unwrap().clone()
+        let settings = self
+            .capture_settings
+            .read()
+            .unwrap()
+            .clone()
             .unwrap_or_default();
 
         let mut attempts = self.reconnect_attempts.write().unwrap();
@@ -355,7 +355,9 @@ impl ReconnectionManager {
                 );
                 *self.state.write().unwrap() = ReconnectionState::Connected;
                 *self.wait_started.write().unwrap() = None; // Clear wait timer
-                self.event_bus.publish(Event::CameraReconnected { device_id: device_id.clone() });
+                self.event_bus.publish(Event::CameraReconnected {
+                    device_id: device_id.clone(),
+                });
                 Ok(format)
             }
             Err(e) => {
@@ -368,7 +370,9 @@ impl ReconnectionManager {
                 if *attempts >= self.config.max_reconnect_attempts {
                     *self.state.write().unwrap() = ReconnectionState::Failed;
                     *self.wait_started.write().unwrap() = None; // Clear wait timer
-                    self.event_bus.publish(Event::CameraReconnectionFailed { device_id: device_id.clone() });
+                    self.event_bus.publish(Event::CameraReconnectionFailed {
+                        device_id: device_id.clone(),
+                    });
                 } else {
                     // Go back to waiting state for another attempt
                     // Keep existing wait_started for cumulative timeout tracking
@@ -398,7 +402,8 @@ impl ReconnectionManager {
                     *self.state.write().unwrap() = ReconnectionState::TimedOut;
                     *self.wait_started.write().unwrap() = None;
                     if let Some(device_id) = self.target_device_id.read().unwrap().clone() {
-                        self.event_bus.publish(Event::CameraReconnectionTimedOut { device_id });
+                        self.event_bus
+                            .publish(Event::CameraReconnectionTimedOut { device_id });
                     }
                     return true;
                 }
@@ -541,11 +546,7 @@ mod tests {
 
         // Trigger disconnection
         let settings = CaptureSettings::default();
-        manager.on_camera_disconnected(
-            DeviceId("test".into()),
-            "Test Camera".into(),
-            settings,
-        );
+        manager.on_camera_disconnected(DeviceId("test".into()), "Test Camera".into(), settings);
 
         // Should now be waiting
         assert!(manager.is_reconnecting());
@@ -568,11 +569,7 @@ mod tests {
         let settings = CaptureSettings::default();
 
         // Start reconnection flow
-        manager.on_camera_disconnected(
-            device_id.clone(),
-            "Test Camera".into(),
-            settings,
-        );
+        manager.on_camera_disconnected(device_id.clone(), "Test Camera".into(), settings);
 
         // Device returns
         let matched = manager.on_camera_connected(&device_id, "Test Camera");
@@ -593,11 +590,7 @@ mod tests {
         let settings = CaptureSettings::default();
 
         // Start reconnection flow
-        manager.on_camera_disconnected(
-            device_id,
-            "Test Camera".into(),
-            settings,
-        );
+        manager.on_camera_disconnected(device_id, "Test Camera".into(), settings);
 
         // Different device appears
         let matched = manager.on_camera_connected(&DeviceId("other".into()), "Other Camera");
@@ -641,11 +634,7 @@ mod tests {
 
         // Start waiting
         let settings = CaptureSettings::default();
-        manager.on_camera_disconnected(
-            DeviceId("test".into()),
-            "Test".into(),
-            settings,
-        );
+        manager.on_camera_disconnected(DeviceId("test".into()), "Test".into(), settings);
 
         // Initially active polling
         assert_eq!(manager.current_poll_interval(), Duration::from_millis(100));

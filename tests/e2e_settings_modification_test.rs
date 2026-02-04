@@ -14,16 +14,16 @@ use std::time::Duration;
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern},
 };
 use micround::core::{
-    AppContext, Command, DisplayId, CaptureSettings, ScalingMode, Rotation, Flip,
+    AppContext, CaptureSettings, Command, DisplayId, Flip, Rotation, ScalingMode,
 };
 use micround::process::{process_frame, ProcessorConfig};
 use micround::render::{
-    WallpaperRenderer,
     simulator::{DisplaySimulator, DisplaySimulatorConfig},
+    WallpaperRenderer,
 };
 
 // ============================================================================
@@ -45,15 +45,25 @@ fn test_scaling_change_during_capture() {
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
     test_step!(logger, "Setting up display");
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig::hd());
-    display.init(&DisplayId("test:0".into())).expect("init display");
+    display
+        .init(&DisplayId("test:0".into()))
+        .expect("init display");
     test_step_ok!(logger);
 
     // Test each scaling mode
@@ -71,10 +81,14 @@ fn test_scaling_change_during_capture() {
     let processed_fit = process_frame(&frame2, &config_fit).expect("process");
     display.render(&processed_fit).expect("render");
     test_assert!(logger, display.frame_count() == 2, "Fit frame rendered");
-    
+
     // With Fit mode, the frame should be letterboxed
     let fit_frame = display.last_frame().expect("get frame");
-    test_assert!(logger, fit_frame.width == 1920 && fit_frame.height == 1080, "Output dimensions correct");
+    test_assert!(
+        logger,
+        fit_frame.width == 1920 && fit_frame.height == 1080,
+        "Output dimensions correct"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -94,16 +108,30 @@ fn test_rapid_scaling_changes() {
 
     test_step!(logger, "Starting capture pipeline");
     let mut capture = SimulatorBackend::new(SimulatorConfig {
-        width: 640, height: 480, fps: 1000,
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        width: 640,
+        height: 480,
+        fps: 1000,
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
-    
+
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
         frame_history_size: 100,
         ..Default::default()
@@ -114,7 +142,7 @@ fn test_rapid_scaling_changes() {
     test_step!(logger, "Processing frames with alternating scaling modes");
     let modes = [ScalingMode::Fill, ScalingMode::Fit, ScalingMode::Stretch];
     let mut frame_count = 0;
-    
+
     for _ in 0..9 {
         let frame = capture.next_frame().expect("frame");
         let mode = modes[frame_count % 3];
@@ -123,7 +151,7 @@ fn test_rapid_scaling_changes() {
         display.render(&processed).expect("render");
         frame_count += 1;
     }
-    
+
     test_assert!(logger, display.frame_count() == 9, "All 9 frames rendered");
     test_step_ok!(logger);
 
@@ -156,42 +184,60 @@ fn test_rotation_change_during_capture() {
 
     test_step!(logger, "Starting capture pipeline");
     let mut capture = SimulatorBackend::new(SimulatorConfig {
-        width: 640, height: 480, fps: 1000,
+        width: 640,
+        height: 480,
+        fps: 1000,
         pattern: FramePattern::Checkerboard { size: 32 },
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
     test_step!(logger, "Processing with no rotation");
     let frame = capture.next_frame().expect("frame");
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
-        width: 1920, height: 1080, ..Default::default()
+        width: 1920,
+        height: 1080,
+        ..Default::default()
     });
     display.init(&DisplayId("test:0".into())).expect("init");
-    
+
     let config = ProcessorConfig::new(1920, 1080).with_rotation(Rotation::None);
     let processed = process_frame(&frame, &config).expect("process");
     display.render(&processed).expect("render");
-    test_assert!(logger, display.frame_count() == 1, "No rotation frame rendered");
+    test_assert!(
+        logger,
+        display.frame_count() == 1,
+        "No rotation frame rendered"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Applying 90 degree rotation");
     let frame2 = capture.next_frame().expect("frame");
     // For 90 degree rotation, swap target dimensions
     let mut display90 = DisplaySimulator::new(DisplaySimulatorConfig {
-        width: 1080, height: 1920, ..Default::default()
+        width: 1080,
+        height: 1920,
+        ..Default::default()
     });
     display90.init(&DisplayId("test:90".into())).expect("init");
-    
+
     let config90 = ProcessorConfig::new(1080, 1920).with_rotation(Rotation::Clockwise90);
     let processed90 = process_frame(&frame2, &config90).expect("process");
     display90.render(&processed90).expect("render");
-    
+
     let rotated = display90.last_frame().expect("get frame");
     test_assert!(logger, rotated.width == 1080, "Rotated width");
     test_assert!(logger, rotated.height == 1920, "Rotated height");
@@ -204,7 +250,7 @@ fn test_rotation_change_during_capture() {
         (Rotation::Clockwise180, 1920, 1080),
         (Rotation::Clockwise270, 1080, 1920),
     ];
-    
+
     for (rotation, w, h) in &rotations {
         let frame = capture.next_frame().expect("frame");
         let config = ProcessorConfig::new(*w, *h).with_rotation(*rotation);
@@ -235,20 +281,31 @@ fn test_flip_change_during_capture() {
 
     test_step!(logger, "Starting capture with gradient pattern");
     let mut capture = SimulatorBackend::new(SimulatorConfig {
-        width: 640, height: 480, fps: 1000,
+        width: 640,
+        height: 480,
+        fps: 1000,
         pattern: FramePattern::HorizontalGradient,
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
     test_step!(logger, "Setting up display");
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
-        width: 1920, height: 1080,
+        width: 1920,
+        height: 1080,
         frame_history_size: 10,
         ..Default::default()
     });
@@ -272,7 +329,11 @@ fn test_flip_change_during_capture() {
         display.render(&processed).expect("render");
         tracing::info!(flip = ?flip, "Flip applied");
     }
-    test_assert!(logger, display.frame_count() == 4, "All flip modes rendered");
+    test_assert!(
+        logger,
+        display.frame_count() == 4,
+        "All flip modes rendered"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -296,20 +357,32 @@ fn test_combined_settings_change() {
 
     test_step!(logger, "Starting capture");
     let mut capture = SimulatorBackend::new(SimulatorConfig {
-        width: 1280, height: 720, fps: 1000,
+        width: 1280,
+        height: 720,
+        fps: 1000,
         pattern: FramePattern::Checkerboard { size: 64 },
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 1280, height: 720, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 1280,
+                height: 720,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     test_step_ok!(logger);
 
     test_step!(logger, "Setting up display");
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig::hd());
-    display.init(&DisplayId("test:combined".into())).expect("init");
+    display
+        .init(&DisplayId("test:combined".into()))
+        .expect("init");
     test_step_ok!(logger);
 
     test_step!(logger, "Processing with initial settings");
@@ -324,23 +397,31 @@ fn test_combined_settings_change() {
 
     test_step!(logger, "Changing all settings at once");
     let frame2 = capture.next_frame().expect("frame");
-    
+
     // Change to rotated display
     let mut display_rotated = DisplaySimulator::new(DisplaySimulatorConfig {
-        width: 1080, height: 1920, ..Default::default()
+        width: 1080,
+        height: 1920,
+        ..Default::default()
     });
-    display_rotated.init(&DisplayId("test:rotated".into())).expect("init");
-    
+    display_rotated
+        .init(&DisplayId("test:rotated".into()))
+        .expect("init");
+
     let config2 = ProcessorConfig::new(1080, 1920)
         .with_scaling(ScalingMode::Fit)
         .with_rotation(Rotation::Clockwise90)
         .with_flip(Flip::Horizontal);
     let processed2 = process_frame(&frame2, &config2).expect("process");
     display_rotated.render(&processed2).expect("render");
-    
+
     let rotated_frame = display_rotated.last_frame().expect("get frame");
     test_assert!(logger, rotated_frame.width == 1080, "Rotated width correct");
-    test_assert!(logger, rotated_frame.height == 1920, "Rotated height correct");
+    test_assert!(
+        logger,
+        rotated_frame.height == 1920,
+        "Rotated height correct"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Cleanup");
@@ -361,23 +442,42 @@ fn test_settings_matrix() {
 
     test_step!(logger, "Starting capture");
     let mut capture = SimulatorBackend::new(SimulatorConfig {
-        width: 640, height: 480, fps: 1000,
-        pattern: FramePattern::SolidColor { r: 100, g: 150, b: 200 },
+        width: 640,
+        height: 480,
+        fps: 1000,
+        pattern: FramePattern::SolidColor {
+            r: 100,
+            g: 150,
+            b: 200,
+        },
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     let frame = capture.next_frame().expect("frame");
     test_step_ok!(logger);
 
     test_step!(logger, "Testing all settings combinations");
     let scalings = [ScalingMode::Fill, ScalingMode::Fit, ScalingMode::Stretch];
-    let rotations = [Rotation::None, Rotation::Clockwise90, Rotation::Clockwise180, Rotation::Clockwise270];
+    let rotations = [
+        Rotation::None,
+        Rotation::Clockwise90,
+        Rotation::Clockwise180,
+        Rotation::Clockwise270,
+    ];
     let flips = [Flip::None, Flip::Horizontal, Flip::Vertical, Flip::Both];
-    
+
     let mut successful = 0;
     for scaling in &scalings {
         for rotation in &rotations {
@@ -396,9 +496,13 @@ fn test_settings_matrix() {
             }
         }
     }
-    
+
     let expected = scalings.len() * rotations.len() * flips.len();
-    test_assert!(logger, successful == expected, "All combinations successful");
+    test_assert!(
+        logger,
+        successful == expected,
+        "All combinations successful"
+    );
     test_step_ok!(logger, "Processed {} combinations", successful);
 
     test_step!(logger, "Cleanup");
@@ -425,36 +529,78 @@ async fn test_settings_command_dispatch() {
     test_step_ok!(logger);
 
     test_step!(logger, "Sending scaling command");
-    handle.send_command(Command::SetScaling { mode: ScalingMode::Fit })
-        .await.expect("send");
+    handle
+        .send_command(Command::SetScaling {
+            mode: ScalingMode::Fit,
+        })
+        .await
+        .expect("send");
     let cmd = cmd_rx.recv().await.expect("recv");
-    test_assert!(logger, matches!(cmd, Command::SetScaling { mode: ScalingMode::Fit }),
-        "Scaling command received");
+    test_assert!(
+        logger,
+        matches!(
+            cmd,
+            Command::SetScaling {
+                mode: ScalingMode::Fit
+            }
+        ),
+        "Scaling command received"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Sending rotation command");
-    handle.send_command(Command::SetRotation { rotation: Rotation::Clockwise90 })
-        .await.expect("send");
+    handle
+        .send_command(Command::SetRotation {
+            rotation: Rotation::Clockwise90,
+        })
+        .await
+        .expect("send");
     let cmd = cmd_rx.recv().await.expect("recv");
-    test_assert!(logger, matches!(cmd, Command::SetRotation { rotation: Rotation::Clockwise90 }),
-        "Rotation command received");
+    test_assert!(
+        logger,
+        matches!(
+            cmd,
+            Command::SetRotation {
+                rotation: Rotation::Clockwise90
+            }
+        ),
+        "Rotation command received"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Sending flip command");
-    handle.send_command(Command::SetFlip { flip: Flip::Both })
-        .await.expect("send");
+    handle
+        .send_command(Command::SetFlip { flip: Flip::Both })
+        .await
+        .expect("send");
     let cmd = cmd_rx.recv().await.expect("recv");
-    test_assert!(logger, matches!(cmd, Command::SetFlip { flip: Flip::Both }),
-        "Flip command received");
+    test_assert!(
+        logger,
+        matches!(cmd, Command::SetFlip { flip: Flip::Both }),
+        "Flip command received"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Sending rapid settings commands");
     for _ in 0..5 {
-        handle.send_command(Command::SetScaling { mode: ScalingMode::Fill }).await.ok();
-        handle.send_command(Command::SetRotation { rotation: Rotation::None }).await.ok();
-        handle.send_command(Command::SetFlip { flip: Flip::None }).await.ok();
+        handle
+            .send_command(Command::SetScaling {
+                mode: ScalingMode::Fill,
+            })
+            .await
+            .ok();
+        handle
+            .send_command(Command::SetRotation {
+                rotation: Rotation::None,
+            })
+            .await
+            .ok();
+        handle
+            .send_command(Command::SetFlip { flip: Flip::None })
+            .await
+            .ok();
     }
-    
+
     let mut count = 0;
     while cmd_rx.try_recv().is_ok() {
         count += 1;
@@ -477,16 +623,26 @@ fn test_frame_continuity_during_settings_change() {
 
     test_step!(logger, "Starting capture");
     let mut capture = SimulatorBackend::new(SimulatorConfig {
-        width: 640, height: 480, fps: 1000,
+        width: 640,
+        height: 480,
+        fps: 1000,
         pattern: FramePattern::Counter,
         ..Default::default()
     });
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 1000.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 1000.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
-    
+
     let mut display = DisplaySimulator::new(DisplaySimulatorConfig {
         frame_history_size: 30,
         ..Default::default()
@@ -500,20 +656,24 @@ fn test_frame_continuity_during_settings_change() {
         ProcessorConfig::new(1920, 1080).with_scaling(ScalingMode::Fit),
         ProcessorConfig::new(1920, 1080).with_flip(Flip::Horizontal),
     ];
-    
+
     for i in 0..15 {
         let frame = capture.next_frame().expect("frame");
         let config = &configs[i % 3];
         let processed = process_frame(&frame, config).expect("process");
         display.render(&processed).expect("render");
     }
-    test_assert!(logger, display.frame_count() == 15, "All 15 frames rendered");
+    test_assert!(
+        logger,
+        display.frame_count() == 15,
+        "All 15 frames rendered"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying frame continuity");
     let history = display.frame_history();
     test_assert!(logger, history.len() >= 15, "Frame history has all frames");
-    
+
     // All frames should have data (no dropped frames)
     for (i, frame) in history.iter().enumerate() {
         test_assert!(logger, !frame.data.is_empty(), "Frame {} has data", i);
@@ -542,9 +702,17 @@ fn test_invalid_settings_rejected() {
     test_step!(logger, "Starting capture");
     let mut capture = SimulatorBackend::new_default();
     let devices = capture.enumerate_devices();
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640, height: 480, framerate: 30.0, format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     let frame = capture.next_frame().expect("frame");
     test_step_ok!(logger);

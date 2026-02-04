@@ -9,7 +9,6 @@
 //!
 //! Run with: cargo test --test perf_gpu_test -- --nocapture
 
-#[allow(dead_code)]
 mod common;
 
 use std::fs;

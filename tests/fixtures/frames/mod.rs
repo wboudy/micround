@@ -122,7 +122,7 @@ pub fn rgba_checkerboard_1920x1080() -> Frame {
         for x in 0..width {
             let block_x = x / block_size;
             let block_y = y / block_size;
-            let value = if (block_x + block_y) % 2 == 0 {
+            let value = if (block_x + block_y).is_multiple_of(2) {
                 255u8
             } else {
                 0u8
@@ -360,7 +360,7 @@ pub fn nv12_color_bars_640x480() -> Frame {
     }
 
     // UV plane (interleaved, half resolution)
-    for y in (0..height).step_by(2) {
+    for _y in (0..height).step_by(2) {
         for x in (0..width).step_by(2) {
             let bar_index = (x / bar_width).min(7) as usize;
             let (_, u, v) = yuv_colors[bar_index];
@@ -395,7 +395,7 @@ pub fn nv12_checkerboard_1920x1080() -> Frame {
         for x in 0..width {
             let block_x = x / block_size;
             let block_y = y / block_size;
-            let value = if (block_x + block_y) % 2 == 0 {
+            let value = if (block_x + block_y).is_multiple_of(2) {
                 235
             } else {
                 16
@@ -405,9 +405,7 @@ pub fn nv12_checkerboard_1920x1080() -> Frame {
     }
 
     // UV plane (grayscale = 128 for both)
-    for _ in 0..uv_size {
-        data.push(128);
-    }
+    data.extend(std::iter::repeat_n(128, uv_size));
 
     Frame {
         data,

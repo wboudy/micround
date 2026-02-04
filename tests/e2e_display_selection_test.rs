@@ -560,10 +560,8 @@ async fn test_display_selection_command_dispatch() {
 
     let mut received = Vec::new();
     for _ in 0..3 {
-        if let Some(cmd) = cmd_rx.recv().await {
-            if let Command::SelectDisplay { display_id } = cmd {
-                received.push(display_id.0.clone());
-            }
+        if let Some(Command::SelectDisplay { display_id }) = cmd_rx.recv().await {
+            received.push(display_id.0.clone());
         }
     }
     test_assert!(logger, received.len() == 3, "All commands received");

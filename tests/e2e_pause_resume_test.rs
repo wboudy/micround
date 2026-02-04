@@ -246,7 +246,7 @@ fn test_rapid_pause_resume() {
     for i in 0..10 {
         // Capture a frame
         if capture.is_capturing() {
-            if let Ok(frame) = capture.next_frame() {
+            if let Ok(_frame) = capture.next_frame() {
                 frames_captured += 1;
             }
         }

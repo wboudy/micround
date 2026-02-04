@@ -74,6 +74,7 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
     let mut event_subscriber = app_handle.subscribe_events();
 
     // Track application state
+    #[allow(unused_assignments)]
     let mut current_state = AppState::Idle;
 
     // Initialize system tray (if feature enabled)
@@ -136,13 +137,14 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
                         current_state = AppState::Running;
                         app_handle.publish_event(Event::StateChanged {
                             old_state: AppState::Idle,
-                            new_state: AppState::Running,
+                            new_state: current_state,
                         });
                     }
                     Command::StopCapture => {
                         info!("Stop capture requested");
                         engine.stop();
                         current_state = AppState::Idle;
+                        let _ = current_state; // Prevent unused warning
                     }
                     Command::TakeSnapshot { to_clipboard } => {
                         info!(to_clipboard = *to_clipboard, "Snapshot requested");

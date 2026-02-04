@@ -68,7 +68,6 @@ fn test_camera_selection_complete_flow() {
 
     let devices = backend.enumerate_devices();
     test_assert!(logger, !devices.is_empty(), "At least one camera found");
-    test_assert!(logger, devices.len() >= 1, "Expected camera count");
 
     for (i, device) in devices.iter().enumerate() {
         tracing::info!(
@@ -199,7 +198,7 @@ fn test_camera_selection_multiple_devices() {
     // Enumerate and verify multiple devices
     test_step!(logger, "Enumerating multiple cameras");
     let devices = backend.enumerate_devices();
-    test_assert!(logger, devices.len() >= 1, "Multiple devices found");
+    test_assert!(logger, !devices.is_empty(), "Multiple devices found");
     for device in &devices {
         tracing::info!(device_id = %device.id.0, name = %device.name, "Found device");
     }
@@ -266,7 +265,7 @@ async fn test_camera_selection_state_transitions() {
 
     // Create capture backend
     test_step!(logger, "Creating capture backend");
-    let mut backend = SimulatorBackend::new_default();
+    let backend = SimulatorBackend::new_default();
     let devices = backend.enumerate_devices();
     test_assert!(logger, !devices.is_empty(), "Devices available");
     test_step_ok!(logger);
@@ -565,7 +564,7 @@ fn test_camera_selection_respects_settings() {
         (640, 480, 30.0, "VGA"),
     ];
 
-    for (width, height, fps, name) in test_cases {
+    for (width, height, fps, _name) in test_cases {
         let result = backend.open(
             &devices[0].id,
             CaptureSettings {

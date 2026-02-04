@@ -179,6 +179,7 @@ fn test_pixel_format_copy() {
 }
 
 #[test]
+#[allow(clippy::clone_on_copy)]
 fn test_pixel_format_clone() {
     let format1 = PixelFormat::Mjpeg;
     let format2 = format1.clone();
@@ -515,6 +516,7 @@ fn test_scaling_mode_copy() {
 }
 
 #[test]
+#[allow(clippy::clone_on_copy)]
 fn test_scaling_mode_clone() {
     let mode1 = ScalingMode::Stretch;
     let mode2 = mode1.clone();
@@ -583,6 +585,7 @@ fn test_rotation_copy() {
 }
 
 #[test]
+#[allow(clippy::clone_on_copy)]
 fn test_rotation_clone() {
     let rot1 = Rotation::Clockwise180;
     let rot2 = rot1.clone();
@@ -646,6 +649,7 @@ fn test_flip_copy() {
 }
 
 #[test]
+#[allow(clippy::clone_on_copy)]
 fn test_flip_clone() {
     let flip1 = Flip::Both;
     let flip2 = flip1.clone();

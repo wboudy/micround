@@ -589,5 +589,5 @@ fn test_env_filter_parsing() {
     assert!(format!("{:?}", filter).contains("micround"));
 
     let filter2 = EnvFilter::new("trace");
-    assert!(format!("{:?}", filter2).len() > 0);
+    assert!(!format!("{:?}", filter2).is_empty());
 }

@@ -109,7 +109,7 @@ fn test_startup_full_initialization_sequence() {
     // Step 6: Create application context
     test_step!(logger, "Creating application context");
     let (ctx, _cmd_rx) = AppContext::new();
-    let handle = ctx.handle();
+    let _handle = ctx.handle();
     test_assert!(logger, true, "AppContext created successfully");
     test_step_ok!(logger, "Application context ready");
 
@@ -659,7 +659,7 @@ fn test_startup_timing_performance() {
     test_step_ok!(logger, "Backends created in {:?}", backend_time);
 
     test_step!(logger, "Timing device enumeration");
-    let mut capture = SimulatorBackend::new_default();
+    let capture = SimulatorBackend::new_default();
     let start = Instant::now();
     let _devices = capture.enumerate_devices();
     let enum_time = start.elapsed();

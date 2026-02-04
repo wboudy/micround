@@ -245,7 +245,7 @@ fn test_flip_change_during_capture() {
     test_step!(logger, "Process frame with no flip");
     let config = ProcessorConfig::new(320, 240).with_flip(Flip::None);
     let no_flip = process_frame(&frame, &config).unwrap();
-    test_assert!(logger, no_flip.data.len() > 0, "Frame has data");
+    test_assert!(logger, !no_flip.data.is_empty(), "Frame has data");
     test_step_ok!(logger);
 
     test_step!(logger, "Apply horizontal flip");

@@ -333,6 +333,7 @@ fn test_frame_drop_reason_copy() {
 }
 
 #[test]
+#[allow(clippy::clone_on_copy)]
 fn test_frame_drop_reason_clone() {
     let reason1 = FrameDropReason::ProcessingTimeout;
     let reason2 = reason1.clone();
@@ -386,6 +387,7 @@ fn test_app_state_copy() {
 }
 
 #[test]
+#[allow(clippy::clone_on_copy)]
 fn test_app_state_clone() {
     let state1 = AppState::Paused;
     let state2 = state1.clone();

@@ -5,7 +5,6 @@
 //!
 //! Run with: cargo test --test perf_cpu_test -- --nocapture
 
-#[allow(dead_code)]
 mod common;
 
 use std::fs;

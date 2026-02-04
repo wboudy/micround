@@ -95,7 +95,7 @@ pub fn list_config_fixtures() -> Vec<String> {
     if let Ok(entries) = fs::read_dir(&dir) {
         entries
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "toml"))
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "toml"))
             .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
             .collect()
     } else {
@@ -131,7 +131,7 @@ pub fn list_device_fixtures() -> Vec<String> {
     if let Ok(entries) = fs::read_dir(&dir) {
         entries
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "json"))
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
             .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
             .collect()
     } else {

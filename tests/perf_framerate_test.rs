@@ -5,7 +5,6 @@
 //!
 //! Run with: cargo test --features test-simulator --test perf_framerate_test -- --nocapture
 
-#[allow(dead_code)]
 mod common;
 
 use std::time::{Duration, Instant};

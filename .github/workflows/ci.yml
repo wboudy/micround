@@ -32,9 +32,9 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run Clippy
-        # Allow common patterns in test code; deny actual issues
+        # Use linux feature set on Ubuntu CI runner (not --all-features which mixes platforms)
         run: |
-          cargo clippy --all-targets --all-features -- \
+          cargo clippy --all-targets --features "linux,tray,hotkeys,recovery,test-simulator,clipboard" -- \
             -D warnings \
             -A dead_code \
             -A unused_imports \

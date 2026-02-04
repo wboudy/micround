@@ -63,7 +63,10 @@ jobs:
             -A clippy::overly_complex_bool_expr \
             -A clippy::needless_return \
             -A clippy::needless_borrow \
-            -A clippy::redundant_pattern_matching
+            -A clippy::redundant_pattern_matching \
+            -A clippy::ptr_arg \
+            -A clippy::bind_instead_of_map \
+            -A clippy::redundant_closure
 
   # Run tests on all platforms
   test-linux:

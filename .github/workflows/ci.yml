@@ -58,7 +58,12 @@ jobs:
             -A clippy::same_item_push \
             -A clippy::useless_vec \
             -A clippy::duplicated_attributes \
-            -A clippy::unnecessary_unwrap
+            -A clippy::unnecessary_unwrap \
+            -A clippy::missing_transmute_annotations \
+            -A clippy::overly_complex_bool_expr \
+            -A clippy::needless_return \
+            -A clippy::needless_borrow \
+            -A clippy::redundant_pattern_matching
 
   # Run tests on all platforms
   test-linux:

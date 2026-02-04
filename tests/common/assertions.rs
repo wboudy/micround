@@ -695,7 +695,11 @@ pub fn create_checkerboard_frame(
         for x in 0..width {
             let block_x = x / block_size;
             let block_y = y / block_size;
-            let value = if (block_x + block_y).is_multiple_of(2) { 255 } else { 0 };
+            let value = if (block_x + block_y).is_multiple_of(2) {
+                255
+            } else {
+                0
+            };
 
             for _ in 0..bytes_per_pixel {
                 data.push(value);

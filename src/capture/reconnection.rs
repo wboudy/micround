@@ -34,7 +34,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::capture::enumerator::{CameraEvent, CameraEventHandler};
 use crate::core::events::{Event, EventBus};
@@ -182,6 +182,9 @@ pub struct ReconnectionManager {
     reconnect_attempts: RwLock<u32>,
     /// Flag to stop reconnection attempts
     cancelled: AtomicBool,
+    /// When the wait started (monotonic time for reliable timeout tracking)
+    /// Uses Instant instead of SystemTime to avoid NTP clock adjustment issues.
+    wait_started: RwLock<Option<Instant>>,
 }
 
 impl ReconnectionManager {
@@ -201,6 +204,7 @@ impl ReconnectionManager {
             event_bus,
             reconnect_attempts: RwLock::new(0),
             cancelled: AtomicBool::new(false),
+            wait_started: RwLock::new(None),
         }
     }
 
@@ -259,7 +263,11 @@ impl ReconnectionManager {
         *self.reconnect_attempts.write().unwrap() = 0;
         self.cancelled.store(false, Ordering::Release);
 
-        // Transition to waiting state
+        // Record monotonic start time for reliable timeout tracking
+        // (Instant is monotonic; SystemTime can jump due to NTP)
+        *self.wait_started.write().unwrap() = Some(Instant::now());
+
+        // Transition to waiting state (epoch_ms kept for debug/logging purposes)
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -346,6 +354,7 @@ impl ReconnectionManager {
                     "Reconnection successful"
                 );
                 *self.state.write().unwrap() = ReconnectionState::Connected;
+                *self.wait_started.write().unwrap() = None; // Clear wait timer
                 self.event_bus.publish(Event::CameraReconnected { device_id: device_id.clone() });
                 Ok(format)
             }
@@ -358,9 +367,12 @@ impl ReconnectionManager {
 
                 if *attempts >= self.config.max_reconnect_attempts {
                     *self.state.write().unwrap() = ReconnectionState::Failed;
+                    *self.wait_started.write().unwrap() = None; // Clear wait timer
                     self.event_bus.publish(Event::CameraReconnectionFailed { device_id: device_id.clone() });
                 } else {
                     // Go back to waiting state for another attempt
+                    // Keep existing wait_started for cumulative timeout tracking
+                    // (epoch_ms for debug/logging only)
                     let now_ms = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -376,22 +388,20 @@ impl ReconnectionManager {
 
     /// Check if the reconnection has timed out
     pub fn check_timeout(&self) -> bool {
-        if let ReconnectionState::WaitingForDevice { started_at_epoch_ms } = self.state() {
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64;
+        if matches!(self.state(), ReconnectionState::WaitingForDevice { .. }) {
+            // Use monotonic Instant for reliable timeout (immune to NTP clock adjustments)
+            if let Some(started) = *self.wait_started.read().unwrap() {
+                let elapsed = started.elapsed();
 
-            let elapsed_ms = now_ms.saturating_sub(started_at_epoch_ms);
-            let active_duration_ms = self.config.active_poll_duration.as_millis() as u64;
-
-            if elapsed_ms > active_duration_ms {
-                tracing::info!("Reconnection timed out after {}ms", elapsed_ms);
-                *self.state.write().unwrap() = ReconnectionState::TimedOut;
-                if let Some(device_id) = self.target_device_id.read().unwrap().clone() {
-                    self.event_bus.publish(Event::CameraReconnectionTimedOut { device_id });
+                if elapsed > self.config.active_poll_duration {
+                    tracing::info!("Reconnection timed out after {:?}", elapsed);
+                    *self.state.write().unwrap() = ReconnectionState::TimedOut;
+                    *self.wait_started.write().unwrap() = None;
+                    if let Some(device_id) = self.target_device_id.read().unwrap().clone() {
+                        self.event_bus.publish(Event::CameraReconnectionTimedOut { device_id });
+                    }
+                    return true;
                 }
-                return true;
             }
         }
         false
@@ -401,6 +411,7 @@ impl ReconnectionManager {
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
         *self.state.write().unwrap() = ReconnectionState::Connected;
+        *self.wait_started.write().unwrap() = None; // Clear wait timer
         tracing::info!("Reconnection cancelled");
     }
 
@@ -410,6 +421,10 @@ impl ReconnectionManager {
             self.state(),
             ReconnectionState::TimedOut | ReconnectionState::Failed
         ) {
+            // Reset monotonic timer for timeout tracking
+            *self.wait_started.write().unwrap() = Some(Instant::now());
+
+            // Update state (epoch_ms for debug/logging)
             let now_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -427,19 +442,16 @@ impl ReconnectionManager {
 
     /// Get the poll interval based on current state
     pub fn current_poll_interval(&self) -> Duration {
-        if let ReconnectionState::WaitingForDevice { started_at_epoch_ms } = self.state() {
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64;
-
-            let elapsed_ms = now_ms.saturating_sub(started_at_epoch_ms);
-            let active_duration_ms = self.config.active_poll_duration.as_millis() as u64;
-
-            if elapsed_ms < active_duration_ms {
-                self.config.poll_interval
+        if matches!(self.state(), ReconnectionState::WaitingForDevice { .. }) {
+            // Use monotonic Instant for reliable timing (immune to NTP adjustments)
+            if let Some(started) = *self.wait_started.read().unwrap() {
+                if started.elapsed() < self.config.active_poll_duration {
+                    self.config.poll_interval
+                } else {
+                    self.config.background_poll_interval
+                }
             } else {
-                self.config.background_poll_interval
+                self.config.poll_interval
             }
         } else {
             self.config.poll_interval

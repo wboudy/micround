@@ -26,6 +26,8 @@
 
 use crate::core::PlatformError;
 use std::path::PathBuf;
+#[cfg(target_os = "linux")]
+use std::process::Command;
 
 /// Information about a wallpaper configuration
 #[derive(Debug, Clone, Default)]

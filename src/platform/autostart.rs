@@ -175,6 +175,7 @@ mod linux {
     use super::*;
     use std::env;
     use std::fs;
+    use std::path::PathBuf;
 
     /// Get the XDG autostart directory
     fn autostart_dir() -> AutostartResult<PathBuf> {
@@ -376,6 +377,9 @@ mod tests {
     mod linux_tests {
         use super::*;
         use serial_test::serial;
+        use std::env;
+        use std::path::PathBuf;
+        use tempfile::TempDir;
 
         #[test]
         fn test_desktop_entry_content() {

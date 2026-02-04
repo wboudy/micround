@@ -37,6 +37,7 @@ use crate::core::{CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, 
 pub use capture_loop::{start_capture_loop, CaptureLoopHandle, FrameReceiver, MetricsSnapshot};
 pub use enumerator::*;
 pub use manager::CaptureManager;
+pub use negotiation::negotiate_format;
 pub use state::{shared_camera_state, CameraErrorInfo, CameraState, SharedCameraState};
 
 /// Trait for platform-specific capture implementations

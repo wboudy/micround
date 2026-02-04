@@ -23,10 +23,10 @@
 //! cargo test --features test-simulator --test soak_test soak_1_hour -- --ignored --nocapture
 //! ```
 
-#[allow(dead_code)]
 mod common;
 
 use std::collections::VecDeque;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -536,7 +536,7 @@ fn run_continuous_test(
         }
 
         // Periodically check memory
-        if test_start.elapsed().as_secs() % 60 == 0 {
+        if test_start.elapsed().as_secs().is_multiple_of(60) {
             let current_rss = read_rss_kb();
             if current_rss > peak_rss_kb {
                 peak_rss_kb = current_rss;
@@ -710,6 +710,7 @@ fn run_reconnection_test(
     let mut last_reconnect = Instant::now();
     let mut recovery_attempts = 0u64;
     let mut recovery_successes = 0u64;
+    #[allow(unused_assignments)]
     let mut capture: Option<SimulatorBackend> = None;
 
     // Initial connection

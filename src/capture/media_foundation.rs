@@ -16,7 +16,6 @@
 //! Frames are read synchronously via ReadSample().
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::capture::enumerator::CameraEnumerator;
 use crate::capture::{negotiate_format, CaptureBackend};
@@ -31,7 +30,7 @@ use crate::core::{
 
 #[cfg(all(target_os = "windows", feature = "windows"))]
 use windows::{
-    core::{GUID, HRESULT, PCWSTR, PWSTR},
+    core::GUID,
     Win32::{
         Media::MediaFoundation::{
             IMFActivate, IMFAttributes, IMFMediaSource, IMFMediaType, IMFSourceReader,
@@ -41,8 +40,7 @@ use windows::{
             MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
             MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK,
             MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
-            MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS,
-            MF_SOURCE_READER_ASYNC_CALLBACK, MF_SOURCE_READER_FIRST_VIDEO_STREAM,
+            MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, MF_SOURCE_READER_FIRST_VIDEO_STREAM,
         },
         System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED},
     },
@@ -239,17 +237,20 @@ impl MediaFoundationEnumerator {
                 return devices;
             }
 
-            // Iterate through found devices
+            // Iterate through found devices and take ownership of COM objects
             for i in 0..count {
                 let activate_ptr = device_sources.add(i as usize);
-                if let Some(ref activate) = *activate_ptr {
+                // Take ownership of the Option<IMFActivate> to ensure proper Release on drop
+                let activate_opt = std::ptr::read(activate_ptr);
+                if let Some(ref activate) = activate_opt {
                     if let Some(device) = Self::device_from_activate(activate) {
                         devices.push(device);
                     }
                 }
+                // activate_opt is dropped here, which calls Release on the COM object
             }
 
-            // Free the array (individual IMFActivate are released when dropped)
+            // Free the array memory (COM objects already released above)
             windows::Win32::System::Com::CoTaskMemFree(Some(
                 device_sources as *const std::ffi::c_void,
             ));
@@ -329,12 +330,7 @@ impl MediaFoundationEnumerator {
     unsafe fn query_capabilities_from_source(source: &IMFMediaSource) -> Vec<CameraCapability> {
         let mut capabilities = Vec::new();
 
-        // Create source reader to enumerate formats
-        let mut reader_attributes: Option<IMFAttributes> = None;
-        if MFCreateAttributes(&mut reader_attributes, 1).is_err() {
-            return capabilities;
-        }
-
+        // Create source reader to enumerate formats (no attributes needed for enumeration)
         let reader: IMFSourceReader = match MFCreateSourceReaderFromMediaSource(source, None) {
             Ok(r) => r,
             Err(_) => return capabilities,
@@ -545,24 +541,29 @@ impl MediaFoundationBackend {
             }
 
             // Find the device with matching symbolic link
+            // Take ownership of all COM objects to ensure proper cleanup
             let mut found_source: Option<IMFMediaSource> = None;
 
             for i in 0..count {
                 let activate_ptr = device_sources.add(i as usize);
-                if let Some(ref activate) = *activate_ptr {
-                    if let Some(link) = MediaFoundationEnumerator::get_string_attribute(
-                        activate,
-                        &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK,
-                    ) {
-                        if link == device_id {
-                            found_source = activate.ActivateObject().ok();
-                            break;
+                let activate_opt = std::ptr::read(activate_ptr);
+                if let Some(ref activate) = activate_opt {
+                    // Only try to activate if we haven't found our device yet
+                    if found_source.is_none() {
+                        if let Some(link) = MediaFoundationEnumerator::get_string_attribute(
+                            activate,
+                            &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK,
+                        ) {
+                            if link == device_id {
+                                found_source = activate.ActivateObject().ok();
+                            }
                         }
                     }
                 }
+                // activate_opt is dropped here, releasing the COM object
             }
 
-            // Free the array
+            // Free the array memory (COM objects already released in the loop)
             windows::Win32::System::Com::CoTaskMemFree(Some(
                 device_sources as *const std::ffi::c_void,
             ));
@@ -855,12 +856,20 @@ impl CaptureBackend for MediaFoundationBackend {
 
             self.sequence += 1;
 
+            // Convert timestamp from 100ns units to nanoseconds
+            // Handle negative timestamps gracefully (treat as 0)
+            let timestamp_ns = if timestamp >= 0 {
+                (timestamp as u64) * 100
+            } else {
+                0
+            };
+
             Ok(Frame {
                 data,
                 format: format.format,
                 width: format.width,
                 height: format.height,
-                timestamp_ns: (timestamp as u64) * 100, // Convert 100ns units to ns
+                timestamp_ns,
                 sequence: self.sequence,
             })
         }

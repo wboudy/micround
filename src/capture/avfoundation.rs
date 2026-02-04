@@ -18,7 +18,8 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
 
 use crate::capture::enumerator::CameraEnumerator;
 use crate::capture::{negotiate_format, CaptureBackend};
@@ -276,7 +277,7 @@ struct FrameBuffer {
     format: PixelFormat,
     timestamp_ns: u64,
     new_frame: AtomicBool,
-    _sequence: AtomicU64,
+    sequence: AtomicU64,
 }
 
 /// AVFoundation-based capture backend
@@ -298,7 +299,13 @@ pub struct AVFoundationBackend {
     #[cfg(all(target_os = "macos", feature = "macos"))]
     video_output: Option<*mut std::ffi::c_void>,
     #[cfg(all(target_os = "macos", feature = "macos"))]
+    dispatch_queue: Option<*mut std::ffi::c_void>,
+    #[cfg(all(target_os = "macos", feature = "macos"))]
+    delegate: Option<*mut std::ffi::c_void>,
+    #[cfg(all(target_os = "macos", feature = "macos"))]
     frame_buffer: Arc<Mutex<FrameBuffer>>,
+    /// Channel to receive frames from delegate callback
+    frame_receiver: Option<mpsc::Receiver<Frame>>,
 }
 
 // SAFETY: AVFoundation objects are accessed only via message passing on dedicated queues
@@ -319,6 +326,10 @@ impl AVFoundationBackend {
             #[cfg(all(target_os = "macos", feature = "macos"))]
             video_output: None,
             #[cfg(all(target_os = "macos", feature = "macos"))]
+            dispatch_queue: None,
+            #[cfg(all(target_os = "macos", feature = "macos"))]
+            delegate: None,
+            #[cfg(all(target_os = "macos", feature = "macos"))]
             frame_buffer: Arc::new(Mutex::new(FrameBuffer {
                 data: None,
                 width: 0,
@@ -326,8 +337,9 @@ impl AVFoundationBackend {
                 format: PixelFormat::Unknown,
                 timestamp_ns: 0,
                 new_frame: AtomicBool::new(false),
-                _sequence: AtomicU64::new(0),
+                sequence: AtomicU64::new(0),
             })),
+            frame_receiver: None,
         }
     }
 
@@ -445,6 +457,38 @@ impl CaptureBackend for AVFoundationBackend {
                 }
                 let _: () = msg_send![session, addOutput: video_output];
 
+                // Create dispatch queue for sample buffer delivery
+                let queue_label = std::ffi::CString::new("com.micround.capture").unwrap();
+                let capture_queue = dispatch_queue_create(queue_label.as_ptr(), std::ptr::null());
+                if capture_queue.is_null() {
+                    let _: () = msg_send![session, commitConfiguration];
+                    let _: () = msg_send![video_output, release];
+                    let _: () = msg_send![session, release];
+                    return Err(CaptureError::Platform("Failed to create dispatch queue".into()));
+                }
+
+                // Create frame channel for delegate to send frames
+                let (frame_sender, frame_receiver) = mpsc::channel::<Frame>();
+
+                // Register the frame buffer for this session
+                let buffer_clone = self.frame_buffer.clone();
+                register_frame_callback(session as usize, buffer_clone, frame_sender);
+
+                // Create delegate instance
+                // Note: We use a custom delegate class registered at runtime
+                let delegate = create_sample_buffer_delegate(session as usize);
+                if delegate.is_null() {
+                    dispatch_release(capture_queue);
+                    let _: () = msg_send![session, commitConfiguration];
+                    let _: () = msg_send![video_output, release];
+                    let _: () = msg_send![session, release];
+                    unregister_frame_callback(session as usize);
+                    return Err(CaptureError::Platform("Failed to create delegate".into()));
+                }
+
+                // Set the delegate on the video output
+                let _: () = msg_send![video_output, setSampleBufferDelegate: delegate queue: capture_queue];
+
                 let _: () = msg_send![session, commitConfiguration];
 
                 // Store handles (already retained via new)
@@ -452,6 +496,9 @@ impl CaptureBackend for AVFoundationBackend {
                 let _: () = msg_send![device_input, retain];
                 self.device_input = Some(device_input as *mut std::ffi::c_void);
                 self.video_output = Some(video_output as *mut std::ffi::c_void);
+                self.dispatch_queue = Some(capture_queue);
+                self.delegate = Some(delegate as *mut std::ffi::c_void);
+                self.frame_receiver = Some(frame_receiver);
                 self.negotiated_format = Some(negotiated.clone());
 
                 tracing::info!(
@@ -516,6 +563,15 @@ impl CaptureBackend for AVFoundationBackend {
 
         #[cfg(all(target_os = "macos", feature = "macos"))]
         unsafe {
+            // Unregister callback first
+            if let Some(session_ptr) = self.session {
+                unregister_frame_callback(session_ptr as usize);
+            }
+
+            // Release delegate first (it references the output)
+            if let Some(ptr) = self.delegate.take() {
+                Self::release_obj(ptr);
+            }
             if let Some(ptr) = self.device_input.take() {
                 Self::release_obj(ptr);
             }
@@ -525,8 +581,13 @@ impl CaptureBackend for AVFoundationBackend {
             if let Some(ptr) = self.session.take() {
                 Self::release_obj(ptr);
             }
+            // Release dispatch queue
+            if let Some(ptr) = self.dispatch_queue.take() {
+                dispatch_release(ptr);
+            }
         }
 
+        self.frame_receiver = None;
         self.negotiated_format = None;
         tracing::info!("AVFoundation capture closed");
     }
@@ -541,8 +602,24 @@ impl CaptureBackend for AVFoundationBackend {
 
     #[cfg(all(target_os = "macos", feature = "macos"))]
     fn next_frame(&mut self) -> Result<Frame, CaptureError> {
-        // Note: Full implementation requires setting up a sample buffer delegate.
-        // For now, check if we have a frame in the buffer.
+        if !self.capturing {
+            return Err(CaptureError::Platform("Not capturing".into()));
+        }
+
+        // Try to receive from channel first (preferred path when delegate is working)
+        if let Some(ref receiver) = self.frame_receiver {
+            match receiver.recv_timeout(Duration::from_millis(100)) {
+                Ok(frame) => return Ok(frame),
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    // Fall through to buffer check
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err(CaptureError::Disconnected);
+                }
+            }
+        }
+
+        // Fallback: check the shared buffer (for when delegate populates it directly)
         let buffer = self.frame_buffer.lock()
             .map_err(|_| CaptureError::Platform("Frame buffer lock poisoned".into()))?;
 
@@ -594,6 +671,226 @@ unsafe fn string_to_nsstring(s: &str) -> *const AnyObject {
 }
 
 // ============================================================================
+// Sample Buffer Delegate
+// ============================================================================
+
+/// Global registry for frame callbacks, keyed by session pointer
+#[cfg(all(target_os = "macos", feature = "macos"))]
+static FRAME_CALLBACKS: std::sync::OnceLock<Mutex<HashMap<usize, FrameCallback>>> = std::sync::OnceLock::new();
+
+#[cfg(all(target_os = "macos", feature = "macos"))]
+struct FrameCallback {
+    buffer: Arc<Mutex<FrameBuffer>>,
+    sender: mpsc::Sender<Frame>,
+}
+
+#[cfg(all(target_os = "macos", feature = "macos"))]
+fn get_frame_callbacks() -> &'static Mutex<HashMap<usize, FrameCallback>> {
+    FRAME_CALLBACKS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(all(target_os = "macos", feature = "macos"))]
+fn register_frame_callback(session_id: usize, buffer: Arc<Mutex<FrameBuffer>>, sender: mpsc::Sender<Frame>) {
+    if let Ok(mut callbacks) = get_frame_callbacks().lock() {
+        callbacks.insert(session_id, FrameCallback { buffer, sender });
+    }
+}
+
+#[cfg(all(target_os = "macos", feature = "macos"))]
+fn unregister_frame_callback(session_id: usize) {
+    if let Ok(mut callbacks) = get_frame_callbacks().lock() {
+        callbacks.remove(&session_id);
+    }
+}
+
+/// Process a sample buffer and deliver the frame
+#[cfg(all(target_os = "macos", feature = "macos"))]
+unsafe fn process_sample_buffer(session_id: usize, sample_buffer: *const std::ffi::c_void) {
+    if sample_buffer.is_null() {
+        return;
+    }
+
+    // Get pixel buffer from sample buffer
+    let pixel_buffer = CMSampleBufferGetImageBuffer(sample_buffer);
+    if pixel_buffer.is_null() {
+        return;
+    }
+
+    // Lock the pixel buffer for reading
+    let lock_result = CVPixelBufferLockBaseAddress(pixel_buffer, 0);
+    if lock_result != 0 {
+        tracing::warn!("Failed to lock pixel buffer: {}", lock_result);
+        return;
+    }
+
+    // Extract frame data
+    let width = CVPixelBufferGetWidth(pixel_buffer) as u32;
+    let height = CVPixelBufferGetHeight(pixel_buffer) as u32;
+    let bytes_per_row = CVPixelBufferGetBytesPerRow(pixel_buffer);
+    let base_address = CVPixelBufferGetBaseAddress(pixel_buffer);
+    let pixel_format_type = CVPixelBufferGetPixelFormatType(pixel_buffer);
+
+    let format = fourcc_to_pixel_format(pixel_format_type);
+
+    // Calculate data size and copy
+    let data_size = bytes_per_row * height as usize;
+    let mut frame_data = vec![0u8; data_size];
+    if !base_address.is_null() {
+        std::ptr::copy_nonoverlapping(base_address, frame_data.as_mut_ptr(), data_size);
+    }
+
+    // Get timestamp
+    let timestamp = CMSampleBufferGetPresentationTimeStamp(sample_buffer);
+    let timestamp_ns = if timestamp.timescale > 0 {
+        (timestamp.value as u64 * 1_000_000_000) / timestamp.timescale as u64
+    } else {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0)
+    };
+
+    // Unlock pixel buffer
+    CVPixelBufferUnlockBaseAddress(pixel_buffer, 0);
+
+    // Deliver frame to callback
+    if let Ok(callbacks) = get_frame_callbacks().lock() {
+        if let Some(callback) = callbacks.get(&session_id) {
+            // Update shared buffer
+            if let Ok(mut buffer) = callback.buffer.lock() {
+                let seq = buffer.sequence.fetch_add(1, Ordering::SeqCst) + 1;
+                buffer.data = Some(frame_data.clone());
+                buffer.width = width;
+                buffer.height = height;
+                buffer.format = format;
+                buffer.timestamp_ns = timestamp_ns;
+                buffer.new_frame.store(true, Ordering::Release);
+
+                // Also send through channel
+                let frame = Frame {
+                    data: frame_data,
+                    format,
+                    width,
+                    height,
+                    timestamp_ns,
+                    sequence: seq,
+                };
+                let _ = callback.sender.send(frame);
+            }
+        }
+    }
+}
+
+/// Delegate class registration flag
+#[cfg(all(target_os = "macos", feature = "macos"))]
+static DELEGATE_CLASS_REGISTERED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Register the sample buffer delegate class with the Objective-C runtime
+#[cfg(all(target_os = "macos", feature = "macos"))]
+fn ensure_delegate_class_registered() -> bool {
+    *DELEGATE_CLASS_REGISTERED.get_or_init(|| {
+        unsafe {
+            use objc2::runtime::{AnyClass, ClassBuilder};
+
+            // Check if class already exists
+            if AnyClass::get("MicroundSampleBufferDelegate").is_some() {
+                return true;
+            }
+
+            // Get NSObject as superclass
+            let superclass = match AnyClass::get("NSObject") {
+                Some(cls) => cls,
+                None => {
+                    tracing::error!("Failed to get NSObject class");
+                    return false;
+                }
+            };
+
+            // Create class builder
+            let mut builder = match ClassBuilder::new("MicroundSampleBufferDelegate", superclass) {
+                Some(b) => b,
+                None => {
+                    tracing::error!("Failed to create class builder");
+                    return false;
+                }
+            };
+
+            // Add session_id ivar to store the session pointer
+            builder.add_ivar::<usize>("sessionId");
+
+            // Add the delegate method
+            // captureOutput:didOutputSampleBuffer:fromConnection:
+            unsafe extern "C" fn delegate_method(
+                this: *const AnyObject,
+                _sel: objc2::runtime::Sel,
+                _output: *const AnyObject,
+                sample_buffer: *const std::ffi::c_void,
+                _connection: *const AnyObject,
+            ) {
+                if this.is_null() {
+                    return;
+                }
+                // Get session ID from ivar
+                let session_id: usize = *(*this).get_ivar("sessionId");
+                process_sample_buffer(session_id, sample_buffer);
+            }
+
+            // Register the method
+            // Selector: captureOutput:didOutputSampleBuffer:fromConnection:
+            let sel = objc2::sel!(captureOutput:didOutputSampleBuffer:fromConnection:);
+            builder.add_method(
+                sel,
+                delegate_method as unsafe extern "C" fn(*const AnyObject, objc2::runtime::Sel, *const AnyObject, *const std::ffi::c_void, *const AnyObject),
+            );
+
+            // Register the class
+            let _cls = builder.register();
+            tracing::info!("Registered MicroundSampleBufferDelegate class");
+            true
+        }
+    })
+}
+
+/// Create a new sample buffer delegate instance
+#[cfg(all(target_os = "macos", feature = "macos"))]
+fn create_sample_buffer_delegate(session_id: usize) -> *const AnyObject {
+    if !ensure_delegate_class_registered() {
+        return std::ptr::null();
+    }
+
+    unsafe {
+        let cls = match objc2::runtime::AnyClass::get("MicroundSampleBufferDelegate") {
+            Some(c) => c,
+            None => return std::ptr::null(),
+        };
+
+        // Create instance
+        let delegate: *const AnyObject = msg_send![cls, new];
+        if delegate.is_null() {
+            return std::ptr::null();
+        }
+
+        // Set session ID ivar using object_setInstanceVariable
+        // This is the low-level way to set an ivar
+        let ivar_name = std::ffi::CString::new("sessionId").unwrap();
+        extern "C" {
+            fn object_setInstanceVariable(
+                obj: *mut AnyObject,
+                name: *const std::ffi::c_char,
+                value: *mut std::ffi::c_void,
+            ) -> *mut std::ffi::c_void;
+        }
+        object_setInstanceVariable(
+            delegate as *mut AnyObject,
+            ivar_name.as_ptr(),
+            session_id as *mut std::ffi::c_void,
+        );
+
+        delegate
+    }
+}
+
+// ============================================================================
 // CoreMedia FFI Declarations
 // ============================================================================
 
@@ -610,6 +907,46 @@ struct CMVideoDimensions {
 extern "C" {
     fn CMVideoFormatDescriptionGetDimensions(format_desc: *const std::ffi::c_void) -> CMVideoDimensions;
     fn CMFormatDescriptionGetMediaSubType(format_desc: *const std::ffi::c_void) -> u32;
+    fn CMSampleBufferGetImageBuffer(sample_buffer: *const std::ffi::c_void) -> *const std::ffi::c_void;
+    fn CMSampleBufferGetPresentationTimeStamp(sample_buffer: *const std::ffi::c_void) -> CMTime;
+}
+
+/// CMTime structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+#[cfg(all(target_os = "macos", feature = "macos"))]
+struct CMTime {
+    value: i64,
+    timescale: i32,
+    flags: u32,
+    epoch: i64,
+}
+
+// ============================================================================
+// CoreVideo FFI Declarations
+// ============================================================================
+
+#[cfg(all(target_os = "macos", feature = "macos"))]
+#[link(name = "CoreVideo", kind = "framework")]
+extern "C" {
+    fn CVPixelBufferLockBaseAddress(pixel_buffer: *const std::ffi::c_void, lock_flags: u64) -> i32;
+    fn CVPixelBufferUnlockBaseAddress(pixel_buffer: *const std::ffi::c_void, unlock_flags: u64) -> i32;
+    fn CVPixelBufferGetBaseAddress(pixel_buffer: *const std::ffi::c_void) -> *const u8;
+    fn CVPixelBufferGetWidth(pixel_buffer: *const std::ffi::c_void) -> usize;
+    fn CVPixelBufferGetHeight(pixel_buffer: *const std::ffi::c_void) -> usize;
+    fn CVPixelBufferGetBytesPerRow(pixel_buffer: *const std::ffi::c_void) -> usize;
+    fn CVPixelBufferGetPixelFormatType(pixel_buffer: *const std::ffi::c_void) -> u32;
+}
+
+// ============================================================================
+// Dispatch FFI Declarations
+// ============================================================================
+
+#[cfg(all(target_os = "macos", feature = "macos"))]
+#[link(name = "System")]
+extern "C" {
+    fn dispatch_queue_create(label: *const std::ffi::c_char, attr: *const std::ffi::c_void) -> *mut std::ffi::c_void;
+    fn dispatch_release(object: *mut std::ffi::c_void);
 }
 
 // ============================================================================

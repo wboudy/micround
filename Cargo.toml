@@ -9,7 +9,7 @@ description = "Live microscope wallpaper"
 default = ["secure-zero"]
 secure-zero = []
 windows = ["dep:windows"]
-macos = ["dep:objc2", "dep:block2"]
+macos = ["dep:objc2", "dep:objc2-foundation", "dep:block2", "dep:dispatch"]
 linux = ["dep:v4l", "dep:x11rb"]
 # System tray integration - requires GTK3 on Linux
 tray = ["dep:tray-icon", "dep:muda"]
@@ -77,7 +77,9 @@ windows = { version = "0.58", optional = true, features = [
 # Platform: macOS
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { version = "0.5", optional = true }
+objc2-foundation = { version = "0.2", optional = true, features = ["NSObject", "NSString", "NSArray", "NSDictionary", "NSNumber"] }
 block2 = { version = "0.5", optional = true }
+dispatch = { version = "0.2", optional = true }
 
 # Platform: Linux
 [target.'cfg(target_os = "linux")'.dependencies]

@@ -26,6 +26,9 @@ pub mod state;
 #[cfg(target_os = "linux")]
 pub mod v4l2;
 
+#[cfg(target_os = "windows")]
+pub mod media_foundation;
+
 // Simulator module is always available - it's production code, not mocks
 pub mod simulator;
 
@@ -97,15 +100,27 @@ pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
     Box::new(v4l2::V4l2Enumerator::new())
 }
 
-// Placeholder for other platforms
-#[cfg(not(target_os = "linux"))]
+/// Create a platform-appropriate capture backend (Windows)
+#[cfg(target_os = "windows")]
 pub fn create_backend() -> Box<dyn CaptureBackend> {
-    unimplemented!("Capture backend not implemented for this platform")
+    Box::new(media_foundation::MFBackend::new())
 }
 
-#[cfg(not(target_os = "linux"))]
+/// Create a platform-appropriate camera enumerator (Windows)
+#[cfg(target_os = "windows")]
 pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
-    unimplemented!("Camera enumerator not implemented for this platform")
+    Box::new(media_foundation::MFEnumerator::new())
+}
+
+// Placeholder for macOS (not yet implemented)
+#[cfg(target_os = "macos")]
+pub fn create_backend() -> Box<dyn CaptureBackend> {
+    unimplemented!("Capture backend not implemented for macOS yet")
+}
+
+#[cfg(target_os = "macos")]
+pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
+    unimplemented!("Camera enumerator not implemented for macOS yet")
 }
 
 /// Create a simulator backend for testing (requires test-simulator feature)

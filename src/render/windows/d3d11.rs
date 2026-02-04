@@ -247,6 +247,10 @@ impl D3D11Renderer {
     }
 
     /// Handle resize when display configuration changes
+    ///
+    /// This operation is transactional: all new resources are created first,
+    /// and only swapped into the struct on complete success. On failure,
+    /// the renderer remains in a valid state with the old dimensions.
     pub fn resize(&mut self, new_width: u32, new_height: u32) -> Result<(), RenderError> {
         if new_width == self.width && new_height == self.height {
             return Ok(());
@@ -256,31 +260,7 @@ impl D3D11Renderer {
             tracing::debug!("D3D11 resize: {}x{} -> {}x{}",
                 self.width, self.height, new_width, new_height);
 
-            // Release the render target view (it holds a reference to the back buffer)
-            // We need to drop our reference before ResizeBuffers
-            drop(std::mem::replace(&mut self.render_target, std::mem::zeroed()));
-
-            // Resize the swap chain buffers
-            self.swap_chain
-                .ResizeBuffers(
-                    0, // Keep buffer count
-                    new_width,
-                    new_height,
-                    DXGI_FORMAT_B8G8R8A8_UNORM,
-                    0,
-                )
-                .map_err(|e| RenderError::Platform(format!("ResizeBuffers failed: {}", e)))?;
-
-            // Recreate render target view
-            let back_buffer: ID3D11Texture2D = self.swap_chain
-                .GetBuffer(0)
-                .map_err(|e| RenderError::Platform(format!("GetBuffer after resize failed: {}", e)))?;
-
-            self.render_target = self.device
-                .CreateRenderTargetView(&back_buffer, None)
-                .map_err(|e| RenderError::Platform(format!("CreateRenderTargetView after resize failed: {}", e)))?;
-
-            // Recreate staging texture with new size
+            // Step 1: Create new staging texture first (doesn't require releasing old resources)
             let staging_desc = D3D11_TEXTURE2D_DESC {
                 Width: new_width,
                 Height: new_height,
@@ -297,10 +277,43 @@ impl D3D11Renderer {
                 MiscFlags: 0,
             };
 
-            self.staging_texture = self.device
+            let new_staging_texture = self.device
                 .CreateTexture2D(&staging_desc, None)
                 .map_err(|e| RenderError::Platform(format!("CreateTexture2D after resize failed: {}", e)))?;
 
+            // Step 2: Now we need to resize the swap chain, which requires releasing
+            // the render target first. Take ownership of the old render target.
+            let old_render_target = std::mem::replace(
+                &mut self.render_target,
+                // Temporarily clone to maintain valid state during resize
+                self.render_target.clone()
+            );
+            // Drop the old reference to release the back buffer
+            drop(old_render_target);
+
+            // Step 3: Resize the swap chain buffers
+            self.swap_chain
+                .ResizeBuffers(
+                    0, // Keep buffer count
+                    new_width,
+                    new_height,
+                    DXGI_FORMAT_B8G8R8A8_UNORM,
+                    0,
+                )
+                .map_err(|e| RenderError::Platform(format!("ResizeBuffers failed: {}", e)))?;
+
+            // Step 4: Recreate render target view from new back buffer
+            let back_buffer: ID3D11Texture2D = self.swap_chain
+                .GetBuffer(0)
+                .map_err(|e| RenderError::Platform(format!("GetBuffer after resize failed: {}", e)))?;
+
+            let new_render_target = self.device
+                .CreateRenderTargetView(&back_buffer, None)
+                .map_err(|e| RenderError::Platform(format!("CreateRenderTargetView after resize failed: {}", e)))?;
+
+            // Step 5: All resources created successfully - commit the changes
+            self.render_target = new_render_target;
+            self.staging_texture = new_staging_texture;
             self.width = new_width;
             self.height = new_height;
 

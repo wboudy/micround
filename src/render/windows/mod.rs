@@ -115,6 +115,11 @@ pub struct WindowsRenderer {
     #[cfg(all(target_os = "windows", feature = "windows"))]
     use_d3d11: bool,
 
+    /// Reusable buffer for RGBA→BGRA conversion (GDI fallback only)
+    /// Avoids allocating ~8MB per frame at 30fps (240MB/s allocation pressure)
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    conversion_buffer: Vec<u8>,
+
     /// Current display width
     width: u32,
     /// Current display height
@@ -146,6 +151,8 @@ impl WindowsRenderer {
             mem_dc: None,
             #[cfg(all(target_os = "windows", feature = "windows"))]
             use_d3d11: true, // Prefer D3D11 by default
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            conversion_buffer: Vec::new(), // Allocated lazily on first use
             width: 0,
             height: 0,
             initialized: false,
@@ -351,7 +358,7 @@ impl WindowsRenderer {
 
     /// Render a frame to the window
     #[cfg(all(target_os = "windows", feature = "windows"))]
-    fn render_frame_to_window(&self, frame: &ProcessedFrame) -> Result<(), RenderError> {
+    fn render_frame_to_window(&mut self, frame: &ProcessedFrame) -> Result<(), RenderError> {
         let window = self
             .render_window
             .ok_or_else(|| RenderError::Platform("No render window".into()))?;
@@ -380,8 +387,9 @@ impl WindowsRenderer {
                 bmiColors: [RGBQUAD::default()],
             };
 
-            // Convert RGBA to BGRA for Windows
-            let bgra_data = rgba_to_bgra(&frame.data);
+            // Convert RGBA to BGRA using reusable buffer (avoids ~8MB allocation per frame)
+            rgba_to_bgra_reuse(&frame.data, &mut self.conversion_buffer);
+            let bgra_data = &self.conversion_buffer;
 
             // Draw to memory DC
             let result = SetDIBitsToDevice(
@@ -663,6 +671,23 @@ fn rgba_to_bgra(rgba: &[u8]) -> Vec<u8> {
     }
 
     bgra
+}
+
+/// Convert RGBA to BGRA format, reusing an existing buffer
+/// This avoids allocating ~8MB per frame (240MB/s at 30fps)
+/// Windows bitmaps expect BGRA byte order
+#[cfg(all(target_os = "windows", feature = "windows"))]
+fn rgba_to_bgra_reuse(rgba: &[u8], bgra: &mut Vec<u8>) {
+    // Ensure buffer has correct capacity
+    bgra.clear();
+    bgra.reserve(rgba.len());
+
+    for chunk in rgba.chunks_exact(4) {
+        bgra.push(chunk[2]); // B
+        bgra.push(chunk[1]); // G
+        bgra.push(chunk[0]); // R
+        bgra.push(chunk[3]); // A
+    }
 }
 
 // ============================================================================

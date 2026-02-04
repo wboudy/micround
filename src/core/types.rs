@@ -95,7 +95,10 @@ pub struct Frame {
 impl Drop for Frame {
     fn drop(&mut self) {
         // Privacy: Zero out frame data before deallocation (opt-in)
-        self.data.iter_mut().for_each(|b| *b = 0);
+        // Uses zeroize crate to prevent compiler from optimizing away
+        // the zeroing as a "dead store" (security-critical)
+        use zeroize::Zeroize;
+        self.data.zeroize();
     }
 }
 

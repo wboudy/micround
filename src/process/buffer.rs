@@ -382,6 +382,18 @@ impl FrameBuffer {
 
 impl Drop for FrameBuffer {
     fn drop(&mut self) {
+        // PRIVACY: Zero out frame data before release to prevent
+        // residual camera data from persisting in memory.
+        // Required by docs/PRIVACY.md - "Frame buffers zeroed on drop"
+        let slot = &self.pool.slots[self.slot_idx];
+        // SAFETY: We have exclusive access via FrameBuffer ownership
+        unsafe {
+            let data = slot.data_mut();
+            // Use volatile write to prevent compiler from optimizing this away
+            for byte in data.iter_mut() {
+                std::ptr::write_volatile(byte, 0);
+            }
+        }
         self.pool.release_slot(self.slot_idx);
     }
 }

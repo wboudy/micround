@@ -7,7 +7,7 @@ description = "Live microscope wallpaper"
 
 [features]
 default = ["secure-zero"]
-secure-zero = []
+secure-zero = ["dep:zeroize"]
 windows = ["dep:windows"]
 macos = ["dep:objc2", "dep:block2"]
 linux = ["dep:v4l", "dep:x11rb"]
@@ -57,6 +57,9 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 
 # GPU data transfer
 bytemuck = { version = "1", features = ["derive"] }
+
+# Secure memory zeroing (prevents compiler optimization of privacy-critical zeroing)
+zeroize = { version = "1", optional = true }
 
 # Platform: Windows
 [target.'cfg(target_os = "windows")'.dependencies]

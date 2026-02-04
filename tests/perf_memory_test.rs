@@ -132,8 +132,16 @@ impl MemoryAnalysis {
 
         let initial_rss_kb = actual_samples.first().map(|s| s.vm_rss_kb).unwrap_or(0);
         let final_rss_kb = actual_samples.last().map(|s| s.vm_rss_kb).unwrap_or(0);
-        let peak_rss_kb = actual_samples.iter().map(|s| s.vm_rss_kb).max().unwrap_or(0);
-        let min_rss_kb = actual_samples.iter().map(|s| s.vm_rss_kb).min().unwrap_or(0);
+        let peak_rss_kb = actual_samples
+            .iter()
+            .map(|s| s.vm_rss_kb)
+            .max()
+            .unwrap_or(0);
+        let min_rss_kb = actual_samples
+            .iter()
+            .map(|s| s.vm_rss_kb)
+            .min()
+            .unwrap_or(0);
         let growth_kb = final_rss_kb as i64 - initial_rss_kb as i64;
         let growth_percent = if initial_rss_kb > 0 {
             (growth_kb as f64 / initial_rss_kb as f64) * 100.0
@@ -142,7 +150,10 @@ impl MemoryAnalysis {
         };
 
         let duration = if actual_samples.len() >= 2 {
-            actual_samples.last().unwrap().timestamp
+            actual_samples
+                .last()
+                .unwrap()
+                .timestamp
                 .duration_since(actual_samples.first().unwrap().timestamp)
         } else {
             Duration::ZERO
@@ -178,21 +189,51 @@ impl MemoryAnalysis {
         eprintln!("\n╔════════════════════════════════════════════════════════════╗");
         eprintln!("║ MEMORY REPORT: {:42} ║", test_name);
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Status:        [{:^4}]                                      ║", status);
+        eprintln!(
+            "║ Status:        [{:^4}]                                      ║",
+            status
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Duration:      {:>12.2?}                              ║", self.duration);
-        eprintln!("║ Samples:       {:>12}                                ║", self.samples.len());
+        eprintln!(
+            "║ Duration:      {:>12.2?}                              ║",
+            self.duration
+        );
+        eprintln!(
+            "║ Samples:       {:>12}                                ║",
+            self.samples.len()
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Initial RSS:   {:>12}                                ║", MemoryStats::format_kb(self.initial_rss_kb));
-        eprintln!("║ Final RSS:     {:>12}                                ║", MemoryStats::format_kb(self.final_rss_kb));
-        eprintln!("║ Peak RSS:      {:>12}                                ║", MemoryStats::format_kb(self.peak_rss_kb));
-        eprintln!("║ Min RSS:       {:>12}                                ║", MemoryStats::format_kb(self.min_rss_kb));
+        eprintln!(
+            "║ Initial RSS:   {:>12}                                ║",
+            MemoryStats::format_kb(self.initial_rss_kb)
+        );
+        eprintln!(
+            "║ Final RSS:     {:>12}                                ║",
+            MemoryStats::format_kb(self.final_rss_kb)
+        );
+        eprintln!(
+            "║ Peak RSS:      {:>12}                                ║",
+            MemoryStats::format_kb(self.peak_rss_kb)
+        );
+        eprintln!(
+            "║ Min RSS:       {:>12}                                ║",
+            MemoryStats::format_kb(self.min_rss_kb)
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
         let growth_sign = if self.growth_kb >= 0 { "+" } else { "" };
-        eprintln!("║ Growth:        {:>12} ({:>+6.1}%)                    ║",
-            format!("{}{}", growth_sign, MemoryStats::format_kb(self.growth_kb.unsigned_abs())),
-            self.growth_percent);
-        eprintln!("║ Trend:         {:>12.2} KB/s                         ║", self.trend_slope_kb_per_sec);
+        eprintln!(
+            "║ Growth:        {:>12} ({:>+6.1}%)                    ║",
+            format!(
+                "{}{}",
+                growth_sign,
+                MemoryStats::format_kb(self.growth_kb.unsigned_abs())
+            ),
+            self.growth_percent
+        );
+        eprintln!(
+            "║ Trend:         {:>12.2} KB/s                         ║",
+            self.trend_slope_kb_per_sec
+        );
         if self.suspected_leak {
             eprintln!("╠════════════════════════════════════════════════════════════╣");
             eprintln!("║ ⚠ SUSPECTED MEMORY LEAK DETECTED                           ║");
@@ -217,14 +258,26 @@ impl MemoryAnalysis {
         };
 
         // Find range for scaling
-        let max_rss = display_samples.iter().map(|s| s.vm_rss_kb).max().unwrap_or(1);
-        let min_rss = display_samples.iter().map(|s| s.vm_rss_kb).min().unwrap_or(0);
+        let max_rss = display_samples
+            .iter()
+            .map(|s| s.vm_rss_kb)
+            .max()
+            .unwrap_or(1);
+        let min_rss = display_samples
+            .iter()
+            .map(|s| s.vm_rss_kb)
+            .min()
+            .unwrap_or(0);
         let range = (max_rss - min_rss).max(1);
 
         for sample in &display_samples {
             let normalized = ((sample.vm_rss_kb - min_rss) as f64 / range as f64 * 40.0) as usize;
             let bar: String = "█".repeat(normalized);
-            eprintln!("{:>8} │{:<40}│", MemoryStats::format_kb(sample.vm_rss_kb), bar);
+            eprintln!(
+                "{:>8} │{:<40}│",
+                MemoryStats::format_kb(sample.vm_rss_kb),
+                bar
+            );
         }
         eprintln!();
     }
@@ -290,11 +343,15 @@ fn monitor_memory_during_capture(
         format: Some(micround::core::PixelFormat::Rgba32),
     };
 
-    capture.open(&devices[0].id, settings).expect("Failed to open capture device");
+    capture
+        .open(&devices[0].id, settings)
+        .expect("Failed to open capture device");
 
     // Initialize display simulator
     let mut display = DisplaySimulator::new(display_config);
-    display.init(&DisplayId("memory-test".into())).expect("Failed to init display");
+    display
+        .init(&DisplayId("memory-test".into()))
+        .expect("Failed to init display");
 
     capture.start().expect("Failed to start capture");
 
@@ -351,7 +408,11 @@ fn test_memory_basic_capture() {
         width: 640,
         height: 480,
         fps: 30,
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -423,22 +484,39 @@ fn test_memory_allocation_patterns() {
     eprintln!("╔════════════════════════════════════════════════════════════╗");
     eprintln!("║ ALLOCATION PATTERN ANALYSIS                                ║");
     eprintln!("╠════════════════════════════════════════════════════════════╣");
-    
+
     // Calculate memory volatility (standard deviation)
     if analysis.samples.len() > 1 {
-        let rss_values: Vec<f64> = analysis.samples.iter().map(|s| s.vm_rss_kb as f64).collect();
+        let rss_values: Vec<f64> = analysis
+            .samples
+            .iter()
+            .map(|s| s.vm_rss_kb as f64)
+            .collect();
         let mean: f64 = rss_values.iter().sum::<f64>() / rss_values.len() as f64;
-        let variance: f64 = rss_values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / rss_values.len() as f64;
+        let variance: f64 =
+            rss_values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / rss_values.len() as f64;
         let std_dev = variance.sqrt();
 
-        eprintln!("║ Mean RSS:      {:>12}                                ║", MemoryStats::format_kb(mean as u64));
-        eprintln!("║ Std Dev:       {:>12}                                ║", MemoryStats::format_kb(std_dev as u64));
-        eprintln!("║ Volatility:    {:>12.2}%                               ║", (std_dev / mean) * 100.0);
+        eprintln!(
+            "║ Mean RSS:      {:>12}                                ║",
+            MemoryStats::format_kb(mean as u64)
+        );
+        eprintln!(
+            "║ Std Dev:       {:>12}                                ║",
+            MemoryStats::format_kb(std_dev as u64)
+        );
+        eprintln!(
+            "║ Volatility:    {:>12.2}%                               ║",
+            (std_dev / mean) * 100.0
+        );
     }
     eprintln!("╚════════════════════════════════════════════════════════════╝\n");
 
     // Ensure samples were collected
-    assert!(analysis.samples.len() > 0, "Should have collected memory samples");
+    assert!(
+        analysis.samples.len() > 0,
+        "Should have collected memory samples"
+    );
 }
 
 #[test]
@@ -479,8 +557,10 @@ fn test_memory_trend_detection() {
     // Log trend analysis
     eprintln!("Trend slope: {:.2} KB/s", analysis.trend_slope_kb_per_sec);
     if analysis.trend_slope_kb_per_sec > 0.0 {
-        eprintln!("Projected growth over 1 hour: {}", 
-            MemoryStats::format_kb((analysis.trend_slope_kb_per_sec * 3600.0) as u64));
+        eprintln!(
+            "Projected growth over 1 hour: {}",
+            MemoryStats::format_kb((analysis.trend_slope_kb_per_sec * 3600.0) as u64)
+        );
     }
 
     // No runaway memory growth (< 100 KB/s trend)
@@ -501,7 +581,11 @@ fn test_memory_detailed_report() {
         width: 320,
         height: 240,
         fps: 30,
-        pattern: FramePattern::SolidColor { r: 64, g: 64, b: 64 },
+        pattern: FramePattern::SolidColor {
+            r: 64,
+            g: 64,
+            b: 64,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -527,13 +611,22 @@ fn test_memory_detailed_report() {
     analysis.print_memory_graph();
 
     // Informational test - always passes if samples collected
-    assert!(analysis.samples.len() > 0, "Should have collected memory samples");
-    
+    assert!(
+        analysis.samples.len() > 0,
+        "Should have collected memory samples"
+    );
+
     // Log summary
-    eprintln!("Summary: {} samples over {:?}", analysis.samples.len(), analysis.duration);
-    eprintln!("Memory range: {} - {}",
+    eprintln!(
+        "Summary: {} samples over {:?}",
+        analysis.samples.len(),
+        analysis.duration
+    );
+    eprintln!(
+        "Memory range: {} - {}",
         MemoryStats::format_kb(analysis.min_rss_kb),
-        MemoryStats::format_kb(analysis.peak_rss_kb));
+        MemoryStats::format_kb(analysis.peak_rss_kb)
+    );
 }
 
 #[test]
@@ -575,8 +668,7 @@ fn test_memory_extended_60sec() {
     assert!(
         !analysis.suspected_leak,
         "Memory leak suspected after 60s: {:.1}% growth, {:.2} KB/s trend",
-        analysis.growth_percent,
-        analysis.trend_slope_kb_per_sec
+        analysis.growth_percent, analysis.trend_slope_kb_per_sec
     );
 }
 
@@ -639,7 +731,11 @@ fn test_memory_hd_capture() {
         width: 1920,
         height: 1080,
         fps: 30,
-        pattern: FramePattern::SolidColor { r: 100, g: 150, b: 200 },
+        pattern: FramePattern::SolidColor {
+            r: 100,
+            g: 150,
+            b: 200,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,

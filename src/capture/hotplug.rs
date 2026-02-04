@@ -146,8 +146,7 @@ fn hotplug_thread_main<E, H>(
     mut known_devices: HashSet<DeviceId>,
     config: HotplugConfig,
     stop_signal: Arc<AtomicBool>,
-)
-where
+) where
     E: CameraEnumerator,
     H: CameraEventHandler,
 {
@@ -275,6 +274,13 @@ pub mod linux {
 #[cfg(test)]
 pub struct CollectingHandler {
     pub events: Vec<CameraEvent>,
+}
+
+#[cfg(test)]
+impl Default for CollectingHandler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]

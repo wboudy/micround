@@ -4,6 +4,41 @@ This directory contains build and packaging scripts for Micround.
 
 ## Scripts
 
+### ci-loop.sh
+
+CI feedback loop automation for rapid development iteration.
+
+**Requirements:**
+- gh (GitHub CLI) installed and authenticated
+- jq (JSON processor)
+- git
+
+**Usage:**
+```bash
+./scripts/ci-loop.sh watch         # Poll CI until completion
+./scripts/ci-loop.sh logs [RUN_ID] # Fetch failed job logs
+./scripts/ci-loop.sh full          # Push + watch + logs on failure
+./scripts/ci-loop.sh status        # Show latest run info
+./scripts/ci-loop.sh help          # Show usage
+```
+
+**Environment variables:**
+- `POLL_INTERVAL`: Seconds between CI status checks (default: 30)
+- `MAX_WAIT`: Max seconds before timeout (default: 600)
+
+**Exit codes:**
+- 0: CI passed / success
+- 1: CI failed / error
+- 2: Timeout waiting for CI
+
+**Example workflow:**
+```bash
+# Make changes, commit, then run full CI loop
+git commit -am "Fix bug"
+./scripts/ci-loop.sh full
+# Script will push, watch CI, and show logs on failure
+```
+
 ### build-appimage.sh
 
 Creates a self-contained AppImage for Linux distribution.

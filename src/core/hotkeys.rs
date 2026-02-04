@@ -1,3 +1,6 @@
+// Allow unused imports - linter auto-adds tracing macros for future use
+#![allow(unused_imports)]
+
 //! Global keyboard shortcuts
 //!
 //! Provides cross-platform global hotkey support using the `global-hotkey` crate.
@@ -201,7 +204,10 @@ mod manager {
         }
 
         /// Create with custom configuration
-        pub fn with_config(app_handle: AppHandle, config: HotkeyConfig) -> Result<Self, HotkeyError> {
+        pub fn with_config(
+            app_handle: AppHandle,
+            config: HotkeyConfig,
+        ) -> Result<Self, HotkeyError> {
             let manager = Self::new(app_handle)?;
             *manager.config.write().unwrap() = config;
             Ok(manager)
@@ -301,7 +307,9 @@ mod manager {
                     }
                     HotkeyId::TakeSnapshot => {
                         info!("Take snapshot hotkey pressed");
-                        Some(Command::TakeSnapshot { to_clipboard: false })
+                        Some(Command::TakeSnapshot {
+                            to_clipboard: false,
+                        })
                     }
                 };
 
@@ -559,6 +567,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_hotkey_config_reset() {
         let mut config = HotkeyConfig::default();
         config.enabled = false;

@@ -4,9 +4,8 @@
 
 mod fixtures;
 
-use fixtures::*;
 use fixtures::frames::*;
-use micround::core::PixelFormat;
+use fixtures::*;
 
 // ============================================================================
 // Frame Fixture Tests
@@ -84,7 +83,10 @@ fn test_color_bar_values() {
 
     // Last bar (black) - near the end of a row
     let last_bar_start = 600 * 4; // x=600 is in the 8th bar
-    assert_eq!(&frame.data[last_bar_start..last_bar_start + 4], &[0, 0, 0, 255]);
+    assert_eq!(
+        &frame.data[last_bar_start..last_bar_start + 4],
+        &[0, 0, 0, 255]
+    );
 }
 
 #[test]
@@ -104,19 +106,35 @@ fn test_corner_markers_positions() {
     let frame = rgba_corner_markers_100x100();
 
     // Top-left (0,0) should be red
-    assert_eq!(&frame.data[0..4], &[255, 0, 0, 255], "Top-left should be red");
+    assert_eq!(
+        &frame.data[0..4],
+        &[255, 0, 0, 255],
+        "Top-left should be red"
+    );
 
     // Top-right (99,0) should be green
     let tr = (99 * 4) as usize;
-    assert_eq!(&frame.data[tr..tr + 4], &[0, 255, 0, 255], "Top-right should be green");
+    assert_eq!(
+        &frame.data[tr..tr + 4],
+        &[0, 255, 0, 255],
+        "Top-right should be green"
+    );
 
     // Bottom-left (0,99) should be blue
     let bl = (99 * 100 * 4) as usize;
-    assert_eq!(&frame.data[bl..bl + 4], &[0, 0, 255, 255], "Bottom-left should be blue");
+    assert_eq!(
+        &frame.data[bl..bl + 4],
+        &[0, 0, 255, 255],
+        "Bottom-left should be blue"
+    );
 
     // Bottom-right (99,99) should be yellow
     let br = ((99 * 100 + 99) * 4) as usize;
-    assert_eq!(&frame.data[br..br + 4], &[255, 255, 0, 255], "Bottom-right should be yellow");
+    assert_eq!(
+        &frame.data[br..br + 4],
+        &[255, 255, 0, 255],
+        "Bottom-right should be yellow"
+    );
 }
 
 #[test]
@@ -206,7 +224,9 @@ fn test_load_cameras() {
     assert_eq!(cameras.devices.len(), 4, "Should have 4 camera devices");
 
     // Check first camera
-    let logitech = cameras.devices.iter()
+    let logitech = cameras
+        .devices
+        .iter()
         .find(|c| c.name.contains("C270"))
         .expect("Should have C270");
     assert!(logitech.is_available);
@@ -219,7 +239,9 @@ fn test_load_displays() {
     assert_eq!(displays.displays.len(), 2, "Should have 2 displays");
 
     // Check primary
-    let primary = displays.displays.iter()
+    let primary = displays
+        .displays
+        .iter()
         .find(|d| d.is_primary)
         .expect("Should have primary display");
     assert_eq!(primary.bounds.width, 3840);
@@ -232,12 +254,13 @@ fn test_load_multi_monitor() {
     assert_eq!(displays.displays.len(), 4, "Should have 4 displays");
 
     // Check for negative X coordinate (TV)
-    let has_negative_x = displays.displays.iter()
-        .any(|d| d.bounds.x < 0);
+    let has_negative_x = displays.displays.iter().any(|d| d.bounds.x < 0);
     assert!(has_negative_x, "Should have display with negative X");
 
     // Check for portrait mode (width < height)
-    let has_portrait = displays.displays.iter()
+    let has_portrait = displays
+        .displays
+        .iter()
         .any(|d| d.bounds.width < d.bounds.height);
     assert!(has_portrait, "Should have portrait display");
 }
@@ -283,14 +306,20 @@ fn test_frames_with_assertions() {
     let frame_b = rgba_color_bars_640x480();
 
     // Same generator should produce identical frames
-    assert_eq!(frame_a.data, frame_b.data, "Same generator should produce identical frames");
+    assert_eq!(
+        frame_a.data, frame_b.data,
+        "Same generator should produce identical frames"
+    );
 }
 
 #[test]
 fn test_corrupted_frames_invalid() {
     let truncated = corrupted_truncated_frame();
     let expected_size = (truncated.width * truncated.height * 4) as usize; // RGBA32
-    assert!(truncated.data.len() < expected_size, "Truncated frame should be too small");
+    assert!(
+        truncated.data.len() < expected_size,
+        "Truncated frame should be too small"
+    );
 
     let zero_dim = corrupted_zero_dimensions();
     assert_eq!(zero_dim.width, 0);

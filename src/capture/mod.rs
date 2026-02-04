@@ -26,28 +26,19 @@ pub mod state;
 #[cfg(target_os = "linux")]
 pub mod v4l2;
 
+#[cfg(target_os = "windows")]
+pub mod media_foundation;
+
 // Simulator module is always available - it's production code, not mocks
 pub mod simulator;
 
-use crate::core::{CameraDevice, CaptureSettings, DeviceId, Frame, CaptureError, NegotiatedFormat};
+use crate::core::{CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat};
 
+pub use capture_loop::{start_capture_loop, CaptureLoopHandle, FrameReceiver, MetricsSnapshot};
 pub use enumerator::*;
-pub use negotiation::{negotiate_format, filter_acceptable_capabilities};
-pub use capture_loop::{
-    start_capture_loop, CaptureLoopHandle, CaptureLoopError, CaptureMetrics,
-    CaptureState, FrameReceiver, MetricsSnapshot,
-};
-pub use state::{
-    CameraState, CameraStateManager, CameraErrorInfo, StateTransition,
-    TransitionReason, SharedCameraState, shared_camera_state, shared_camera_state_available,
-};
-pub use hotplug::{
-    HotplugConfig, HotplugMonitorHandle, start_hotplug_monitor,
-    ChannelHandler, TokioChannelHandler,
-};
-pub use manager::{
-    CaptureManager, CameraHandle, DeviceEvent,
-};
+pub use manager::CaptureManager;
+pub use negotiation::negotiate_format;
+pub use state::{shared_camera_state, CameraErrorInfo, CameraState, SharedCameraState};
 
 /// Trait for platform-specific capture implementations
 pub trait CaptureBackend: Send {
@@ -64,7 +55,11 @@ pub trait CaptureBackend: Send {
     /// - `DeviceBusy` - Device is in use by another application
     /// - `FormatNegotiationFailed` - No suitable format available
     /// - `PermissionDenied` - Insufficient permissions
-    fn open(&mut self, device_id: &DeviceId, settings: CaptureSettings) -> Result<NegotiatedFormat, CaptureError>;
+    fn open(
+        &mut self,
+        device_id: &DeviceId,
+        settings: CaptureSettings,
+    ) -> Result<NegotiatedFormat, CaptureError>;
 
     /// Start capturing frames
     fn start(&mut self) -> Result<(), CaptureError>;
@@ -97,15 +92,27 @@ pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
     Box::new(v4l2::V4l2Enumerator::new())
 }
 
-// Placeholder for other platforms
-#[cfg(not(target_os = "linux"))]
+/// Create a platform-appropriate capture backend (Windows)
+#[cfg(target_os = "windows")]
 pub fn create_backend() -> Box<dyn CaptureBackend> {
-    unimplemented!("Capture backend not implemented for this platform")
+    Box::new(media_foundation::MFBackend::new())
 }
 
-#[cfg(not(target_os = "linux"))]
+/// Create a platform-appropriate camera enumerator (Windows)
+#[cfg(target_os = "windows")]
 pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
-    unimplemented!("Camera enumerator not implemented for this platform")
+    Box::new(media_foundation::MFEnumerator::new())
+}
+
+// Placeholder for macOS (not yet implemented)
+#[cfg(target_os = "macos")]
+pub fn create_backend() -> Box<dyn CaptureBackend> {
+    unimplemented!("Capture backend not implemented for macOS yet")
+}
+
+#[cfg(target_os = "macos")]
+pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
+    unimplemented!("Camera enumerator not implemented for macOS yet")
 }
 
 /// Create a simulator backend for testing (requires test-simulator feature)
@@ -116,6 +123,8 @@ pub fn create_simulator_backend() -> Box<dyn CaptureBackend> {
 
 /// Create a simulator backend with custom configuration
 #[cfg(feature = "test-simulator")]
-pub fn create_simulator_backend_with_config(config: simulator::SimulatorConfig) -> Box<dyn CaptureBackend> {
+pub fn create_simulator_backend_with_config(
+    config: simulator::SimulatorConfig,
+) -> Box<dyn CaptureBackend> {
     Box::new(simulator::SimulatorBackend::new(config))
 }

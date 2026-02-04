@@ -130,10 +130,10 @@ impl Default for Color {
 /// Text size preset
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextSize {
-    Small,  // ~12px equivalent
+    Small, // ~12px equivalent
     #[default]
     Medium, // ~16px equivalent
-    Large,  // ~24px equivalent
+    Large, // ~24px equivalent
 }
 
 impl TextSize {
@@ -460,13 +460,7 @@ fn render_text_overlay(
     let text_width = text.len() as u32 * char_width;
     let text_height = char_height;
 
-    let (x, y) = position.calculate_position(
-        width,
-        height,
-        text_width,
-        text_height,
-        style.padding,
-    );
+    let (x, y) = position.calculate_position(width, height, text_width, text_height, style.padding);
 
     // Draw shadow first if enabled
     if style.draw_shadow {
@@ -500,6 +494,7 @@ fn render_text_overlay(
 }
 
 /// Render text at specific coordinates
+#[allow(clippy::too_many_arguments)]
 fn render_text_at(
     frame_data: &mut [u8],
     frame_width: u32,
@@ -532,6 +527,7 @@ fn render_text_at(
 }
 
 /// Render a single character using a simple bitmap font
+#[allow(clippy::too_many_arguments)]
 fn render_char(
     frame_data: &mut [u8],
     frame_width: u32,
@@ -546,7 +542,11 @@ fn render_char(
 ) {
     let bitmap = get_char_bitmap(ch);
     let bitmap_height = bitmap.len() as u32;
-    let bitmap_width = if bitmap.is_empty() { 0 } else { bitmap[0].len() as u32 };
+    let bitmap_width = if bitmap.is_empty() {
+        0
+    } else {
+        bitmap[0].len() as u32
+    };
 
     // Scale bitmap to char dimensions
     for py in 0..char_height {
@@ -562,11 +562,7 @@ fn render_char(
                 if fx < frame_width && fy < frame_height {
                     let idx = ((fy * frame_width + fx) * 4) as usize;
                     if idx + 3 < frame_data.len() {
-                        blend_pixel(
-                            &mut frame_data[idx..idx + 4],
-                            color,
-                            opacity,
-                        );
+                        blend_pixel(&mut frame_data[idx..idx + 4], color, opacity);
                     }
                 }
             }
@@ -918,15 +914,12 @@ mod tests {
 
     #[test]
     fn test_overlay_builder() {
-        let overlay = Overlay::new(
-            OverlayContent::text("Test"),
-            OverlayPosition::TopRight,
-        )
-        .with_style(OverlayStyle {
-            color: Color::RED,
-            ..Default::default()
-        })
-        .enabled(true);
+        let overlay = Overlay::new(OverlayContent::text("Test"), OverlayPosition::TopRight)
+            .with_style(OverlayStyle {
+                color: Color::RED,
+                ..Default::default()
+            })
+            .enabled(true);
 
         assert_eq!(overlay.position, OverlayPosition::TopRight);
         assert_eq!(overlay.style.color, Color::RED);

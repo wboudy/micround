@@ -6,8 +6,8 @@
 //! Run with: cargo test --test core_events_test
 
 use micround::core::{
-    AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event,
-    EventBus, Flip, FrameDropReason, Rotation, ScalingMode,
+    AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event, EventBus, Flip,
+    FrameDropReason, Rotation, ScalingMode,
 };
 
 // ============================================================================
@@ -64,7 +64,9 @@ fn test_command_take_snapshot_to_clipboard() {
 
 #[test]
 fn test_command_take_snapshot_to_file() {
-    let cmd = Command::TakeSnapshot { to_clipboard: false };
+    let cmd = Command::TakeSnapshot {
+        to_clipboard: false,
+    };
     if let Command::TakeSnapshot { to_clipboard } = cmd {
         assert!(!to_clipboard);
     } else {
@@ -98,7 +100,9 @@ fn test_command_select_display() {
 
 #[test]
 fn test_command_set_scaling() {
-    let cmd = Command::SetScaling { mode: ScalingMode::Fill };
+    let cmd = Command::SetScaling {
+        mode: ScalingMode::Fill,
+    };
     if let Command::SetScaling { mode } = cmd {
         assert_eq!(mode, ScalingMode::Fill);
     } else {
@@ -108,7 +112,9 @@ fn test_command_set_scaling() {
 
 #[test]
 fn test_command_set_rotation() {
-    let cmd = Command::SetRotation { rotation: Rotation::Clockwise90 };
+    let cmd = Command::SetRotation {
+        rotation: Rotation::Clockwise90,
+    };
     if let Command::SetRotation { rotation } = cmd {
         assert_eq!(rotation, Rotation::Clockwise90);
     } else {
@@ -118,7 +124,9 @@ fn test_command_set_rotation() {
 
 #[test]
 fn test_command_set_flip() {
-    let cmd = Command::SetFlip { flip: Flip::Horizontal };
+    let cmd = Command::SetFlip {
+        flip: Flip::Horizontal,
+    };
     if let Command::SetFlip { flip } = cmd {
         assert_eq!(flip, Flip::Horizontal);
     } else {
@@ -186,7 +194,12 @@ fn test_event_capture_started() {
         resolution: (1920, 1080),
         fps: 30.0,
     };
-    if let Event::CaptureStarted { device_id, resolution, fps } = event {
+    if let Event::CaptureStarted {
+        device_id,
+        resolution,
+        fps,
+    } = event
+    {
         assert_eq!(device_id.0, "cam-0");
         assert_eq!(resolution, (1920, 1080));
         assert_eq!(fps, 30.0);
@@ -264,7 +277,11 @@ fn test_event_state_changed() {
         old_state: AppState::Idle,
         new_state: AppState::Running,
     };
-    if let Event::StateChanged { old_state, new_state } = event {
+    if let Event::StateChanged {
+        old_state,
+        new_state,
+    } = event
+    {
         assert_eq!(old_state, AppState::Idle);
         assert_eq!(new_state, AppState::Running);
     } else {
@@ -325,8 +342,14 @@ fn test_frame_drop_reason_clone() {
 #[test]
 fn test_frame_drop_reason_debug() {
     assert_eq!(format!("{:?}", FrameDropReason::QueueFull), "QueueFull");
-    assert_eq!(format!("{:?}", FrameDropReason::ProcessingTimeout), "ProcessingTimeout");
-    assert_eq!(format!("{:?}", FrameDropReason::RenderQueueFull), "RenderQueueFull");
+    assert_eq!(
+        format!("{:?}", FrameDropReason::ProcessingTimeout),
+        "ProcessingTimeout"
+    );
+    assert_eq!(
+        format!("{:?}", FrameDropReason::RenderQueueFull),
+        "RenderQueueFull"
+    );
 }
 
 // ============================================================================
@@ -803,9 +826,12 @@ async fn test_full_command_event_flow() {
     let mut event_sub = handle.subscribe_events();
 
     // Send command
-    handle.send_command(Command::StartCapture {
-        device_id: DeviceId("cam-0".to_string()),
-    }).await.unwrap();
+    handle
+        .send_command(Command::StartCapture {
+            device_id: DeviceId("cam-0".to_string()),
+        })
+        .await
+        .unwrap();
 
     // Receive command
     let cmd = cmd_rx.recv().await.unwrap();
@@ -936,7 +962,10 @@ fn test_capture_started_zero_resolution() {
         resolution: (0, 0),
         fps: 0.0,
     };
-    if let Event::CaptureStarted { resolution, fps, .. } = event {
+    if let Event::CaptureStarted {
+        resolution, fps, ..
+    } = event
+    {
         assert_eq!(resolution, (0, 0));
         assert_eq!(fps, 0.0);
     }

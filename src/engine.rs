@@ -24,7 +24,7 @@ use std::time::Instant;
 
 use crate::core::events::{Command, Event, EventBus};
 use crate::core::{Frame, RenderError};
-use crate::process::{process_frame, ProcessedFrame, ProcessorConfig, ProcessError};
+use crate::process::{process_frame, ProcessError, ProcessedFrame, ProcessorConfig};
 use crate::render::WallpaperRenderer;
 
 // ============================================================================
@@ -321,7 +321,10 @@ impl DisplayEngine {
     ///
     /// If the display is paused, the frame is discarded (but counted).
     /// If running, the frame is processed and stored as the last frame.
-    pub fn process_frame(&self, raw_frame: &Frame) -> Result<Option<Arc<ProcessedFrame>>, ProcessError> {
+    pub fn process_frame(
+        &self,
+        raw_frame: &Frame,
+    ) -> Result<Option<Arc<ProcessedFrame>>, ProcessError> {
         let state = self.state();
 
         // Skip processing if stopped

@@ -15,17 +15,14 @@ use tempfile::TempDir;
 
 use common::test_logger::*;
 use micround::capture::{
+    simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
     CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern},
 };
-use micround::config::{AppConfig, load_config, save_config, config_path};
-use micround::core::{
-    AppContext, AppState, Command, DeviceId, DisplayId, Event,
-    CaptureSettings,
-};
+use micround::config::{config_path, load_config, save_config, AppConfig};
+use micround::core::{AppContext, AppState, CaptureSettings, Command, DeviceId, DisplayId, Event};
 use micround::render::{
-    WallpaperRenderer,
     simulator::{DisplaySimulator, DisplaySimulatorConfig},
+    WallpaperRenderer,
 };
 
 // ============================================================================
@@ -56,9 +53,18 @@ fn test_startup_full_initialization_sequence() {
     test_assert!(logger, config.version > 0, "Config has valid version");
     test_assert!(logger, config.camera.width > 0, "Camera width configured");
     test_assert!(logger, config.camera.height > 0, "Camera height configured");
-    test_assert!(logger, config.camera.framerate > 0.0, "Framerate configured");
-    test_step_ok!(logger, "Config loaded: {}x{} @ {} fps",
-        config.camera.width, config.camera.height, config.camera.framerate);
+    test_assert!(
+        logger,
+        config.camera.framerate > 0.0,
+        "Framerate configured"
+    );
+    test_step_ok!(
+        logger,
+        "Config loaded: {}x{} @ {} fps",
+        config.camera.width,
+        config.camera.height,
+        config.camera.framerate
+    );
 
     // Step 3: Create capture backend (simulator for testing)
     test_step!(logger, "Initializing capture backend");
@@ -69,8 +75,12 @@ fn test_startup_full_initialization_sequence() {
         pattern: FramePattern::Checkerboard { size: 32 },
         ..Default::default()
     };
-    let mut capture = SimulatorBackend::new(capture_config);
-    test_assert!(logger, !capture.is_capturing(), "Capture starts in idle state");
+    let capture = SimulatorBackend::new(capture_config);
+    test_assert!(
+        logger,
+        !capture.is_capturing(),
+        "Capture starts in idle state"
+    );
     test_step_ok!(logger, "Capture backend created (Simulator)");
 
     // Step 4: Create render backend (simulator for testing)
@@ -82,7 +92,9 @@ fn test_startup_full_initialization_sequence() {
         ..Default::default()
     };
     let mut renderer = DisplaySimulator::new(display_config);
-    renderer.init(&DisplayId("test:primary".into())).expect("init renderer");
+    renderer
+        .init(&DisplayId("test:primary".into()))
+        .expect("init renderer");
     test_step_ok!(logger, "Render backend created (Simulator) 1920x1080");
 
     // Step 5: Device enumeration
@@ -119,23 +131,52 @@ fn test_startup_missing_config_uses_defaults() {
     let config = AppConfig::default();
     test_assert!(logger, config.version == 1, "Default version is 1");
     test_assert!(logger, config.camera.width == 1920, "Default width is 1920");
-    test_assert!(logger, config.camera.height == 1080, "Default height is 1080");
-    test_assert!(logger, config.camera.framerate == 30.0, "Default framerate is 30");
+    test_assert!(
+        logger,
+        config.camera.height == 1080,
+        "Default height is 1080"
+    );
+    test_assert!(
+        logger,
+        config.camera.framerate == 30.0,
+        "Default framerate is 30"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying startup behavior settings");
-    test_assert!(logger, !config.startup.launch_at_login, "launch_at_login defaults to false");
-    test_assert!(logger, !config.startup.auto_start_feed, "auto_start_feed defaults to false");
-    test_assert!(logger, !config.startup.minimize_on_start, "minimize_on_start defaults to false");
+    test_assert!(
+        logger,
+        !config.startup.launch_at_login,
+        "launch_at_login defaults to false"
+    );
+    test_assert!(
+        logger,
+        !config.startup.auto_start_feed,
+        "auto_start_feed defaults to false"
+    );
+    test_assert!(
+        logger,
+        !config.startup.minimize_on_start,
+        "minimize_on_start defaults to false"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Verifying internal state defaults");
-    test_assert!(logger, config.internal.original_wallpaper_path.is_none(),
-        "No original wallpaper path");
-    test_assert!(logger, config.internal.last_clean_shutdown,
-        "last_clean_shutdown defaults to true");
-    test_assert!(logger, config.internal.last_camera_id.is_none(),
-        "No last camera ID");
+    test_assert!(
+        logger,
+        config.internal.original_wallpaper_path.is_none(),
+        "No original wallpaper path"
+    );
+    test_assert!(
+        logger,
+        config.internal.last_clean_shutdown,
+        "last_clean_shutdown defaults to true"
+    );
+    test_assert!(
+        logger,
+        config.internal.last_camera_id.is_none(),
+        "No last camera ID"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -167,11 +208,31 @@ fn test_startup_config_validation_and_sanitization() {
     test_step!(logger, "Sanitizing config");
     config.sanitize();
     let errors_after = config.validate();
-    test_assert!(logger, errors_after.is_empty(), "Config is valid after sanitization");
-    test_assert!(logger, config.camera.width == 1920, "Width sanitized to default");
-    test_assert!(logger, config.camera.height == 1080, "Height sanitized to default");
-    test_assert!(logger, config.camera.framerate == 30.0, "Framerate sanitized to default");
-    test_assert!(logger, config.display.rotation == 0, "Rotation sanitized to 0");
+    test_assert!(
+        logger,
+        errors_after.is_empty(),
+        "Config is valid after sanitization"
+    );
+    test_assert!(
+        logger,
+        config.camera.width == 1920,
+        "Width sanitized to default"
+    );
+    test_assert!(
+        logger,
+        config.camera.height == 1080,
+        "Height sanitized to default"
+    );
+    test_assert!(
+        logger,
+        config.camera.framerate == 30.0,
+        "Framerate sanitized to default"
+    );
+    test_assert!(
+        logger,
+        config.display.rotation == 0,
+        "Rotation sanitized to 0"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Using sanitized config for backend creation");
@@ -179,11 +240,19 @@ fn test_startup_config_validation_and_sanitization() {
         width: config.camera.width,
         height: config.camera.height,
         fps: config.camera.framerate as u32,
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         ..Default::default()
     };
     let capture = SimulatorBackend::new(capture_config);
-    test_assert!(logger, !capture.is_capturing(), "Backend created successfully");
+    test_assert!(
+        logger,
+        !capture.is_capturing(),
+        "Backend created successfully"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -222,12 +291,15 @@ fn test_startup_device_enumeration() {
 
     test_step!(logger, "Testing device selection");
     let first_device = &devices[0];
-    let result = capture.open(&first_device.id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let result = capture.open(
+        &first_device.id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
     test_assert!(logger, result.is_ok(), "Can open first device");
     capture.close();
     test_step_ok!(logger);
@@ -247,13 +319,20 @@ fn test_startup_invalid_device_handling() {
 
     test_step!(logger, "Attempting to open invalid device");
     let invalid_id = DeviceId("nonexistent:camera:12345".into());
-    let result = capture.open(&invalid_id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
-    test_assert!(logger, result.is_err(), "Opening invalid device returns error");
+    let result = capture.open(
+        &invalid_id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
+    test_assert!(
+        logger,
+        result.is_err(),
+        "Opening invalid device returns error"
+    );
     if let Err(e) = &result {
         tracing::warn!(error = %e, "Expected error for invalid device");
     }
@@ -262,12 +341,15 @@ fn test_startup_invalid_device_handling() {
     test_step!(logger, "Backend remains usable after error");
     let devices = capture.enumerate_devices();
     test_assert!(logger, !devices.is_empty(), "Can still enumerate devices");
-    let valid_result = capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let valid_result = capture.open(
+        &devices[0].id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
     test_assert!(logger, valid_result.is_ok(), "Can still open valid device");
     capture.close();
     test_step_ok!(logger);
@@ -300,18 +382,37 @@ async fn test_startup_event_system_init() {
         new_state: AppState::Running,
     });
     let event = event_sub.recv().await.expect("receive startup event");
-    if let Event::StateChanged { old_state, new_state } = event {
-        test_assert!(logger, old_state == AppState::Starting, "Old state is Starting");
-        test_assert!(logger, new_state == AppState::Running, "New state is Running");
+    if let Event::StateChanged {
+        old_state,
+        new_state,
+    } = event
+    {
+        test_assert!(
+            logger,
+            old_state == AppState::Starting,
+            "Old state is Starting"
+        );
+        test_assert!(
+            logger,
+            new_state == AppState::Running,
+            "New state is Running"
+        );
     } else {
         test_assert!(logger, false, "Expected StateChanged event");
     }
     test_step_ok!(logger);
 
     test_step!(logger, "Testing command dispatch");
-    handle.send_command(Command::Quit).await.expect("send shutdown");
+    handle
+        .send_command(Command::Quit)
+        .await
+        .expect("send shutdown");
     let cmd = cmd_rx.recv().await.expect("receive command");
-    test_assert!(logger, matches!(cmd, Command::Quit), "Shutdown command received");
+    test_assert!(
+        logger,
+        matches!(cmd, Command::Quit),
+        "Shutdown command received"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Event system operational");
@@ -351,9 +452,21 @@ async fn test_startup_multiple_event_subscribers() {
     test_step_ok!(logger);
 
     test_step!(logger, "All received same event type");
-    test_assert!(logger, matches!(e1.unwrap(), Event::StateChanged { .. }), "Sub1 got StateChanged");
-    test_assert!(logger, matches!(e2.unwrap(), Event::StateChanged { .. }), "Sub2 got StateChanged");
-    test_assert!(logger, matches!(e3.unwrap(), Event::StateChanged { .. }), "Sub3 got StateChanged");
+    test_assert!(
+        logger,
+        matches!(e1.unwrap(), Event::StateChanged { .. }),
+        "Sub1 got StateChanged"
+    );
+    test_assert!(
+        logger,
+        matches!(e2.unwrap(), Event::StateChanged { .. }),
+        "Sub2 got StateChanged"
+    );
+    test_assert!(
+        logger,
+        matches!(e3.unwrap(), Event::StateChanged { .. }),
+        "Sub3 got StateChanged"
+    );
     test_step_ok!(logger);
 
     let result = logger.finish();
@@ -385,12 +498,17 @@ fn test_startup_full_pipeline_init() {
     });
     let devices = capture.enumerate_devices();
     test_assert!(logger, !devices.is_empty(), "Devices available");
-    capture.open(&devices[0].id, CaptureSettings {
-        width: config.camera.width,
-        height: config.camera.height,
-        framerate: config.camera.framerate,
-        format: None,
-    }).expect("open capture device");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: config.camera.width,
+                height: config.camera.height,
+                framerate: config.camera.framerate,
+                format: None,
+            },
+        )
+        .expect("open capture device");
     test_step_ok!(logger);
 
     // Step 3: Start capture
@@ -407,7 +525,9 @@ fn test_startup_full_pipeline_init() {
         frame_history_size: 5,
         ..Default::default()
     });
-    renderer.init(&DisplayId("test:0".into())).expect("init renderer");
+    renderer
+        .init(&DisplayId("test:0".into()))
+        .expect("init renderer");
     test_step_ok!(logger);
 
     // Step 5: Process a frame through pipeline
@@ -447,7 +567,11 @@ fn test_startup_auto_start_behavior() {
     test_step!(logger, "Creating config with auto_start enabled");
     let mut config = AppConfig::default();
     config.startup.auto_start_feed = true;
-    test_assert!(logger, config.startup.auto_start_feed, "auto_start_feed is enabled");
+    test_assert!(
+        logger,
+        config.startup.auto_start_feed,
+        "auto_start_feed is enabled"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Simulating auto-start initialization");
@@ -458,21 +582,32 @@ fn test_startup_auto_start_behavior() {
     let devices = capture.enumerate_devices();
 
     // Prefer last_camera_id if set, else first available
-    let device_id = config.internal.last_camera_id
+    let device_id = config
+        .internal
+        .last_camera_id
         .as_ref()
         .or_else(|| devices.first().map(|d| &d.id));
 
-    test_assert!(logger, device_id.is_some(), "Device available for auto-start");
+    test_assert!(
+        logger,
+        device_id.is_some(),
+        "Device available for auto-start"
+    );
     test_step_ok!(logger);
 
     test_step!(logger, "Auto-starting capture");
     let device = device_id.unwrap();
-    capture.open(device, CaptureSettings {
-        width: config.camera.width,
-        height: config.camera.height,
-        framerate: config.camera.framerate,
-        format: None,
-    }).expect("open device");
+    capture
+        .open(
+            device,
+            CaptureSettings {
+                width: config.camera.width,
+                height: config.camera.height,
+                framerate: config.camera.framerate,
+                format: None,
+            },
+        )
+        .expect("open device");
     capture.start().expect("start capture");
     test_assert!(logger, capture.is_capturing(), "Capture auto-started");
     test_step_ok!(logger);
@@ -503,8 +638,11 @@ fn test_startup_timing_performance() {
     let _config = AppConfig::default();
     let config_time = start.elapsed();
     logger.timing("config_load", config_time);
-    test_assert!(logger, config_time < Duration::from_millis(100),
-        "Config load under 100ms");
+    test_assert!(
+        logger,
+        config_time < Duration::from_millis(100),
+        "Config load under 100ms"
+    );
     test_step_ok!(logger, "Config loaded in {:?}", config_time);
 
     test_step!(logger, "Timing backend creation");
@@ -513,8 +651,11 @@ fn test_startup_timing_performance() {
     let _renderer = DisplaySimulator::new(DisplaySimulatorConfig::default());
     let backend_time = start.elapsed();
     logger.timing("backend_creation", backend_time);
-    test_assert!(logger, backend_time < Duration::from_millis(100),
-        "Backend creation under 100ms");
+    test_assert!(
+        logger,
+        backend_time < Duration::from_millis(100),
+        "Backend creation under 100ms"
+    );
     test_step_ok!(logger, "Backends created in {:?}", backend_time);
 
     test_step!(logger, "Timing device enumeration");
@@ -523,14 +664,20 @@ fn test_startup_timing_performance() {
     let _devices = capture.enumerate_devices();
     let enum_time = start.elapsed();
     logger.timing("device_enumeration", enum_time);
-    test_assert!(logger, enum_time < Duration::from_millis(500),
-        "Device enumeration under 500ms");
+    test_assert!(
+        logger,
+        enum_time < Duration::from_millis(500),
+        "Device enumeration under 500ms"
+    );
     test_step_ok!(logger, "Devices enumerated in {:?}", enum_time);
 
     test_step!(logger, "Total startup time check");
     let total = config_time + backend_time + enum_time;
-    test_assert!(logger, total < Duration::from_millis(1000),
-        "Total startup under 1 second");
+    test_assert!(
+        logger,
+        total < Duration::from_millis(1000),
+        "Total startup under 1 second"
+    );
     test_step_ok!(logger, "Total startup time: {:?}", total);
 
     let result = logger.finish();
@@ -553,36 +700,55 @@ fn test_startup_backend_failure_recovery() {
 
     test_step!(logger, "Attempting to open invalid device");
     let invalid = DeviceId("invalid:device:999".into());
-    let result = capture.open(&invalid, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let result = capture.open(
+        &invalid,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
     test_assert!(logger, result.is_err(), "Invalid device open fails");
     test_step_ok!(logger);
 
     test_step!(logger, "Recovering by using valid device");
     let devices = capture.enumerate_devices();
-    test_assert!(logger, !devices.is_empty(), "Can still enumerate after failure");
-    let result = capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
-    test_assert!(logger, result.is_ok(), "Can open valid device after recovery");
+    test_assert!(
+        logger,
+        !devices.is_empty(),
+        "Can still enumerate after failure"
+    );
+    let result = capture.open(
+        &devices[0].id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
+    test_assert!(
+        logger,
+        result.is_ok(),
+        "Can open valid device after recovery"
+    );
     capture.close();
     test_step_ok!(logger);
 
     test_step!(logger, "Backend is fully operational after recovery");
     // Re-open and verify capture works
-    capture.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    }).expect("open");
+    capture
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
     capture.start().expect("start");
     let frame = capture.next_frame();
     test_assert!(logger, frame.is_ok(), "Can capture frames after recovery");

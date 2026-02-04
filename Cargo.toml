@@ -7,7 +7,7 @@ description = "Live microscope wallpaper"
 
 [features]
 default = ["secure-zero"]
-secure-zero = []
+secure-zero = ["dep:zeroize"]
 windows = ["dep:windows"]
 macos = ["dep:objc2", "dep:block2"]
 linux = ["dep:v4l", "dep:x11rb"]
@@ -15,6 +15,8 @@ linux = ["dep:v4l", "dep:x11rb"]
 tray = ["dep:tray-icon", "dep:muda"]
 # Global keyboard shortcuts
 hotkeys = ["dep:global-hotkey"]
+# Crash recovery support
+recovery = []
 # Test simulator for headless testing - generates synthetic frames
 test-simulator = []
 # Clipboard support for snapshot feature (requires platform-specific deps)
@@ -58,6 +60,9 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 # GPU data transfer
 bytemuck = { version = "1", features = ["derive"] }
 
+# Secure memory zeroing (prevents compiler optimization of privacy-critical zeroing)
+zeroize = { version = "1", optional = true }
+
 # Platform: Windows
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", optional = true, features = [
@@ -72,6 +77,11 @@ windows = { version = "0.58", optional = true, features = [
     "Win32_System_Com",
     "Win32_System_Com_StructuredStorage",
     "Win32_System_Variant",
+    # Direct3D 11 for GPU-accelerated wallpaper rendering
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
 ] }
 
 # Platform: macOS

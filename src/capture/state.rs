@@ -53,9 +53,10 @@ use crate::core::{CaptureError, DeviceId, NegotiatedFormat};
 // ============================================================================
 
 /// State of an individual camera device
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CameraState {
     /// Device is not connected or not detected
+    #[default]
     Disconnected,
     /// Device is enumerated and available but not open
     Available,
@@ -142,12 +143,6 @@ impl CameraState {
     }
 }
 
-impl Default for CameraState {
-    fn default() -> Self {
-        Self::Disconnected
-    }
-}
-
 impl fmt::Display for CameraState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -189,10 +184,7 @@ impl CameraErrorInfo {
     }
 
     pub fn from_capture_error(err: &CaptureError) -> Self {
-        let recoverable = matches!(
-            err,
-            CaptureError::Timeout(_) | CaptureError::Disconnected
-        );
+        let recoverable = matches!(err, CaptureError::Timeout(_) | CaptureError::Disconnected);
         Self::new(err.to_string(), recoverable)
     }
 
@@ -291,6 +283,7 @@ pub struct CameraStateManager {
     /// Callback for state changes
     /// Uses Arc to allow cloning the callback out of the lock before invoking,
     /// which prevents deadlock if the callback tries to modify state.
+    #[allow(clippy::type_complexity)]
     on_state_change: RwLock<Option<Arc<dyn Fn(&StateTransition) + Send + Sync>>>,
 }
 
@@ -359,7 +352,11 @@ impl CameraStateManager {
     }
 
     /// Internal transition method
-    fn transition(&self, new_state: CameraState, reason: TransitionReason) -> Result<(), CaptureError> {
+    fn transition(
+        &self,
+        new_state: CameraState,
+        reason: TransitionReason,
+    ) -> Result<(), CaptureError> {
         let mut state = self.state.write().unwrap();
         let old_state = state.clone();
 
@@ -679,13 +676,15 @@ mod tests {
     fn test_sudden_disconnect() {
         let manager = CameraStateManager::new_available(DeviceId("test".into()));
         manager.begin_open().unwrap();
-        manager.open_succeeded(NegotiatedFormat {
-            width: 640,
-            height: 480,
-            framerate: 30.0,
-            format: crate::core::PixelFormat::Mjpeg,
-            exact_match: true,
-        }).unwrap();
+        manager
+            .open_succeeded(NegotiatedFormat {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: crate::core::PixelFormat::Mjpeg,
+                exact_match: true,
+            })
+            .unwrap();
         manager.start_capture().unwrap();
 
         // Sudden disconnect while capturing

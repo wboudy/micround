@@ -62,11 +62,16 @@ impl FrameRateStats {
         // Calculate frame-to-frame times
         let mut frame_times_ms: Vec<f64> = Vec::with_capacity(timings.len() - 1);
         for i in 1..timings.len() {
-            let dt = timings[i].render_end.duration_since(timings[i - 1].render_end);
+            let dt = timings[i]
+                .render_end
+                .duration_since(timings[i - 1].render_end);
             frame_times_ms.push(dt.as_secs_f64() * 1000.0);
         }
 
-        let total_duration = timings.last().unwrap().render_end
+        let total_duration = timings
+            .last()
+            .unwrap()
+            .render_end
             .duration_since(timings.first().unwrap().capture_start);
         let actual_fps = (timings.len() as f64) / total_duration.as_secs_f64();
 
@@ -79,7 +84,8 @@ impl FrameRateStats {
         let variance_ms: f64 = frame_times_ms
             .iter()
             .map(|t| (t - avg_frame_time_ms).powi(2))
-            .sum::<f64>() / frame_times_ms.len() as f64;
+            .sum::<f64>()
+            / frame_times_ms.len() as f64;
         let std_dev_ms = variance_ms.sqrt();
 
         // Target frame time in ms
@@ -95,7 +101,8 @@ impl FrameRateStats {
         let jitter_ms: f64 = frame_times_ms
             .iter()
             .map(|t| (t - avg_frame_time_ms).abs())
-            .sum::<f64>() / frame_times_ms.len() as f64;
+            .sum::<f64>()
+            / frame_times_ms.len() as f64;
 
         Self {
             target_fps,
@@ -119,24 +126,61 @@ impl FrameRateStats {
         eprintln!("\n╔════════════════════════════════════════════════════════════╗");
         eprintln!("║ FRAME RATE REPORT: {:38}  ║", test_name);
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Status:        [{:^4}]                                      ║", status);
+        eprintln!(
+            "║ Status:        [{:^4}]                                      ║",
+            status
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Target FPS:    {:>10.1}                                   ║", self.target_fps);
-        eprintln!("║ Actual FPS:    {:>10.1}                                   ║", self.actual_fps);
-        eprintln!("║ Frame count:   {:>10}                                   ║", self.frame_count);
-        eprintln!("║ Duration:      {:>10.2?}                              ║", self.total_duration);
+        eprintln!(
+            "║ Target FPS:    {:>10.1}                                   ║",
+            self.target_fps
+        );
+        eprintln!(
+            "║ Actual FPS:    {:>10.1}                                   ║",
+            self.actual_fps
+        );
+        eprintln!(
+            "║ Frame count:   {:>10}                                   ║",
+            self.frame_count
+        );
+        eprintln!(
+            "║ Duration:      {:>10.2?}                              ║",
+            self.total_duration
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
         eprintln!("║ Frame Time Statistics (ms):                                ║");
-        eprintln!("║   Min:         {:>10.2}                                   ║", self.min_frame_time_ms);
-        eprintln!("║   Max:         {:>10.2}                                   ║", self.max_frame_time_ms);
-        eprintln!("║   Avg:         {:>10.2}                                   ║", self.avg_frame_time_ms);
-        eprintln!("║   Std Dev:     {:>10.2}                                   ║", self.std_dev_ms);
-        eprintln!("║   Jitter:      {:>10.2}                                   ║", self.jitter_ms);
+        eprintln!(
+            "║   Min:         {:>10.2}                                   ║",
+            self.min_frame_time_ms
+        );
+        eprintln!(
+            "║   Max:         {:>10.2}                                   ║",
+            self.max_frame_time_ms
+        );
+        eprintln!(
+            "║   Avg:         {:>10.2}                                   ║",
+            self.avg_frame_time_ms
+        );
+        eprintln!(
+            "║   Std Dev:     {:>10.2}                                   ║",
+            self.std_dev_ms
+        );
+        eprintln!(
+            "║   Jitter:      {:>10.2}                                   ║",
+            self.jitter_ms
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
         eprintln!("║ Stability:                                                 ║");
-        eprintln!("║   Below target:{:>10}                                   ║", self.frames_below_target);
-        let pct_stable = 100.0 * (1.0 - self.frames_below_target as f64 / self.frame_count.max(1) as f64);
-        eprintln!("║   Stability:   {:>9.1}%                                   ║", pct_stable);
+        eprintln!(
+            "║   Below target:{:>10}                                   ║",
+            self.frames_below_target
+        );
+        let pct_stable =
+            100.0 * (1.0 - self.frames_below_target as f64 / self.frame_count.max(1) as f64);
+        eprintln!(
+            "║   Stability:   {:>9.1}%                                   ║",
+            pct_stable
+        );
         eprintln!("╚════════════════════════════════════════════════════════════╝\n");
     }
 }
@@ -165,11 +209,15 @@ fn measure_frame_rate(
         format: Some(micround::core::PixelFormat::Rgba32),
     };
 
-    capture.open(&devices[0].id, settings).expect("Failed to open capture device");
+    capture
+        .open(&devices[0].id, settings)
+        .expect("Failed to open capture device");
 
     // Initialize display simulator
     let mut display = DisplaySimulator::new(display_config);
-    display.init(&DisplayId("framerate-test".into())).expect("Failed to init display");
+    display
+        .init(&DisplayId("framerate-test".into()))
+        .expect("Failed to init display");
 
     capture.start().expect("Failed to start capture");
 
@@ -230,7 +278,11 @@ fn test_framerate_24fps_target_5sec() {
         width: 160,
         height: 120,
         fps: 1000, // High FPS - no artificial timing delay
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -245,12 +297,7 @@ fn test_framerate_24fps_target_5sec() {
         ..Default::default()
     };
 
-    let stats = measure_frame_rate(
-        capture_config,
-        display_config,
-        24.0,
-        Duration::from_secs(5),
-    );
+    let stats = measure_frame_rate(capture_config, display_config, 24.0, Duration::from_secs(5));
     stats.print_report("24 FPS / 5 sec");
 
     // Must achieve at least 24 FPS
@@ -262,7 +309,8 @@ fn test_framerate_24fps_target_5sec() {
 
     // Stability: at least 90% of frames should be within target
     // (Allow some slack for CI systems under load)
-    let stability_pct = 100.0 * (1.0 - stats.frames_below_target as f64 / stats.frame_count.max(1) as f64);
+    let stability_pct =
+        100.0 * (1.0 - stats.frames_below_target as f64 / stats.frame_count.max(1) as f64);
     assert!(
         stability_pct >= 90.0,
         "Stability {:.1}% below 90% threshold",
@@ -280,7 +328,11 @@ fn test_framerate_30fps_target_3sec() {
         width: 160,
         height: 120,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 64, g: 128, b: 192 },
+        pattern: FramePattern::SolidColor {
+            r: 64,
+            g: 128,
+            b: 192,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -295,12 +347,7 @@ fn test_framerate_30fps_target_3sec() {
         ..Default::default()
     };
 
-    let stats = measure_frame_rate(
-        capture_config,
-        display_config,
-        30.0,
-        Duration::from_secs(3),
-    );
+    let stats = measure_frame_rate(capture_config, display_config, 30.0, Duration::from_secs(3));
     stats.print_report("30 FPS / 3 sec");
 
     assert!(
@@ -320,7 +367,11 @@ fn test_framerate_60fps_target_2sec() {
         width: 320,
         height: 240,
         fps: 1000,
-        pattern: FramePattern::SolidColor { r: 64, g: 64, b: 64 },
+        pattern: FramePattern::SolidColor {
+            r: 64,
+            g: 64,
+            b: 64,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -335,12 +386,7 @@ fn test_framerate_60fps_target_2sec() {
         ..Default::default()
     };
 
-    let stats = measure_frame_rate(
-        capture_config,
-        display_config,
-        60.0,
-        Duration::from_secs(2),
-    );
+    let stats = measure_frame_rate(capture_config, display_config, 60.0, Duration::from_secs(2));
     stats.print_report("60 FPS / 2 sec");
 
     assert!(
@@ -369,12 +415,7 @@ fn test_framerate_variance_logging() {
         ..Default::default()
     };
 
-    let stats = measure_frame_rate(
-        capture_config,
-        display_config,
-        30.0,
-        Duration::from_secs(2),
-    );
+    let stats = measure_frame_rate(capture_config, display_config, 30.0, Duration::from_secs(2));
     stats.print_report("Variance Analysis");
 
     // For tiny frames, jitter should be low
@@ -433,7 +474,8 @@ fn test_framerate_24fps_extended_30sec() {
     );
 
     // Extended test should maintain 98% stability
-    let stability_pct = 100.0 * (1.0 - stats.frames_below_target as f64 / stats.frame_count.max(1) as f64);
+    let stability_pct =
+        100.0 * (1.0 - stats.frames_below_target as f64 / stats.frame_count.max(1) as f64);
     assert!(
         stability_pct >= 98.0,
         "Extended stability {:.1}% below 98% threshold",
@@ -466,12 +508,7 @@ fn test_framerate_hd_24fps() {
         ..Default::default()
     };
 
-    let stats = measure_frame_rate(
-        capture_config,
-        display_config,
-        24.0,
-        Duration::from_secs(3),
-    );
+    let stats = measure_frame_rate(capture_config, display_config, 24.0, Duration::from_secs(3));
     stats.print_report("HD 24 FPS");
 
     assert!(
@@ -507,12 +544,7 @@ fn test_framerate_with_light_load() {
         ..Default::default()
     };
 
-    let stats = measure_frame_rate(
-        capture_config,
-        display_config,
-        24.0,
-        Duration::from_secs(3),
-    );
+    let stats = measure_frame_rate(capture_config, display_config, 24.0, Duration::from_secs(3));
     stats.print_report("Light Load 24 FPS");
 
     assert!(

@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::platform::display::*;
-use crate::platform::window::*;
 use crate::platform::system::*;
+use crate::platform::window::*;
 
 // ============================================================================
 // Mock Display Provider
@@ -176,7 +176,10 @@ impl DesktopWindow for MockDesktopWindow {
     }
 
     fn present(&mut self, handle: &WindowHandle, data: &[u8]) -> Result<(), WindowError> {
-        let window = self.windows.get_mut(&handle.raw()).ok_or(WindowError::NotFound)?;
+        let window = self
+            .windows
+            .get_mut(&handle.raw())
+            .ok_or(WindowError::NotFound)?;
 
         let expected = window.surface_info.buffer_size();
         if data.len() != expected {

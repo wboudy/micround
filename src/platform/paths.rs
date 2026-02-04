@@ -90,8 +90,7 @@ impl AppPaths {
     pub fn ensure_dirs(&self) -> Result<(), PathError> {
         for dir in [&self.config, &self.data, &self.cache, &self.logs] {
             if !dir.exists() {
-                std::fs::create_dir_all(dir)
-                    .map_err(|e| PathError::CreateFailed(e.to_string()))?;
+                std::fs::create_dir_all(dir).map_err(|e| PathError::CreateFailed(e.to_string()))?;
             }
         }
         Ok(())
@@ -283,12 +282,14 @@ pub fn temp_dir() -> PathBuf {
 }
 
 /// Helper trait for pipeline-style transformations
+#[allow(dead_code)]
 trait Pipe: Sized {
     fn pipe<R>(self, f: impl FnOnce(Self) -> R) -> R {
         f(self)
     }
 }
 
+#[allow(dead_code)]
 impl<T> Pipe for T {}
 
 // ============================================================================

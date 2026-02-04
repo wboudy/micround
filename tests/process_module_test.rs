@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use micround::core::{Flip, Frame, PixelFormat, Rotation, ScalingMode};
 use micround::process::{
-    process_frame, FrameBufferPool, FrameMetrics, PoolConfig, PoolStatsSnapshot,
-    ProcessError, ProcessedFrame, ProcessorConfig, Region, ScaleConfig, ScaleFilter,
+    process_frame, FrameBufferPool, FrameMetrics, PoolConfig, PoolStatsSnapshot, ProcessError,
+    ProcessedFrame, ProcessorConfig, Region, ScaleConfig, ScaleFilter,
 };
 
 // ============================================================================
@@ -34,24 +34,24 @@ fn make_test_frame(width: u32, height: u32, format: PixelFormat) -> Frame {
         PixelFormat::Rgba32 => {
             for i in 0..(width * height) as usize {
                 let idx = i * 4;
-                data[idx] = (i % 256) as u8;     // R
+                data[idx] = (i % 256) as u8; // R
                 data[idx + 1] = (i / 256) as u8; // G
-                data[idx + 2] = 128;             // B
-                data[idx + 3] = 255;             // A
+                data[idx + 2] = 128; // B
+                data[idx + 3] = 255; // A
             }
         }
         PixelFormat::Rgb24 => {
             for i in 0..(width * height) as usize {
                 let idx = i * 3;
-                data[idx] = (i % 256) as u8;     // R
+                data[idx] = (i % 256) as u8; // R
                 data[idx + 1] = (i / 256) as u8; // G
-                data[idx + 2] = 128;             // B
+                data[idx + 2] = 128; // B
             }
         }
         PixelFormat::Yuyv => {
             for i in 0..((width * height) as usize / 2) {
                 let idx = i * 4;
-                data[idx] = 235;     // Y0
+                data[idx] = 235; // Y0
                 data[idx + 1] = 128; // U
                 data[idx + 2] = 235; // Y1
                 data[idx + 3] = 128; // V
@@ -156,7 +156,12 @@ fn test_processor_config_builder() {
 
 #[test]
 fn test_processor_config_all_scaling_modes() {
-    for mode in [ScalingMode::Fit, ScalingMode::Fill, ScalingMode::Stretch, ScalingMode::Center] {
+    for mode in [
+        ScalingMode::Fit,
+        ScalingMode::Fill,
+        ScalingMode::Stretch,
+        ScalingMode::Center,
+    ] {
         let config = ProcessorConfig::new(100, 100).with_scaling(mode);
         assert_eq!(config.scaling, mode);
     }
@@ -341,7 +346,12 @@ fn test_process_frame_invalid_config_height() {
 fn test_process_frame_all_scaling_modes() {
     let frame = make_test_frame(160, 90, PixelFormat::Rgba32);
 
-    for mode in [ScalingMode::Fit, ScalingMode::Fill, ScalingMode::Stretch, ScalingMode::Center] {
+    for mode in [
+        ScalingMode::Fit,
+        ScalingMode::Fill,
+        ScalingMode::Stretch,
+        ScalingMode::Center,
+    ] {
         let config = ProcessorConfig::new(320, 240).with_scaling(mode);
         let result = process_frame(&frame, &config);
         assert!(result.is_ok(), "Failed for mode {:?}", mode);
@@ -784,7 +794,11 @@ fn test_process_frame_all_rotations_and_scales() {
 fn test_process_frame_all_filters() {
     let frame = make_test_frame(100, 100, PixelFormat::Rgba32);
 
-    for filter in [ScaleFilter::Nearest, ScaleFilter::Bilinear, ScaleFilter::Lanczos] {
+    for filter in [
+        ScaleFilter::Nearest,
+        ScaleFilter::Bilinear,
+        ScaleFilter::Lanczos,
+    ] {
         let config = ProcessorConfig::new(200, 150).with_filter(filter);
         let result = process_frame(&frame, &config);
         assert!(result.is_ok(), "Failed for filter {:?}", filter);

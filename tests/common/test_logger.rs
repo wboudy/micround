@@ -218,7 +218,9 @@ pub struct TestResult {
 impl TestResult {
     /// Check if all steps passed
     pub fn all_steps_ok(&self) -> bool {
-        self.steps.iter().all(|s| s.status.is_ok() || matches!(s.status, StepStatus::Skipped(_)))
+        self.steps
+            .iter()
+            .all(|s| s.status.is_ok() || matches!(s.status, StepStatus::Skipped(_)))
     }
 
     /// Check if all assertions passed
@@ -256,14 +258,18 @@ impl TestResult {
             })
         }).collect();
 
-        let assertions: Vec<serde_json::Value> = self.assertions.iter().map(|a| {
-            serde_json::json!({
-                "description": a.description,
-                "passed": a.passed,
-                "expected": a.expected,
-                "actual": a.actual,
+        let assertions: Vec<serde_json::Value> = self
+            .assertions
+            .iter()
+            .map(|a| {
+                serde_json::json!({
+                    "description": a.description,
+                    "passed": a.passed,
+                    "expected": a.expected,
+                    "actual": a.actual,
+                })
             })
-        }).collect();
+            .collect();
 
         serde_json::json!({
             "test_name": self.test_name,
@@ -272,7 +278,8 @@ impl TestResult {
             "steps": steps,
             "assertions": assertions,
             "failure_reason": self.failure_reason,
-        }).to_string()
+        })
+        .to_string()
     }
 }
 
@@ -329,12 +336,13 @@ impl TestLogger {
     /// Start a new step
     pub fn step(&mut self, description: &str) {
         // Complete previous step if any
-        if self.step_start.is_some() && !self.steps.is_empty() {
-            let last = self.steps.last_mut().unwrap();
-            if matches!(last.status, StepStatus::InProgress) {
-                let duration = self.step_start.unwrap().elapsed();
-                last.duration = duration;
-                last.status = StepStatus::Ok(String::new());
+        if let Some(step_start) = self.step_start {
+            if let Some(last) = self.steps.last_mut() {
+                if matches!(last.status, StepStatus::InProgress) {
+                    let duration = step_start.elapsed();
+                    last.duration = duration;
+                    last.status = StepStatus::Ok(String::new());
+                }
             }
         }
 
@@ -348,11 +356,7 @@ impl TestLogger {
         };
 
         if self.log_level <= LogLevel::Info {
-            eprintln!(
-                "{} {}",
-                color(&step_str, colors::CYAN),
-                description
-            );
+            eprintln!("{} {}", color(&step_str, colors::CYAN), description);
         }
 
         self.steps.push(StepRecord {
@@ -365,7 +369,10 @@ impl TestLogger {
 
     /// Mark current step as successful
     pub fn step_ok(&mut self, details: &str) {
-        let duration = self.step_start.map(|s| s.elapsed()).unwrap_or(Duration::ZERO);
+        let duration = self
+            .step_start
+            .map(|s| s.elapsed())
+            .unwrap_or(Duration::ZERO);
 
         if let Some(step) = self.steps.last_mut() {
             step.status = StepStatus::Ok(details.to_string());
@@ -385,23 +392,25 @@ impl TestLogger {
 
     /// Mark current step as failed
     pub fn step_err(&mut self, error: &str) {
-        let duration = self.step_start.map(|s| s.elapsed()).unwrap_or(Duration::ZERO);
+        let duration = self
+            .step_start
+            .map(|s| s.elapsed())
+            .unwrap_or(Duration::ZERO);
 
         if let Some(step) = self.steps.last_mut() {
             step.status = StepStatus::Error(error.to_string());
             step.duration = duration;
         }
 
-        eprintln!(
-            "       {} {}",
-            color("ERROR", colors::RED),
-            error
-        );
+        eprintln!("       {} {}", color("ERROR", colors::RED), error);
     }
 
     /// Skip current step
     pub fn step_skip(&mut self, reason: &str) {
-        let duration = self.step_start.map(|s| s.elapsed()).unwrap_or(Duration::ZERO);
+        let duration = self
+            .step_start
+            .map(|s| s.elapsed())
+            .unwrap_or(Duration::ZERO);
 
         if let Some(step) = self.steps.last_mut() {
             step.status = StepStatus::Skipped(reason.to_string());
@@ -409,11 +418,7 @@ impl TestLogger {
         }
 
         if self.log_level <= LogLevel::Info {
-            eprintln!(
-                "       {} {}",
-                color("SKIPPED", colors::YELLOW),
-                reason
-            );
+            eprintln!("       {} {}", color("SKIPPED", colors::YELLOW), reason);
         }
     }
 
@@ -451,20 +456,17 @@ impl TestLogger {
             description,
             color("✗", colors::RED)
         );
-        eprintln!(
-            "         {} {}",
-            color("Expected:", colors::DIM),
-            expected
-        );
-        eprintln!(
-            "         {} {}",
-            color("Actual:", colors::DIM),
-            actual
-        );
+        eprintln!("         {} {}", color("Expected:", colors::DIM), expected);
+        eprintln!("         {} {}", color("Actual:", colors::DIM), actual);
     }
 
     /// Record a conditional assertion
-    pub fn assert_eq<T: PartialEq + fmt::Debug>(&mut self, description: &str, expected: &T, actual: &T) {
+    pub fn assert_eq<T: PartialEq + fmt::Debug>(
+        &mut self,
+        description: &str,
+        expected: &T,
+        actual: &T,
+    ) {
         if expected == actual {
             self.assert_pass(description);
         } else {
@@ -491,43 +493,27 @@ impl TestLogger {
     /// Log a debug message
     pub fn debug(&self, message: &str) {
         if self.log_level <= LogLevel::Debug {
-            eprintln!(
-                "{} {}",
-                color("[DEBUG]", colors::DIM),
-                message
-            );
+            eprintln!("{} {}", color("[DEBUG]", colors::DIM), message);
         }
     }
 
     /// Log an info message
     pub fn info(&self, message: &str) {
         if self.log_level <= LogLevel::Info {
-            eprintln!(
-                "{} {}",
-                color("[INFO]", colors::WHITE),
-                message
-            );
+            eprintln!("{} {}", color("[INFO]", colors::WHITE), message);
         }
     }
 
     /// Log a warning message
     pub fn warn(&self, message: &str) {
         if self.log_level <= LogLevel::Warn {
-            eprintln!(
-                "{} {}",
-                color("[WARN]", colors::YELLOW),
-                message
-            );
+            eprintln!("{} {}", color("[WARN]", colors::YELLOW), message);
         }
     }
 
     /// Log an error message
     pub fn error(&self, message: &str) {
-        eprintln!(
-            "{} {}",
-            color("[ERROR]", colors::RED),
-            message
-        );
+        eprintln!("{} {}", color("[ERROR]", colors::RED), message);
     }
 
     /// Finish the test and produce a result
@@ -535,7 +521,10 @@ impl TestLogger {
         // Complete any in-progress step
         if let Some(step) = self.steps.last_mut() {
             if matches!(step.status, StepStatus::InProgress) {
-                let duration = self.step_start.map(|s| s.elapsed()).unwrap_or(Duration::ZERO);
+                let duration = self
+                    .step_start
+                    .map(|s| s.elapsed())
+                    .unwrap_or(Duration::ZERO);
                 step.duration = duration;
                 step.status = StepStatus::Ok(String::new());
             }
@@ -574,9 +563,15 @@ impl TestLogger {
         }
 
         let result_str = if passed {
-            color("[RESULT] PASS", &format!("{}{}", colors::BG_GREEN, colors::BOLD))
+            color(
+                "[RESULT] PASS",
+                &format!("{}{}", colors::BG_GREEN, colors::BOLD),
+            )
         } else {
-            color("[RESULT] FAIL", &format!("{}{}", colors::BG_RED, colors::BOLD))
+            color(
+                "[RESULT] FAIL",
+                &format!("{}{}", colors::BG_RED, colors::BOLD),
+            )
         };
         eprintln!("{}", result_str);
         eprintln!();
@@ -607,13 +602,16 @@ impl TestLogger {
     }
 
     /// Finish with explicit failure
-    pub fn finish_failed(mut self, reason: &str) -> TestResult {
+    pub fn finish_failed(self, reason: &str) -> TestResult {
         self.error(reason);
         let total_duration = self.start_time.elapsed();
 
         eprintln!(
             "{}",
-            color("[RESULT] FAIL", &format!("{}{}", colors::BG_RED, colors::BOLD))
+            color(
+                "[RESULT] FAIL",
+                &format!("{}{}", colors::BG_RED, colors::BOLD)
+            )
         );
         eprintln!();
 
@@ -747,8 +745,6 @@ macro_rules! test_timed {
 // ============================================================================
 // Re-export macros
 // ============================================================================
-
-pub use crate::{test_step, test_step_ok, test_step_err, test_assert, test_assert_eq, test_timed};
 
 // ============================================================================
 // Tests

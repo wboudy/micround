@@ -3,7 +3,6 @@
 //! Tests for the render module's WallpaperRenderer trait, DisplaySimulator,
 //! and related types. Uses the simulator for headless testing.
 
-use std::thread;
 use std::time::Duration;
 
 // Test-only common utilities
@@ -16,11 +15,9 @@ use common::assertions::{assert_completes_within, timed};
 // Test Imports
 // ============================================================================
 
-use micround::core::{DisplayId, RenderError};
+use micround::core::DisplayId;
 use micround::process::ProcessedFrame;
-use micround::render::simulator::{
-    CapturedFrame, DisplaySimulator, DisplaySimulatorConfig, RenderStats,
-};
+use micround::render::simulator::{DisplaySimulator, DisplaySimulatorConfig, RenderStats};
 use micround::render::WallpaperRenderer;
 
 // ============================================================================
@@ -79,19 +76,31 @@ fn corners_frame(width: u32, height: u32) -> ProcessedFrame {
     let mut data = vec![128u8; (width * height * 4) as usize];
 
     // Top-left: Red
-    data[0] = 255; data[1] = 0; data[2] = 0; data[3] = 255;
+    data[0] = 255;
+    data[1] = 0;
+    data[2] = 0;
+    data[3] = 255;
 
     // Top-right: Green
     let tr = ((width - 1) * 4) as usize;
-    data[tr] = 0; data[tr + 1] = 255; data[tr + 2] = 0; data[tr + 3] = 255;
+    data[tr] = 0;
+    data[tr + 1] = 255;
+    data[tr + 2] = 0;
+    data[tr + 3] = 255;
 
     // Bottom-left: Blue
     let bl = ((height - 1) * width * 4) as usize;
-    data[bl] = 0; data[bl + 1] = 0; data[bl + 2] = 255; data[bl + 3] = 255;
+    data[bl] = 0;
+    data[bl + 1] = 0;
+    data[bl + 2] = 255;
+    data[bl + 3] = 255;
 
     // Bottom-right: White
     let br = (((height - 1) * width + (width - 1)) * 4) as usize;
-    data[br] = 255; data[br + 1] = 255; data[br + 2] = 255; data[br + 3] = 255;
+    data[br] = 255;
+    data[br + 1] = 255;
+    data[br + 2] = 255;
+    data[br + 3] = 255;
 
     ProcessedFrame::new(data, width, height)
 }

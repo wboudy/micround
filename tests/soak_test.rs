@@ -23,18 +23,20 @@
 //! cargo test --features test-simulator --test soak_test soak_1_hour -- --ignored --nocapture
 //! ```
 
-#[allow(dead_code)]
 mod common;
 
 use std::collections::VecDeque;
-use std::fs::{self, File};
+use std::fs;
+use std::fs::File;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
-use micround::capture::simulator::{FramePattern, InjectedErrorType, SimulatorBackend, SimulatorConfig};
+use micround::capture::simulator::{
+    FramePattern, InjectedErrorType, SimulatorBackend, SimulatorConfig,
+};
 use micround::capture::CaptureBackend;
 use micround::core::DisplayId;
 use micround::process::ProcessedFrame;
@@ -273,35 +275,87 @@ impl SoakTestReport {
         eprintln!("╠══════════════════════════════════════════════════════════════════════╣");
         eprintln!("║ Test:     {:58} ║", self.test_name);
         eprintln!("║ Scenario: {:58} ║", self.scenario);
-        eprintln!("║ Status:   [{:^4}]                                                     ║", status);
+        eprintln!(
+            "║ Status:   [{:^4}]                                                     ║",
+            status
+        );
         eprintln!("╠══════════════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Duration: {:>12.2?}                                               ║", self.duration);
-        eprintln!("║ Frames:   {:>12}                                                  ║", self.total_frames);
-        eprintln!("║ Errors:   {:>12}                                                  ║", self.total_errors);
-        eprintln!("║ Avg FPS:  {:>12.1}                                                  ║", self.avg_fps);
+        eprintln!(
+            "║ Duration: {:>12.2?}                                               ║",
+            self.duration
+        );
+        eprintln!(
+            "║ Frames:   {:>12}                                                  ║",
+            self.total_frames
+        );
+        eprintln!(
+            "║ Errors:   {:>12}                                                  ║",
+            self.total_errors
+        );
+        eprintln!(
+            "║ Avg FPS:  {:>12.1}                                                  ║",
+            self.avg_fps
+        );
         eprintln!("╠══════════════════════════════════════════════════════════════════════╣");
         eprintln!("║ PERFORMANCE                                                          ║");
-        eprintln!("║   Min FPS:      {:>10.1}                                           ║", self.min_interval_fps);
-        eprintln!("║   Max FPS:      {:>10.1}                                           ║", self.max_interval_fps);
-        eprintln!("║   Degradation:  {:>10.1}%                                          ║", self.fps_degradation_percent);
+        eprintln!(
+            "║   Min FPS:      {:>10.1}                                           ║",
+            self.min_interval_fps
+        );
+        eprintln!(
+            "║   Max FPS:      {:>10.1}                                           ║",
+            self.max_interval_fps
+        );
+        eprintln!(
+            "║   Degradation:  {:>10.1}%                                          ║",
+            self.fps_degradation_percent
+        );
         eprintln!("╠══════════════════════════════════════════════════════════════════════╣");
         eprintln!("║ CPU USAGE                                                            ║");
-        eprintln!("║   Average:  {:>10.1}%                                              ║", self.avg_cpu_percent);
-        eprintln!("║   Peak:     {:>10.1}%                                              ║", self.peak_cpu_percent);
+        eprintln!(
+            "║   Average:  {:>10.1}%                                              ║",
+            self.avg_cpu_percent
+        );
+        eprintln!(
+            "║   Peak:     {:>10.1}%                                              ║",
+            self.peak_cpu_percent
+        );
         eprintln!("╠══════════════════════════════════════════════════════════════════════╣");
         eprintln!("║ MEMORY                                                               ║");
-        eprintln!("║   Initial:  {:>10} KB                                             ║", self.initial_rss_kb);
-        eprintln!("║   Final:    {:>10} KB                                             ║", self.final_rss_kb);
-        eprintln!("║   Peak:     {:>10} KB                                             ║", self.peak_rss_kb);
-        eprintln!("║   Growth:   {:>10.1}%                                              ║", self.memory_growth_percent);
+        eprintln!(
+            "║   Initial:  {:>10} KB                                             ║",
+            self.initial_rss_kb
+        );
+        eprintln!(
+            "║   Final:    {:>10} KB                                             ║",
+            self.final_rss_kb
+        );
+        eprintln!(
+            "║   Peak:     {:>10} KB                                             ║",
+            self.peak_rss_kb
+        );
+        eprintln!(
+            "║   Growth:   {:>10.1}%                                              ║",
+            self.memory_growth_percent
+        );
 
         if self.recovery_attempts > 0 {
             eprintln!("╠══════════════════════════════════════════════════════════════════════╣");
             eprintln!("║ RECOVERY                                                             ║");
-            eprintln!("║   Attempts:  {:>10}                                               ║", self.recovery_attempts);
-            eprintln!("║   Successes: {:>10}                                               ║", self.recovery_successes);
-            let rate = (self.recovery_successes as f64 / self.recovery_attempts.max(1) as f64) * 100.0;
-            eprintln!("║   Rate:      {:>10.1}%                                              ║", rate);
+            eprintln!(
+                "║   Attempts:  {:>10}                                               ║",
+                self.recovery_attempts
+            );
+            eprintln!(
+                "║   Successes: {:>10}                                               ║",
+                self.recovery_successes
+            );
+            let rate =
+                (self.recovery_successes as f64 / self.recovery_attempts.max(1) as f64) * 100.0;
+            eprintln!(
+                "║   Rate:      {:>10.1}%                                              ║",
+                rate
+            );
         }
 
         if !self.failure_reasons.is_empty() {
@@ -320,14 +374,22 @@ impl SoakTestReport {
         writeln!(file, "# Soak Test Report")?;
         writeln!(file, "Test: {}", self.test_name)?;
         writeln!(file, "Scenario: {}", self.scenario)?;
-        writeln!(file, "Status: {}", if self.passed { "PASS" } else { "FAIL" })?;
+        writeln!(
+            file,
+            "Status: {}",
+            if self.passed { "PASS" } else { "FAIL" }
+        )?;
         writeln!(file, "Duration: {:?}", self.duration)?;
         writeln!(file, "Total Frames: {}", self.total_frames)?;
         writeln!(file, "Total Errors: {}", self.total_errors)?;
         writeln!(file, "Avg FPS: {:.1}", self.avg_fps)?;
         writeln!(file, "Min Interval FPS: {:.1}", self.min_interval_fps)?;
         writeln!(file, "Max Interval FPS: {:.1}", self.max_interval_fps)?;
-        writeln!(file, "FPS Degradation: {:.1}%", self.fps_degradation_percent)?;
+        writeln!(
+            file,
+            "FPS Degradation: {:.1}%",
+            self.fps_degradation_percent
+        )?;
         writeln!(file, "Avg CPU: {:.1}%", self.avg_cpu_percent)?;
         writeln!(file, "Peak CPU: {:.1}%", self.peak_cpu_percent)?;
         writeln!(file, "Initial RSS: {} KB", self.initial_rss_kb)?;
@@ -350,19 +412,43 @@ impl SoakTestReport {
         writeln!(file, "  \"test_name\": \"{}\",", self.test_name)?;
         writeln!(file, "  \"scenario\": \"{}\",", self.scenario)?;
         writeln!(file, "  \"passed\": {},", self.passed)?;
-        writeln!(file, "  \"duration_secs\": {:.1},", self.duration.as_secs_f64())?;
+        writeln!(
+            file,
+            "  \"duration_secs\": {:.1},",
+            self.duration.as_secs_f64()
+        )?;
         writeln!(file, "  \"total_frames\": {},", self.total_frames)?;
         writeln!(file, "  \"total_errors\": {},", self.total_errors)?;
         writeln!(file, "  \"avg_fps\": {:.2},", self.avg_fps)?;
-        writeln!(file, "  \"min_interval_fps\": {:.2},", self.min_interval_fps)?;
-        writeln!(file, "  \"max_interval_fps\": {:.2},", self.max_interval_fps)?;
-        writeln!(file, "  \"fps_degradation_percent\": {:.2},", self.fps_degradation_percent)?;
+        writeln!(
+            file,
+            "  \"min_interval_fps\": {:.2},",
+            self.min_interval_fps
+        )?;
+        writeln!(
+            file,
+            "  \"max_interval_fps\": {:.2},",
+            self.max_interval_fps
+        )?;
+        writeln!(
+            file,
+            "  \"fps_degradation_percent\": {:.2},",
+            self.fps_degradation_percent
+        )?;
         writeln!(file, "  \"avg_cpu_percent\": {:.2},", self.avg_cpu_percent)?;
-        writeln!(file, "  \"peak_cpu_percent\": {:.2},", self.peak_cpu_percent)?;
+        writeln!(
+            file,
+            "  \"peak_cpu_percent\": {:.2},",
+            self.peak_cpu_percent
+        )?;
         writeln!(file, "  \"initial_rss_kb\": {},", self.initial_rss_kb)?;
         writeln!(file, "  \"final_rss_kb\": {},", self.final_rss_kb)?;
         writeln!(file, "  \"peak_rss_kb\": {},", self.peak_rss_kb)?;
-        writeln!(file, "  \"memory_growth_percent\": {:.2},", self.memory_growth_percent)?;
+        writeln!(
+            file,
+            "  \"memory_growth_percent\": {:.2},",
+            self.memory_growth_percent
+        )?;
         writeln!(file, "  \"samples\": [")?;
         for (i, sample) in self.samples.iter().enumerate() {
             let comma = if i < self.samples.len() - 1 { "," } else { "" };
@@ -418,11 +504,15 @@ fn run_continuous_test(
         format: Some(micround::core::PixelFormat::Rgba32),
     };
 
-    capture.open(&devices[0].id, settings).expect("Failed to open capture device");
+    capture
+        .open(&devices[0].id, settings)
+        .expect("Failed to open capture device");
 
     // Initialize display simulator
     let mut display = DisplaySimulator::new(display_config);
-    display.init(&DisplayId("soak-test".into())).expect("Failed to init display");
+    display
+        .init(&DisplayId("soak-test".into()))
+        .expect("Failed to init display");
 
     capture.start().expect("Failed to start capture");
 
@@ -446,7 +536,7 @@ fn run_continuous_test(
         }
 
         // Periodically check memory
-        if test_start.elapsed().as_secs() % 60 == 0 {
+        if test_start.elapsed().as_secs().is_multiple_of(60) {
             let current_rss = read_rss_kb();
             if current_rss > peak_rss_kb {
                 peak_rss_kb = current_rss;
@@ -481,7 +571,8 @@ fn run_continuous_test(
         // Calculate degradation: compare first 10% vs last 10% of samples
         let window_size = (samples.len() / 10).max(1);
         let first_avg: f64 = fps_values.iter().take(window_size).sum::<f64>() / window_size as f64;
-        let last_avg: f64 = fps_values.iter().rev().take(window_size).sum::<f64>() / window_size as f64;
+        let last_avg: f64 =
+            fps_values.iter().rev().take(window_size).sum::<f64>() / window_size as f64;
         let degradation = if first_avg > 0.0 {
             ((first_avg - last_avg) / first_avg) * 100.0
         } else {
@@ -530,15 +621,25 @@ fn run_continuous_test(
     let mut failure_reasons = Vec::new();
 
     // Check memory growth (<10% for short tests, more lenient for long tests)
-    let memory_threshold = if elapsed.as_secs() > 3600 { 10.0 } else { 200.0 }; // Startup overhead for short tests
+    let memory_threshold = if elapsed.as_secs() > 3600 {
+        10.0
+    } else {
+        200.0
+    }; // Startup overhead for short tests
     if elapsed.as_secs() > 3600 && memory_growth_percent > memory_threshold {
-        failure_reasons.push(format!("Memory growth {:.1}% exceeds {}% threshold", memory_growth_percent, memory_threshold));
+        failure_reasons.push(format!(
+            "Memory growth {:.1}% exceeds {}% threshold",
+            memory_growth_percent, memory_threshold
+        ));
     }
 
     // Check for excessive errors (<1% of frames)
     let error_rate = total_errors as f64 / total_frames.max(1) as f64;
     if error_rate > 0.01 {
-        failure_reasons.push(format!("Error rate {:.2}% exceeds 1% threshold", error_rate * 100.0));
+        failure_reasons.push(format!(
+            "Error rate {:.2}% exceeds 1% threshold",
+            error_rate * 100.0
+        ));
     }
 
     // Check frame rate (should be reasonable)
@@ -548,7 +649,10 @@ fn run_continuous_test(
 
     // Check for performance degradation (>20% drop from start to end)
     if fps_degradation_percent > 20.0 {
-        failure_reasons.push(format!("FPS degradation {:.1}% exceeds 20% threshold", fps_degradation_percent));
+        failure_reasons.push(format!(
+            "FPS degradation {:.1}% exceeds 20% threshold",
+            fps_degradation_percent
+        ));
     }
 
     let passed = failure_reasons.is_empty();
@@ -586,14 +690,19 @@ fn run_reconnection_test(
     display_config: DisplaySimulatorConfig,
 ) -> SoakTestReport {
     eprintln!("\n=== Starting Reconnection Test: {} ===", test_name);
-    eprintln!("Duration: {:?}, Reconnect interval: {:?}", duration, reconnect_interval);
+    eprintln!(
+        "Duration: {:?}, Reconnect interval: {:?}",
+        duration, reconnect_interval
+    );
 
     let metrics = MetricsCollector::new(Duration::from_secs(10), 10000);
     let collector_handle = metrics.start_collection();
 
     // Initialize display simulator (keeps running throughout)
     let mut display = DisplaySimulator::new(display_config.clone());
-    display.init(&DisplayId("soak-test".into())).expect("Failed to init display");
+    display
+        .init(&DisplayId("soak-test".into()))
+        .expect("Failed to init display");
 
     let initial_rss_kb = read_rss_kb();
     let test_start = Instant::now();
@@ -601,6 +710,7 @@ fn run_reconnection_test(
     let mut last_reconnect = Instant::now();
     let mut recovery_attempts = 0u64;
     let mut recovery_successes = 0u64;
+    #[allow(unused_assignments)]
     let mut capture: Option<SimulatorBackend> = None;
 
     // Initial connection
@@ -647,7 +757,10 @@ fn run_reconnection_test(
 
             if capture.is_some() {
                 recovery_successes += 1;
-                eprintln!("[{:?}] Camera reconnected successfully", test_start.elapsed());
+                eprintln!(
+                    "[{:?}] Camera reconnected successfully",
+                    test_start.elapsed()
+                );
             } else {
                 eprintln!("[{:?}] Camera reconnection FAILED", test_start.elapsed());
             }
@@ -701,8 +814,11 @@ fn run_reconnection_test(
     let samples = metrics.get_samples();
 
     // Calculate FPS metrics from samples (filtering out disconnected periods)
-    let connected_samples: Vec<&MetricsSample> = samples.iter().filter(|s| s.camera_connected).collect();
-    let (min_interval_fps, max_interval_fps, fps_degradation_percent) = if connected_samples.len() >= 2 {
+    let connected_samples: Vec<&MetricsSample> =
+        samples.iter().filter(|s| s.camera_connected).collect();
+    let (min_interval_fps, max_interval_fps, fps_degradation_percent) = if connected_samples.len()
+        >= 2
+    {
         let fps_values: Vec<f64> = connected_samples.iter().map(|s| s.interval_fps).collect();
         let min_fps = fps_values.iter().cloned().fold(f64::INFINITY, f64::min);
         let max_fps = fps_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -710,7 +826,8 @@ fn run_reconnection_test(
         // Calculate degradation: compare first 10% vs last 10% of connected samples
         let window_size = (connected_samples.len() / 10).max(1);
         let first_avg: f64 = fps_values.iter().take(window_size).sum::<f64>() / window_size as f64;
-        let last_avg: f64 = fps_values.iter().rev().take(window_size).sum::<f64>() / window_size as f64;
+        let last_avg: f64 =
+            fps_values.iter().rev().take(window_size).sum::<f64>() / window_size as f64;
         let degradation = if first_avg > 0.0 {
             ((first_avg - last_avg) / first_avg) * 100.0
         } else {
@@ -769,9 +886,16 @@ fn run_reconnection_test(
     }
 
     // Check memory growth (more lenient for reconnection tests and short tests)
-    let memory_threshold = if elapsed.as_secs() > 3600 { 15.0 } else { 200.0 };
+    let memory_threshold = if elapsed.as_secs() > 3600 {
+        15.0
+    } else {
+        200.0
+    };
     if elapsed.as_secs() > 3600 && memory_growth_percent > memory_threshold {
-        failure_reasons.push(format!("Memory growth {:.1}% exceeds {}% threshold", memory_growth_percent, memory_threshold));
+        failure_reasons.push(format!(
+            "Memory growth {:.1}% exceeds {}% threshold",
+            memory_growth_percent, memory_threshold
+        ));
     }
 
     let passed = failure_reasons.is_empty();
@@ -814,7 +938,11 @@ fn test_soak_infrastructure() {
         width: 320,
         height: 240,
         fps: 60,
-        pattern: FramePattern::SolidColor { r: 100, g: 100, b: 100 },
+        pattern: FramePattern::SolidColor {
+            r: 100,
+            g: 100,
+            b: 100,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -850,7 +978,11 @@ fn test_soak_quick_reconnection() {
         width: 320,
         height: 240,
         fps: 60,
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -875,7 +1007,10 @@ fn test_soak_quick_reconnection() {
     report.print();
 
     // Should have at least 2 reconnection attempts
-    assert!(report.recovery_attempts >= 2, "Should have attempted reconnection");
+    assert!(
+        report.recovery_attempts >= 2,
+        "Should have attempted reconnection"
+    );
     // 100% recovery expected
     assert_eq!(
         report.recovery_successes, report.recovery_attempts,
@@ -928,7 +1063,11 @@ fn test_soak_1_hour() {
     let _ = report.save_to_file(&format!("soak_1h_report_{}.txt", timestamp));
     let _ = report.save_metrics_json(&format!("soak_1h_metrics_{}.json", timestamp));
 
-    assert!(report.passed, "1-hour soak test failed: {:?}", report.failure_reasons);
+    assert!(
+        report.passed,
+        "1-hour soak test failed: {:?}",
+        report.failure_reasons
+    );
 }
 
 #[test]
@@ -959,7 +1098,7 @@ fn test_soak_8_hour_reconnection() {
     let report = run_reconnection_test(
         "8-Hour Reconnection",
         Duration::from_secs(8 * 3600), // 8 hours
-        Duration::from_secs(3600),      // Reconnect every hour
+        Duration::from_secs(3600),     // Reconnect every hour
         capture_config,
         display_config,
     );
@@ -973,7 +1112,11 @@ fn test_soak_8_hour_reconnection() {
     let _ = report.save_to_file(&format!("soak_8h_reconnect_report_{}.txt", timestamp));
     let _ = report.save_metrics_json(&format!("soak_8h_reconnect_metrics_{}.json", timestamp));
 
-    assert!(report.passed, "8-hour reconnection test failed: {:?}", report.failure_reasons);
+    assert!(
+        report.passed,
+        "8-hour reconnection test failed: {:?}",
+        report.failure_reasons
+    );
     assert_eq!(
         report.recovery_successes, report.recovery_attempts,
         "100% recovery rate required"
@@ -1021,7 +1164,11 @@ fn test_soak_24_hour() {
     let _ = report.save_to_file(&format!("soak_24h_report_{}.txt", timestamp));
     let _ = report.save_metrics_json(&format!("soak_24h_metrics_{}.json", timestamp));
 
-    assert!(report.passed, "24-hour soak test failed: {:?}", report.failure_reasons);
+    assert!(
+        report.passed,
+        "24-hour soak test failed: {:?}",
+        report.failure_reasons
+    );
 }
 
 #[test]
@@ -1035,7 +1182,11 @@ fn test_soak_10min_with_errors() {
         width: 640,
         height: 480,
         fps: 30,
-        pattern: FramePattern::SolidColor { r: 64, g: 128, b: 192 },
+        pattern: FramePattern::SolidColor {
+            r: 64,
+            g: 128,
+            b: 192,
+        },
         drop_rate: 0.01, // 1% frame drops
         latency_ms: 0,
         error_rate: 0.001, // 0.1% errors
@@ -1060,5 +1211,8 @@ fn test_soak_10min_with_errors() {
     report.print();
 
     // This test allows some errors but still should render mostly successfully
-    assert!(report.total_frames > 1000, "Should have rendered many frames despite errors");
+    assert!(
+        report.total_frames > 1000,
+        "Should have rendered many frames despite errors"
+    );
 }

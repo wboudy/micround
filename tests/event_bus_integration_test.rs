@@ -40,9 +40,8 @@ mod common;
 use std::time::Duration;
 
 use micround::core::{
-    AppContext, AppState, Command, Event, EventBus,
-    CameraDevice, CaptureSettings, DeviceId, DisplayId, FrameDropReason,
-    Flip, Rotation, ScalingMode, MicroundError, ErrorContext,
+    AppContext, AppState, CameraDevice, CaptureSettings, Command, DeviceId, DisplayId,
+    ErrorContext, Event, EventBus, Flip, FrameDropReason, MicroundError, Rotation, ScalingMode,
 };
 
 use common::test_logger::TestLogger;
@@ -889,7 +888,7 @@ async fn app_handle_cloning() {
 
     // Step 1: Create context and handles
     logger.step("Creating context and handles");
-    let (ctx, mut cmd_rx) = AppContext::new();
+    let (ctx, _cmd_rx) = AppContext::new();
     let handle1 = ctx.handle();
     let handle2 = handle1.clone();
     let handle3 = ctx.handle();

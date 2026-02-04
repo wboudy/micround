@@ -41,16 +41,18 @@ pub mod scale;
 pub mod transform;
 
 pub use buffer::{FrameBuffer, FrameBufferPool, PoolConfig, PoolStats, PoolStatsSnapshot};
-pub use decode::{decode_frame, DecodedFrame, DecodeError};
-pub use gpu::{GpuContext, GpuError, GpuProcessConfig, GpuProcessedFrame, GpuProcessMetrics, GpuProcessor};
+pub use decode::{decode_frame, DecodeError, DecodedFrame};
+pub use gpu::{
+    GpuContext, GpuError, GpuProcessConfig, GpuProcessMetrics, GpuProcessedFrame, GpuProcessor,
+};
 pub use overlay::{
     composite_overlays, Color, Overlay, OverlayConfig, OverlayContent, OverlayError,
     OverlayPosition, OverlayStyle, TextSize,
 };
-pub use scale::{scale_frame, ScaledFrame, ScaleConfig, ScaleFilter, ScaleError, Region};
-pub use transform::{transform_frame, TransformedFrame, TransformError};
+pub use scale::{scale_frame, Region, ScaleConfig, ScaleError, ScaleFilter, ScaledFrame};
+pub use transform::{transform_frame, TransformError, TransformedFrame};
 
-use crate::core::{Frame, ScalingMode, Rotation, Flip};
+use crate::core::{Flip, Frame, Rotation, ScalingMode};
 use std::time::{Duration, Instant};
 
 /// Processed frame ready for rendering
@@ -231,7 +233,10 @@ pub enum ProcessError {
 /// let processed = process_frame(&raw_frame, &config)?;
 /// render_to_wallpaper(&processed);
 /// ```
-pub fn process_frame(frame: &Frame, config: &ProcessorConfig) -> Result<ProcessedFrame, ProcessError> {
+pub fn process_frame(
+    frame: &Frame,
+    config: &ProcessorConfig,
+) -> Result<ProcessedFrame, ProcessError> {
     // Validate inputs
     if frame.width == 0 || frame.height == 0 {
         return Err(ProcessError::InvalidFrame {
@@ -241,15 +246,26 @@ pub fn process_frame(frame: &Frame, config: &ProcessorConfig) -> Result<Processe
 
     if config.target_width == 0 || config.target_height == 0 {
         return Err(ProcessError::InvalidConfig {
-            reason: format!("Invalid target dimensions: {}x{}", config.target_width, config.target_height),
+            reason: format!(
+                "Invalid target dimensions: {}x{}",
+                config.target_width, config.target_height
+            ),
         });
     }
 
-    let total_start = if config.collect_metrics { Some(Instant::now()) } else { None };
+    let total_start = if config.collect_metrics {
+        Some(Instant::now())
+    } else {
+        None
+    };
     let mut metrics = FrameMetrics::new();
 
     // Stage 1: Decode to RGBA
-    let decode_start = if config.collect_metrics { Some(Instant::now()) } else { None };
+    let decode_start = if config.collect_metrics {
+        Some(Instant::now())
+    } else {
+        None
+    };
     let decoded = decode_frame(frame)?;
     if let Some(start) = decode_start {
         metrics.decode_time = start.elapsed();
@@ -263,7 +279,11 @@ pub fn process_frame(frame: &Frame, config: &ProcessorConfig) -> Result<Processe
 
     // Stage 2: Transform (rotation and flip) - skip if no-op
     if !config.transform_is_noop() {
-        let transform_start = if config.collect_metrics { Some(Instant::now()) } else { None };
+        let transform_start = if config.collect_metrics {
+            Some(Instant::now())
+        } else {
+            None
+        };
 
         let decoded_for_transform = DecodedFrame {
             data: current_data,
@@ -285,7 +305,11 @@ pub fn process_frame(frame: &Frame, config: &ProcessorConfig) -> Result<Processe
 
     // Stage 3: Scale - skip if no-op
     if !config.scale_is_noop(current_width, current_height) {
-        let scale_start = if config.collect_metrics { Some(Instant::now()) } else { None };
+        let scale_start = if config.collect_metrics {
+            Some(Instant::now())
+        } else {
+            None
+        };
 
         let decoded_for_scale = DecodedFrame {
             data: current_data,
@@ -325,7 +349,11 @@ pub fn process_frame(frame: &Frame, config: &ProcessorConfig) -> Result<Processe
         data: current_data,
         width: current_width,
         height: current_height,
-        metrics: if config.collect_metrics { Some(metrics) } else { None },
+        metrics: if config.collect_metrics {
+            Some(metrics)
+        } else {
+            None
+        },
     })
 }
 
@@ -384,7 +412,7 @@ mod tests {
             PixelFormat::Rgb24 => 3,
             PixelFormat::Yuyv => 2,
             PixelFormat::Nv12 => 3, // Y + UV/2
-            _ => 4, // Default
+            _ => 4,                 // Default
         };
 
         let size = (width * height * bytes_per_pixel as u32) as usize;
@@ -395,25 +423,25 @@ mod tests {
             PixelFormat::Rgba32 => {
                 for i in 0..(width * height) as usize {
                     let idx = i * 4;
-                    data[idx] = (i % 256) as u8;     // R
+                    data[idx] = (i % 256) as u8; // R
                     data[idx + 1] = (i / 256) as u8; // G
-                    data[idx + 2] = 128;               // B
-                    data[idx + 3] = 255;               // A
+                    data[idx + 2] = 128; // B
+                    data[idx + 3] = 255; // A
                 }
             }
             PixelFormat::Rgb24 => {
                 for i in 0..(width * height) as usize {
                     let idx = i * 3;
-                    data[idx] = (i % 256) as u8;     // R
+                    data[idx] = (i % 256) as u8; // R
                     data[idx + 1] = (i / 256) as u8; // G
-                    data[idx + 2] = 128;             // B
+                    data[idx + 2] = 128; // B
                 }
             }
             PixelFormat::Yuyv => {
                 // Fill with white pixels (Y=235, U=128, V=128)
                 for i in 0..((width * height) as usize / 2) {
                     let idx = i * 4;
-                    data[idx] = 235;     // Y0
+                    data[idx] = 235; // Y0
                     data[idx + 1] = 128; // U
                     data[idx + 2] = 235; // Y1
                     data[idx + 3] = 128; // V
@@ -573,7 +601,12 @@ mod tests {
     fn test_different_scaling_modes() {
         let frame = make_test_frame(160, 90, PixelFormat::Rgba32);
 
-        for mode in [ScalingMode::Fit, ScalingMode::Fill, ScalingMode::Stretch, ScalingMode::Center] {
+        for mode in [
+            ScalingMode::Fit,
+            ScalingMode::Fill,
+            ScalingMode::Stretch,
+            ScalingMode::Center,
+        ] {
             let config = ProcessorConfig::new(320, 240).with_scaling(mode);
             let result = process_frame(&frame, &config);
             assert!(result.is_ok(), "Failed for mode {:?}", mode);

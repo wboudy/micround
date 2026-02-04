@@ -70,7 +70,7 @@ impl GpuContext {
                 force_fallback_adapter: false,
             })
             .await
-            .ok_or_else(|| GpuError::NoAdapter)?;
+            .ok_or(GpuError::NoAdapter)?;
 
         let adapter_info = adapter.get_info();
 
@@ -201,9 +201,7 @@ impl GpuProcessor {
 
             // Calculate output dimensions after rotation
             let (out_w, out_h) = match config.rotation {
-                Rotation::Clockwise90 | Rotation::Clockwise270 => {
-                    (current_height, current_width)
-                }
+                Rotation::Clockwise90 | Rotation::Clockwise270 => (current_height, current_width),
                 _ => (current_width, current_height),
             };
 
@@ -307,20 +305,23 @@ impl GpuProcessor {
 
     /// Create an empty texture for output
     fn create_empty_texture(&self, width: u32, height: u32) -> Result<wgpu::Texture, GpuError> {
-        let texture = self.context.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Output Frame"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
+        let texture = self
+            .context
+            .device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Output Frame"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
+            });
 
         Ok(texture)
     }
@@ -344,12 +345,12 @@ impl GpuProcessor {
             mapped_at_creation: false,
         });
 
-        let mut encoder = self
-            .context
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Download Encoder"),
-            });
+        let mut encoder =
+            self.context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Download Encoder"),
+                });
 
         encoder.copy_texture_to_buffer(
             wgpu::ImageCopyTexture {
@@ -603,16 +604,15 @@ impl ScalePipeline {
                     push_constant_ranges: &[],
                 });
 
-        let pipeline =
-            context
-                .device
-                .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                    label: Some("Scale Pipeline"),
-                    layout: Some(&pipeline_layout),
-                    module: &shader,
-                    entry_point: "main",
-                    compilation_options: Default::default(),
-                });
+        let pipeline = context
+            .device
+            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Scale Pipeline"),
+                layout: Some(&pipeline_layout),
+                module: &shader,
+                entry_point: "main",
+                compilation_options: Default::default(),
+            });
 
         Ok(Self {
             pipeline,
@@ -719,8 +719,8 @@ impl ScalePipeline {
             pass.set_bind_group(0, &bind_group, &[]);
 
             // Dispatch workgroups (8x8 threads per workgroup)
-            let workgroups_x = (dst_width + 7) / 8;
-            let workgroups_y = (dst_height + 7) / 8;
+            let workgroups_x = dst_width.div_ceil(8);
+            let workgroups_y = dst_height.div_ceil(8);
             pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
         }
 
@@ -864,16 +864,15 @@ impl TransformPipeline {
                     push_constant_ranges: &[],
                 });
 
-        let pipeline =
-            context
-                .device
-                .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                    label: Some("Transform Pipeline"),
-                    layout: Some(&pipeline_layout),
-                    module: &shader,
-                    entry_point: "main",
-                    compilation_options: Default::default(),
-                });
+        let pipeline = context
+            .device
+            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Transform Pipeline"),
+                layout: Some(&pipeline_layout),
+                module: &shader,
+                entry_point: "main",
+                compilation_options: Default::default(),
+            });
 
         Ok(Self {
             pipeline,
@@ -881,6 +880,7 @@ impl TransformPipeline {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute(
         &self,
         context: &GpuContext,
@@ -964,8 +964,8 @@ impl TransformPipeline {
             pass.set_bind_group(0, &bind_group, &[]);
 
             // Dispatch workgroups (8x8 threads per workgroup)
-            let workgroups_x = (out_width + 7) / 8;
-            let workgroups_y = (out_height + 7) / 8;
+            let workgroups_x = out_width.div_ceil(8);
+            let workgroups_y = out_height.div_ceil(8);
             pass.dispatch_workgroups(workgroups_x, workgroups_y, 1);
         }
 

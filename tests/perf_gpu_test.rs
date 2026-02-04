@@ -13,9 +13,6 @@
 mod common;
 
 use std::fs;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use micround::capture::simulator::{FramePattern, SimulatorBackend, SimulatorConfig};
@@ -72,12 +69,16 @@ impl GpuStats {
 
         // Count stalls (frames taking >2x average)
         let stall_threshold = avg_render_time * 2;
-        let stall_count = render_times.iter().filter(|t| **t > stall_threshold).count() as u64;
+        let stall_count = render_times
+            .iter()
+            .filter(|t| **t > stall_threshold)
+            .count() as u64;
 
         // Calculate budget utilization
         // Frame budget = 1/target_fps (e.g., 33.3ms for 30fps)
         let frame_budget = Duration::from_secs_f64(1.0 / target_fps);
-        let budget_utilization_percent = (avg_render_time.as_secs_f64() / frame_budget.as_secs_f64()) * 100.0;
+        let budget_utilization_percent =
+            (avg_render_time.as_secs_f64() / frame_budget.as_secs_f64()) * 100.0;
 
         Self {
             frames_rendered: render_times.len() as u64,
@@ -92,29 +93,66 @@ impl GpuStats {
     }
 
     fn print_report(&self, test_name: &str, target_utilization: f64) {
-        let status = if self.budget_utilization_percent <= target_utilization { "PASS" } else { "FAIL" };
+        let status = if self.budget_utilization_percent <= target_utilization {
+            "PASS"
+        } else {
+            "FAIL"
+        };
 
         eprintln!("\n╔════════════════════════════════════════════════════════════╗");
         eprintln!("║ GPU/RENDER REPORT: {:38} ║", test_name);
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Status:        [{:^4}]                                      ║", status);
+        eprintln!(
+            "║ Status:        [{:^4}]                                      ║",
+            status
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Target util:   {:>10.1}%                                  ║", target_utilization);
-        eprintln!("║ Actual util:   {:>10.1}%                                  ║", self.budget_utilization_percent);
+        eprintln!(
+            "║ Target util:   {:>10.1}%                                  ║",
+            target_utilization
+        );
+        eprintln!(
+            "║ Actual util:   {:>10.1}%                                  ║",
+            self.budget_utilization_percent
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Frames:        {:>10}                                   ║", self.frames_rendered);
-        eprintln!("║ Duration:      {:>10.2?}                              ║", self.test_duration);
+        eprintln!(
+            "║ Frames:        {:>10}                                   ║",
+            self.frames_rendered
+        );
+        eprintln!(
+            "║ Duration:      {:>10.2?}                              ║",
+            self.test_duration
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
         eprintln!("║ Render Time Stats:                                         ║");
-        eprintln!("║   Avg:         {:>10.2?}                              ║", self.avg_render_time);
-        eprintln!("║   Min:         {:>10.2?}                              ║", self.min_render_time);
-        eprintln!("║   Max:         {:>10.2?}                              ║", self.max_render_time);
-        eprintln!("║   Total:       {:>10.2?}                              ║", self.total_render_time);
+        eprintln!(
+            "║   Avg:         {:>10.2?}                              ║",
+            self.avg_render_time
+        );
+        eprintln!(
+            "║   Min:         {:>10.2?}                              ║",
+            self.min_render_time
+        );
+        eprintln!(
+            "║   Max:         {:>10.2?}                              ║",
+            self.max_render_time
+        );
+        eprintln!(
+            "║   Total:       {:>10.2?}                              ║",
+            self.total_render_time
+        );
         eprintln!("╠════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Stalls (>2x avg): {:>7}                                  ║", self.stall_count);
+        eprintln!(
+            "║ Stalls (>2x avg): {:>7}                                  ║",
+            self.stall_count
+        );
         if self.stall_count > 0 {
             let stall_pct = (self.stall_count as f64 / self.frames_rendered.max(1) as f64) * 100.0;
-            eprintln!("║ Stall rate:    {:>10.2}%                                  ║", stall_pct);
+            eprintln!(
+                "║ Stall rate:    {:>10.2}%                                  ║",
+                stall_pct
+            );
         }
         eprintln!("╚════════════════════════════════════════════════════════════╝\n");
     }
@@ -160,11 +198,15 @@ fn measure_render_performance(
         format: Some(micround::core::PixelFormat::Rgba32),
     };
 
-    capture.open(&devices[0].id, settings).expect("Failed to open capture device");
+    capture
+        .open(&devices[0].id, settings)
+        .expect("Failed to open capture device");
 
     // Initialize display simulator
     let mut display = DisplaySimulator::new(display_config);
-    display.init(&DisplayId("gpu-test".into())).expect("Failed to init display");
+    display
+        .init(&DisplayId("gpu-test".into()))
+        .expect("Failed to init display");
 
     capture.start().expect("Failed to start capture");
 
@@ -231,7 +273,11 @@ fn test_gpu_basic_render() {
         width: 640,
         height: 480,
         fps: 30,
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -311,9 +357,18 @@ fn test_gpu_stall_detection() {
     eprintln!("╠════════════════════════════════════════════════════════════╣");
     if stats.stall_count > 0 {
         let stall_rate = (stats.stall_count as f64 / stats.frames_rendered.max(1) as f64) * 100.0;
-        eprintln!("║ Stall count:   {:>10}                                   ║", stats.stall_count);
-        eprintln!("║ Stall rate:    {:>10.2}%                                  ║", stall_rate);
-        eprintln!("║ Max render:    {:>10.2?}                              ║", stats.max_render_time);
+        eprintln!(
+            "║ Stall count:   {:>10}                                   ║",
+            stats.stall_count
+        );
+        eprintln!(
+            "║ Stall rate:    {:>10.2}%                                  ║",
+            stall_rate
+        );
+        eprintln!(
+            "║ Max render:    {:>10.2?}                              ║",
+            stats.max_render_time
+        );
     } else {
         eprintln!("║ No stalls detected - render times are consistent         ║");
     }
@@ -355,12 +410,8 @@ fn test_gpu_render_timing_variance() {
         ..Default::default()
     };
 
-    let stats = measure_render_performance(
-        capture_config,
-        display_config,
-        Duration::from_secs(2),
-        60.0,
-    );
+    let stats =
+        measure_render_performance(capture_config, display_config, Duration::from_secs(2), 60.0);
     stats.print_report("Timing Variance", TARGET_UTILIZATION);
 
     // Log variance analysis
@@ -422,17 +473,28 @@ fn test_gpu_shader_timing_log() {
     eprintln!("╠════════════════════════════════════════════════════════════╣");
     eprintln!("║ Note: Using Display Simulator - not actual GPU shaders     ║");
     eprintln!("╠════════════════════════════════════════════════════════════╣");
-    
+
     // Simulate shader breakdown
     let frame_budget = Duration::from_secs_f64(1.0 / TARGET_FPS);
     let used = stats.avg_render_time;
     let remaining = frame_budget.saturating_sub(used);
 
-    eprintln!("║ Frame budget:  {:>10.2?}                              ║", frame_budget);
-    eprintln!("║ Render time:   {:>10.2?}                              ║", used);
-    eprintln!("║ Remaining:     {:>10.2?}                              ║", remaining);
-    eprintln!("║ Headroom:      {:>10.1}%                                  ║", 
-        (remaining.as_secs_f64() / frame_budget.as_secs_f64()) * 100.0);
+    eprintln!(
+        "║ Frame budget:  {:>10.2?}                              ║",
+        frame_budget
+    );
+    eprintln!(
+        "║ Render time:   {:>10.2?}                              ║",
+        used
+    );
+    eprintln!(
+        "║ Remaining:     {:>10.2?}                              ║",
+        remaining
+    );
+    eprintln!(
+        "║ Headroom:      {:>10.1}%                                  ║",
+        (remaining.as_secs_f64() / frame_budget.as_secs_f64()) * 100.0
+    );
     eprintln!("╚════════════════════════════════════════════════════════════╝\n");
 
     // Should have some headroom (>0% - can render within budget)
@@ -454,7 +516,11 @@ fn test_gpu_detailed_profiling() {
         width: 640,
         height: 480,
         fps: 30,
-        pattern: FramePattern::SolidColor { r: 100, g: 150, b: 200 },
+        pattern: FramePattern::SolidColor {
+            r: 100,
+            g: 150,
+            b: 200,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,
@@ -485,9 +551,18 @@ fn test_gpu_detailed_profiling() {
     eprintln!("╔════════════════════════════════════════════════════════════╗");
     eprintln!("║ THROUGHPUT METRICS                                         ║");
     eprintln!("╠════════════════════════════════════════════════════════════╣");
-    eprintln!("║ Frame rate:    {:>10.1} FPS                              ║", fps);
-    eprintln!("║ Throughput:    {:>10.2} MP/s                             ║", megapixels_per_sec);
-    eprintln!("║ Resolution:    {:>10}                                   ║", "640x480");
+    eprintln!(
+        "║ Frame rate:    {:>10.1} FPS                              ║",
+        fps
+    );
+    eprintln!(
+        "║ Throughput:    {:>10.2} MP/s                             ║",
+        megapixels_per_sec
+    );
+    eprintln!(
+        "║ Resolution:    {:>10}                                   ║",
+        "640x480"
+    );
     eprintln!("╚════════════════════════════════════════════════════════════╝\n");
 
     // Test passes if metrics collected
@@ -553,7 +628,11 @@ fn test_gpu_hd_resolution() {
         width: 1920,
         height: 1080,
         fps: 30,
-        pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+        pattern: FramePattern::SolidColor {
+            r: 128,
+            g: 128,
+            b: 128,
+        },
         drop_rate: 0.0,
         latency_ms: 0,
         error_rate: 0.0,

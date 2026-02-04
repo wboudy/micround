@@ -16,9 +16,8 @@ use std::time::{Duration, Instant};
 
 use common::test_logger::*;
 use micround::capture::{
-    CaptureBackend,
-    simulator::{SimulatorBackend, SimulatorConfig, FramePattern},
-    start_capture_loop,
+    simulator::{FramePattern, SimulatorBackend, SimulatorConfig},
+    start_capture_loop, CaptureBackend,
 };
 use micround::core::{
     AppContext, AppState, CaptureSettings, Command, DeviceId, Event, PixelFormat,
@@ -110,7 +109,8 @@ fn test_camera_selection_complete_flow() {
         format: None,
     };
 
-    let negotiated = backend.open(&selected_device.id, settings.clone())
+    let negotiated = backend
+        .open(&selected_device.id, settings.clone())
         .expect("Failed to open device");
 
     tracing::info!(
@@ -123,9 +123,18 @@ fn test_camera_selection_complete_flow() {
 
     test_assert!(logger, negotiated.width > 0, "Negotiated width valid");
     test_assert!(logger, negotiated.height > 0, "Negotiated height valid");
-    test_assert!(logger, negotiated.framerate > 0.0, "Negotiated framerate valid");
-    test_step_ok!(logger, "Negotiated: {}x{} @ {} fps",
-        negotiated.width, negotiated.height, negotiated.framerate);
+    test_assert!(
+        logger,
+        negotiated.framerate > 0.0,
+        "Negotiated framerate valid"
+    );
+    test_step_ok!(
+        logger,
+        "Negotiated: {}x{} @ {} fps",
+        negotiated.width,
+        negotiated.height,
+        negotiated.framerate
+    );
 
     // Step 5: Start capture and verify first frame latency
     test_step!(logger, "Starting capture and measuring first frame latency");
@@ -150,8 +159,11 @@ fn test_camera_selection_complete_flow() {
     test_assert!(logger, frame.height > 0, "Frame has valid height");
     test_assert!(logger, !frame.data.is_empty(), "Frame has data");
     // Note: In production, we'd assert < 100ms. Simulator has higher latency.
-    test_assert!(logger, first_frame_latency < Duration::from_millis(FIRST_FRAME_LATENCY_MS),
-        "First frame received within test timeout");
+    test_assert!(
+        logger,
+        first_frame_latency < Duration::from_millis(FIRST_FRAME_LATENCY_MS),
+        "First frame received within test timeout"
+    );
     test_step_ok!(logger, "First frame in {:?}", first_frame_latency);
 
     // Step 6: Cleanup
@@ -198,12 +210,15 @@ fn test_camera_selection_multiple_devices() {
     for (i, device) in devices.iter().enumerate() {
         tracing::info!(index = i, device_id = %device.id.0, "Selecting device");
 
-        let result = backend.open(&device.id, CaptureSettings {
-            width: 640,
-            height: 480,
-            framerate: 30.0,
-            format: None,
-        });
+        let result = backend.open(
+            &device.id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        );
 
         test_assert!(logger, result.is_ok(), "Can open device");
 
@@ -220,12 +235,15 @@ fn test_camera_selection_multiple_devices() {
 
     // Re-select first device to verify reusability
     test_step!(logger, "Re-selecting first device");
-    let result = backend.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let result = backend.open(
+        &devices[0].id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
     test_assert!(logger, result.is_ok(), "Can re-open first device");
     backend.close();
     test_step_ok!(logger);
@@ -256,9 +274,12 @@ async fn test_camera_selection_state_transitions() {
     // Simulate StartCapture command
     test_step!(logger, "Sending StartCapture command");
     let device_id = devices[0].id.clone();
-    handle.send_command(Command::StartCapture {
-        device_id: device_id.clone(),
-    }).await.expect("send command");
+    handle
+        .send_command(Command::StartCapture {
+            device_id: device_id.clone(),
+        })
+        .await
+        .expect("send command");
 
     // Verify command received
     let cmd = cmd_rx.recv().await.expect("receive command");
@@ -277,7 +298,11 @@ async fn test_camera_selection_state_transitions() {
     });
 
     let event = event_sub.recv().await.expect("receive starting event");
-    if let Event::StateChanged { old_state, new_state } = event {
+    if let Event::StateChanged {
+        old_state,
+        new_state,
+    } = event
+    {
         test_assert!(logger, old_state == AppState::Idle, "From Idle");
         test_assert!(logger, new_state == AppState::Starting, "To Starting");
     }
@@ -298,7 +323,10 @@ async fn test_camera_selection_state_transitions() {
 
     // Verify events
     let event = event_sub.recv().await.expect("receive capture started");
-    if let Event::CaptureStarted { resolution, fps, .. } = event {
+    if let Event::CaptureStarted {
+        resolution, fps, ..
+    } = event
+    {
         test_assert!(logger, resolution == (1920, 1080), "Correct resolution");
         test_assert!(logger, fps == 30.0, "Correct FPS");
     }
@@ -328,12 +356,15 @@ fn test_camera_selection_invalid_device() {
 
     test_step!(logger, "Attempting to select non-existent camera");
     let invalid_id = DeviceId("invalid:camera:12345".into());
-    let result = backend.open(&invalid_id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let result = backend.open(
+        &invalid_id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
 
     test_assert!(logger, result.is_err(), "Invalid device returns error");
     if let Err(e) = &result {
@@ -343,12 +374,15 @@ fn test_camera_selection_invalid_device() {
 
     test_step!(logger, "Can still select valid device after error");
     let devices = backend.enumerate_devices();
-    let result = backend.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let result = backend.open(
+        &devices[0].id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
     test_assert!(logger, result.is_ok(), "Valid device opens successfully");
     backend.close();
     test_step_ok!(logger);
@@ -365,26 +399,37 @@ fn test_camera_selection_device_busy() {
     test_step!(logger, "Opening device with first backend");
     let mut backend1 = SimulatorBackend::new_default();
     let devices = backend1.enumerate_devices();
-    backend1.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    }).expect("open device");
+    backend1
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open device");
     backend1.start().expect("start capture");
     test_assert!(logger, backend1.is_capturing(), "First backend capturing");
     test_step_ok!(logger);
 
-    test_step!(logger, "Note: Simulator allows multiple opens (unlike real hardware)");
+    test_step!(
+        logger,
+        "Note: Simulator allows multiple opens (unlike real hardware)"
+    );
     // Real hardware would return DeviceBusy error
     // Simulator is more permissive for testing
     let mut backend2 = SimulatorBackend::new_default();
-    let result = backend2.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    });
+    let result = backend2.open(
+        &devices[0].id,
+        CaptureSettings {
+            width: 640,
+            height: 480,
+            framerate: 30.0,
+            format: None,
+        },
+    );
     // Simulator allows this, but we document the expected behavior
     tracing::info!("Simulator allows concurrent opens (real HW would fail)");
     test_step_ok!(logger);
@@ -434,11 +479,8 @@ async fn test_camera_selection_with_capture_loop() {
         format: None,
     };
 
-    let (handle, mut receiver) = start_capture_loop(
-        Box::new(backend),
-        device_id.clone(),
-        settings,
-    ).expect("start capture loop");
+    let (handle, mut receiver) = start_capture_loop(Box::new(backend), device_id.clone(), settings)
+        .expect("start capture loop");
 
     test_step_ok!(logger);
 
@@ -446,10 +488,10 @@ async fn test_camera_selection_with_capture_loop() {
     test_step!(logger, "Receiving first frame from async loop");
     let start = Instant::now();
 
-    let frame = tokio::time::timeout(
-        Duration::from_secs(2),
-        receiver.recv()
-    ).await.expect("timeout waiting for frame").expect("channel closed");
+    let frame = tokio::time::timeout(Duration::from_secs(2), receiver.recv())
+        .await
+        .expect("timeout waiting for frame")
+        .expect("channel closed");
 
     let latency = start.elapsed();
 
@@ -472,17 +514,21 @@ async fn test_camera_selection_with_capture_loop() {
     let deadline = Instant::now() + test_duration;
 
     while Instant::now() < deadline {
-        if let Ok(Some(_frame)) = tokio::time::timeout(
-            Duration::from_millis(100),
-            receiver.recv()
-        ).await {
+        if let Ok(Some(_frame)) =
+            tokio::time::timeout(Duration::from_millis(100), receiver.recv()).await
+        {
             frame_count += 1;
         }
     }
 
     tracing::info!(frames_received = frame_count, "Continuous delivery test");
     test_assert!(logger, frame_count > 0, "Multiple frames received");
-    test_step_ok!(logger, "Received {} frames in {:?}", frame_count, test_duration);
+    test_step_ok!(
+        logger,
+        "Received {} frames in {:?}",
+        frame_count,
+        test_duration
+    );
 
     // Stop capture
     test_step!(logger, "Stopping capture loop");
@@ -520,12 +566,15 @@ fn test_camera_selection_respects_settings() {
     ];
 
     for (width, height, fps, name) in test_cases {
-        let result = backend.open(&devices[0].id, CaptureSettings {
-            width,
-            height,
-            framerate: fps,
-            format: None,
-        });
+        let result = backend.open(
+            &devices[0].id,
+            CaptureSettings {
+                width,
+                height,
+                framerate: fps,
+                format: None,
+            },
+        );
 
         test_assert!(logger, result.is_ok(), "Format negotiation succeeded");
 
@@ -543,18 +592,31 @@ fn test_camera_selection_respects_settings() {
 
     // Verify frame matches negotiated settings
     test_step!(logger, "Verifying frame matches negotiated format");
-    let negotiated = backend.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    }).expect("open");
+    let negotiated = backend
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
 
     backend.start().expect("start");
     let frame = backend.next_frame().expect("get frame");
 
-    test_assert!(logger, frame.width == negotiated.width, "Frame width matches negotiated");
-    test_assert!(logger, frame.height == negotiated.height, "Frame height matches negotiated");
+    test_assert!(
+        logger,
+        frame.width == negotiated.width,
+        "Frame width matches negotiated"
+    );
+    test_assert!(
+        logger,
+        frame.height == negotiated.height,
+        "Frame height matches negotiated"
+    );
 
     backend.stop().expect("stop");
     backend.close();
@@ -585,24 +647,37 @@ fn test_camera_selection_first_frame_timing() {
     for fps in fps_values {
         let mut backend = SimulatorBackend::new(SimulatorConfig {
             fps,
-            pattern: FramePattern::SolidColor { r: 128, g: 128, b: 128 },
+            pattern: FramePattern::SolidColor {
+                r: 128,
+                g: 128,
+                b: 128,
+            },
             ..Default::default()
         });
 
         let devices = backend.enumerate_devices();
-        backend.open(&devices[0].id, CaptureSettings {
-            width: 640,
-            height: 480,
-            framerate: fps as f32,
-            format: None,
-        }).expect("open");
+        backend
+            .open(
+                &devices[0].id,
+                CaptureSettings {
+                    width: 640,
+                    height: 480,
+                    framerate: fps as f32,
+                    format: None,
+                },
+            )
+            .expect("open");
 
         let start = Instant::now();
         backend.start().expect("start");
         let _frame = backend.next_frame().expect("frame");
         let latency = start.elapsed();
 
-        tracing::info!(fps = fps, latency_ms = latency.as_millis(), "First frame timing");
+        tracing::info!(
+            fps = fps,
+            latency_ms = latency.as_millis(),
+            "First frame timing"
+        );
         // Just verify frame arrives within reasonable time (simulator has high latency)
         test_assert!(
             logger,
@@ -624,21 +699,33 @@ fn test_camera_selection_first_frame_timing() {
     });
 
     let devices = backend.enumerate_devices();
-    backend.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    }).expect("open");
+    backend
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
 
     let start = Instant::now();
     backend.start().expect("start");
     let _frame = backend.next_frame().expect("frame");
     let latency = start.elapsed();
 
-    tracing::info!(latency_ms = latency.as_millis(), "First frame with simulated latency");
+    tracing::info!(
+        latency_ms = latency.as_millis(),
+        "First frame with simulated latency"
+    );
     // Just verify frame arrives (latency injection may be absorbed by simulator overhead)
-    test_assert!(logger, latency < Duration::from_secs(10), "First frame received with latency");
+    test_assert!(
+        logger,
+        latency < Duration::from_secs(10),
+        "First frame received with latency"
+    );
     backend.stop().expect("stop");
     backend.close();
     test_step_ok!(logger);
@@ -666,12 +753,17 @@ fn test_camera_selection_frame_rate_accuracy() {
     });
 
     let devices = backend.enumerate_devices();
-    backend.open(&devices[0].id, CaptureSettings {
-        width: 640,
-        height: 480,
-        framerate: 30.0,
-        format: None,
-    }).expect("open");
+    backend
+        .open(
+            &devices[0].id,
+            CaptureSettings {
+                width: 640,
+                height: 480,
+                framerate: 30.0,
+                format: None,
+            },
+        )
+        .expect("open");
 
     backend.start().expect("start");
     test_step_ok!(logger);

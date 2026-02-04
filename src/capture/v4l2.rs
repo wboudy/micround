@@ -10,18 +10,19 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::capture::enumerator::{CameraEnumerator, fourcc_to_format, format_to_fourcc};
-use crate::capture::{CaptureBackend, negotiate_format};
+use crate::capture::enumerator::{format_to_fourcc, fourcc_to_format, CameraEnumerator};
+use crate::capture::{negotiate_format, CaptureBackend};
 use crate::core::{
-    CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame, NegotiatedFormat,
+    CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame,
+    NegotiatedFormat,
 };
 
+#[cfg(feature = "linux")]
+use v4l::io::traits::CaptureStream;
 #[cfg(feature = "linux")]
 use v4l::prelude::*;
 #[cfg(feature = "linux")]
 use v4l::video::Capture;
-#[cfg(feature = "linux")]
-use v4l::io::traits::CaptureStream;
 #[cfg(feature = "linux")]
 use v4l::FourCC;
 
@@ -123,7 +124,10 @@ impl V4l2Enumerator {
         let caps = device.query_caps().ok()?;
 
         // Only include video capture devices
-        if !caps.capabilities.contains(v4l::capability::Flags::VIDEO_CAPTURE) {
+        if !caps
+            .capabilities
+            .contains(v4l::capability::Flags::VIDEO_CAPTURE)
+        {
             return None;
         }
 
@@ -180,8 +184,12 @@ impl V4l2Enumerator {
                         match size.size {
                             v4l::framesize::FrameSizeEnum::Discrete(d) => {
                                 // Query framerates for this size
-                                let framerates =
-                                    Self::query_framerates(device, fmt_desc.fourcc, d.width, d.height);
+                                let framerates = Self::query_framerates(
+                                    device,
+                                    fmt_desc.fourcc,
+                                    d.width,
+                                    d.height,
+                                );
 
                                 for fps in framerates {
                                     capabilities.push(CameraCapability {
@@ -194,7 +202,10 @@ impl V4l2Enumerator {
 
                                 // If no framerates found, add a default
                                 if capabilities.is_empty()
-                                    || capabilities.last().map(|c| c.width != d.width).unwrap_or(true)
+                                    || capabilities
+                                        .last()
+                                        .map(|c| c.width != d.width)
+                                        .unwrap_or(true)
                                 {
                                     capabilities.push(CameraCapability {
                                         width: d.width,
@@ -301,7 +312,10 @@ impl CameraEnumerator for V4l2Enumerator {
     }
 
     fn is_available(&self, id: &DeviceId) -> bool {
-        self.devices.get(&id.0).map(|d| d.is_available).unwrap_or(false)
+        self.devices
+            .get(&id.0)
+            .map(|d| d.is_available)
+            .unwrap_or(false)
     }
 
     fn refresh(&mut self) -> Result<(), CaptureError> {
@@ -399,7 +413,11 @@ impl CaptureBackend for V4l2Backend {
     }
 
     #[cfg(feature = "linux")]
-    fn open(&mut self, device_id: &DeviceId, settings: CaptureSettings) -> Result<NegotiatedFormat, CaptureError> {
+    fn open(
+        &mut self,
+        device_id: &DeviceId,
+        settings: CaptureSettings,
+    ) -> Result<NegotiatedFormat, CaptureError> {
         // Close any existing device first
         self.close();
 
@@ -424,19 +442,18 @@ impl CaptureBackend for V4l2Backend {
         })?;
 
         // Get device capabilities for negotiation
-        let capabilities = self.enumerator
+        let capabilities = self
+            .enumerator
             .get_capabilities(device_id)
             .unwrap_or_default();
 
         // Negotiate the best format
-        let negotiated = negotiate_format(&capabilities, &settings)
-            .ok_or_else(|| CaptureError::FormatNegotiationFailed(
-                "No suitable format available".into()
-            ))?;
+        let negotiated = negotiate_format(&capabilities, &settings).ok_or_else(|| {
+            CaptureError::FormatNegotiationFailed("No suitable format available".into())
+        })?;
 
         // Get the fourcc for the negotiated format
-        let fourcc = format_to_fourcc(negotiated.format)
-            .unwrap_or(0x47504A4D); // Default to MJPEG
+        let fourcc = format_to_fourcc(negotiated.format).unwrap_or(0x47504A4D); // Default to MJPEG
 
         // Set the format on the device
         let mut fmt = device
@@ -464,7 +481,9 @@ impl CaptureBackend for V4l2Backend {
             format: fourcc_to_format(u32::from_le_bytes(actual_fmt.fourcc.repr)),
             exact_match: actual_fmt.width == settings.width
                 && actual_fmt.height == settings.height
-                && settings.format.map_or(true, |f| f == fourcc_to_format(u32::from_le_bytes(actual_fmt.fourcc.repr))),
+                && settings.format.map_or(true, |f| {
+                    f == fourcc_to_format(u32::from_le_bytes(actual_fmt.fourcc.repr))
+                }),
         };
 
         self.device = Some(Box::new(device));
@@ -474,7 +493,11 @@ impl CaptureBackend for V4l2Backend {
     }
 
     #[cfg(not(feature = "linux"))]
-    fn open(&mut self, _device_id: &DeviceId, _settings: CaptureSettings) -> Result<NegotiatedFormat, CaptureError> {
+    fn open(
+        &mut self,
+        _device_id: &DeviceId,
+        _settings: CaptureSettings,
+    ) -> Result<NegotiatedFormat, CaptureError> {
         Err(CaptureError::Platform(
             "V4L2 support requires the 'linux' feature".into(),
         ))
@@ -499,7 +522,9 @@ impl CaptureBackend for V4l2Backend {
         // 1. Device is boxed (stable address)
         // 2. Drop order is enforced (stream dropped first)
         // 3. All access to stream happens while device is valid
-        self.stream = Some(std::mem::ManuallyDrop::new(unsafe { std::mem::transmute(stream) }));
+        self.stream = Some(std::mem::ManuallyDrop::new(unsafe {
+            std::mem::transmute(stream)
+        }));
         self.capturing = true;
         self.sequence = 0;
         Ok(())
@@ -551,9 +576,13 @@ impl CaptureBackend for V4l2Backend {
         let (buf, meta) = CaptureStream::next(&mut **stream)
             .map_err(|e| CaptureError::Platform(format!("Failed to capture frame: {}", e)))?;
 
-        let device = self.device.as_ref()
+        let device = self
+            .device
+            .as_ref()
             .ok_or_else(|| CaptureError::Platform("Device not open".into()))?;
-        let fmt = device.format().map_err(|e| CaptureError::Platform(e.to_string()))?;
+        let fmt = device
+            .format()
+            .map_err(|e| CaptureError::Platform(e.to_string()))?;
 
         self.sequence += 1;
 

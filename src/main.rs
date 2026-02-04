@@ -8,16 +8,16 @@ use std::time::Duration;
 use anyhow::Result;
 use tracing::{info, warn, Level};
 
-mod core;
-mod platform;
 mod capture;
+mod config;
+mod core;
+mod engine;
+mod platform;
 mod process;
 mod render;
 mod ui;
-mod config;
-mod engine;
 
-use core::events::{AppContext, Command, Event, AppState};
+use core::events::{AppContext, AppState, Command, Event};
 use engine::DisplayEngine;
 
 fn main() -> Result<()> {
@@ -78,7 +78,7 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
 
     // Initialize system tray (if feature enabled)
     #[cfg(feature = "tray")]
-    let _tray = {
+    let mut _tray = {
         let initial_state = ui::TrayState::default();
         match ui::TrayController::new(app_handle.clone(), initial_state) {
             Ok(tray) => {
@@ -169,12 +169,12 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
 
                         // Update tray state when state changes
                         #[cfg(feature = "tray")]
-                        if let Some(ref tray) = _tray {
+                        if let Some(ref mut tray) = _tray {
                             let tray_state = ui::TrayState {
-                                is_running: current_state.is_capturing(),
-                                is_paused: current_state == AppState::Paused,
-                                fps: 0.0,
-                                resolution: String::new(),
+                                app_state: current_state,
+                                resolution: None,
+                                fps: None,
+                                camera_name: None,
                             };
                             tray.update_state(tray_state);
                         }
@@ -196,7 +196,7 @@ async fn run_application(config: config::AppConfig) -> Result<()> {
             _ = tokio::time::sleep(Duration::from_millis(50)) => {
                 // Process tray events
                 #[cfg(feature = "tray")]
-                if let Some(ref tray) = _tray {
+                if let Some(ref mut tray) = _tray {
                     ui::process_events(tray);
                 }
 

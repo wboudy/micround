@@ -22,11 +22,20 @@
 //! 3. Parent our window to this WorkerW
 //! 4. Render to our window - appears as wallpaper
 //!
+//! # Rendering Backend
+//!
+//! Uses Direct3D 11 for GPU-accelerated rendering with:
+//! - FLIP model swap chain for low latency
+//! - Double buffering for smooth playback
+//! - Falls back to GDI if D3D11 unavailable
+//!
 //! # Risk Note
 //!
 //! This relies on undocumented Windows internals. The WorkerW technique
 //! has been stable since Windows 8 but could potentially break with
 //! future Windows updates.
+
+pub mod d3d11;
 
 use crate::config::AppConfig;
 use crate::core::{DisplayId, RenderError};
@@ -34,26 +43,28 @@ use crate::process::ProcessedFrame;
 use crate::render::WallpaperRenderer;
 
 #[cfg(all(target_os = "windows", feature = "windows"))]
+use self::d3d11::D3D11Renderer;
+
+#[cfg(all(target_os = "windows", feature = "windows"))]
 use windows::{
     core::{PCSTR, PCWSTR},
     Win32::{
         Foundation::{BOOL, HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::Gdi::{
-            BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC,
-            DeleteObject, EndPaint, GetDC, ReleaseDC, SelectObject, SetDIBitsToDevice,
-            BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, PAINTSTRUCT,
-            RGBQUAD, SRCCOPY,
+            BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject,
+            EndPaint, GetDC, ReleaseDC, SelectObject, SetDIBitsToDevice, BITMAPINFO,
+            BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, PAINTSTRUCT, RGBQUAD, SRCCOPY,
         },
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows,
             FindWindowExW, FindWindowW, GetClassNameW, GetClientRect, GetWindowLongPtrW,
-            PeekMessageW, RegisterClassExW, SendMessageTimeoutW, SetParent,
-            SetWindowLongPtrW, SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW,
-            CS_VREDRAW, CW_USEDEFAULT, GWLP_USERDATA, HWND_BOTTOM, MSG, PM_REMOVE,
-            SMTO_NORMAL, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
-            WINDOW_EX_STYLE, WM_DESTROY, WM_PAINT, WNDCLASSEXW, WS_CHILD, WS_EX_LAYERED,
-            WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
+            PeekMessageW, RegisterClassExW, SendMessageTimeoutW, SetParent, SetWindowLongPtrW,
+            SetWindowPos, ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT,
+            GWLP_USERDATA, HWND_BOTTOM, MSG, PM_REMOVE, SMTO_NORMAL, SWP_NOACTIVATE, SWP_NOMOVE,
+            SWP_NOSIZE, SWP_NOZORDER, SW_SHOW, WINDOW_EX_STYLE, WM_DESTROY, WM_PAINT, WNDCLASSEXW,
+            WS_CHILD, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
+            WS_POPUP, WS_VISIBLE,
         },
     },
 };
@@ -87,13 +98,26 @@ pub struct WindowsRenderer {
     #[cfg(all(target_os = "windows", feature = "windows"))]
     render_window: Option<HWND>,
 
-    /// Double-buffer bitmap for smooth rendering
+    /// Direct3D 11 renderer (preferred, GPU-accelerated)
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    d3d11_renderer: Option<D3D11Renderer>,
+
+    /// Double-buffer bitmap for GDI fallback rendering
     #[cfg(all(target_os = "windows", feature = "windows"))]
     back_buffer: Option<HBITMAP>,
 
-    /// Memory DC for double-buffering
+    /// Memory DC for GDI fallback double-buffering
     #[cfg(all(target_os = "windows", feature = "windows"))]
     mem_dc: Option<HDC>,
+
+    /// Whether to use D3D11 (true) or GDI fallback (false)
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    use_d3d11: bool,
+
+    /// Reusable buffer for RGBA→BGRA conversion (GDI fallback only)
+    /// Avoids allocating ~8MB per frame at 30fps (240MB/s allocation pressure)
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    conversion_buffer: Vec<u8>,
 
     /// Current display width
     width: u32,
@@ -119,9 +143,15 @@ impl WindowsRenderer {
             #[cfg(all(target_os = "windows", feature = "windows"))]
             render_window: None,
             #[cfg(all(target_os = "windows", feature = "windows"))]
+            d3d11_renderer: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
             back_buffer: None,
             #[cfg(all(target_os = "windows", feature = "windows"))]
             mem_dc: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            use_d3d11: true, // Prefer D3D11 by default
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            conversion_buffer: Vec::new(), // Allocated lazily on first use
             width: 0,
             height: 0,
             initialized: false,
@@ -254,7 +284,12 @@ impl WindowsRenderer {
             let window = CreateWindowExW(
                 WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
                 PCWSTR::from_raw(class_name.as_ptr()),
-                PCWSTR::from_raw("Micround Wallpaper\0".encode_utf16().collect::<Vec<_>>().as_ptr()),
+                PCWSTR::from_raw(
+                    "Micround Wallpaper\0"
+                        .encode_utf16()
+                        .collect::<Vec<_>>()
+                        .as_ptr(),
+                ),
                 WS_CHILD | WS_VISIBLE,
                 0,
                 0,
@@ -303,8 +338,7 @@ impl WindowsRenderer {
             }
 
             // Create compatible bitmap
-            let bitmap =
-                CreateCompatibleBitmap(hdc, self.width as i32, self.height as i32);
+            let bitmap = CreateCompatibleBitmap(hdc, self.width as i32, self.height as i32);
             if bitmap.0 == 0 {
                 DeleteDC(mem_dc);
                 ReleaseDC(window, hdc);
@@ -327,7 +361,7 @@ impl WindowsRenderer {
 
     /// Render a frame to the window
     #[cfg(all(target_os = "windows", feature = "windows"))]
-    fn render_frame_to_window(&self, frame: &ProcessedFrame) -> Result<(), RenderError> {
+    fn render_frame_to_window(&mut self, frame: &ProcessedFrame) -> Result<(), RenderError> {
         let window = self
             .render_window
             .ok_or_else(|| RenderError::Platform("No render window".into()))?;
@@ -356,8 +390,9 @@ impl WindowsRenderer {
                 bmiColors: [RGBQUAD::default()],
             };
 
-            // Convert RGBA to BGRA for Windows
-            let bgra_data = rgba_to_bgra(&frame.data);
+            // Convert RGBA to BGRA using reusable buffer (avoids ~8MB allocation per frame)
+            rgba_to_bgra_reuse(&frame.data, &mut self.conversion_buffer);
+            let bgra_data = &self.conversion_buffer;
 
             // Draw to memory DC
             let result = SetDIBitsToDevice(
@@ -440,15 +475,35 @@ impl WallpaperRenderer for WindowsRenderer {
             let window = self.create_render_window(workerw)?;
             self.render_window = Some(window);
 
-            // Step 5: Create double-buffering resources
-            self.create_back_buffer(window)?;
+            // Step 5: Try to initialize D3D11 for GPU-accelerated rendering
+            if self.use_d3d11 {
+                match D3D11Renderer::new(window, self.width, self.height) {
+                    Ok(d3d11) => {
+                        self.d3d11_renderer = Some(d3d11);
+                        tracing::info!(
+                            "Windows D3D11 renderer initialized: {}x{}",
+                            self.width,
+                            self.height
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("D3D11 initialization failed, falling back to GDI: {}", e);
+                        self.use_d3d11 = false;
+                    }
+                }
+            }
+
+            // Step 6: If D3D11 failed or disabled, create GDI back buffer
+            if !self.use_d3d11 {
+                self.create_back_buffer(window)?;
+                tracing::info!(
+                    "Windows GDI renderer initialized: {}x{}",
+                    self.width,
+                    self.height
+                );
+            }
 
             self.initialized = true;
-            tracing::info!(
-                "Windows WorkerW renderer initialized: {}x{}",
-                self.width,
-                self.height
-            );
 
             Ok(())
         }
@@ -466,6 +521,41 @@ impl WallpaperRenderer for WindowsRenderer {
 
         #[cfg(all(target_os = "windows", feature = "windows"))]
         {
+            // Try D3D11 first (GPU-accelerated)
+            if self.use_d3d11 {
+                if let Some(ref d3d11) = self.d3d11_renderer {
+                    // Check for device removal (GPU reset, driver crash, etc.)
+                    if d3d11.check_device_removed() {
+                        tracing::warn!("D3D11 device removed, attempting recovery...");
+                        self.d3d11_renderer = None;
+
+                        // Try to recreate D3D11 renderer
+                        if let Some(window) = self.render_window {
+                            match D3D11Renderer::new(window, self.width, self.height) {
+                                Ok(new_d3d11) => {
+                                    self.d3d11_renderer = Some(new_d3d11);
+                                    tracing::info!("D3D11 device recovered successfully");
+                                }
+                                Err(e) => {
+                                    tracing::error!(
+                                        "D3D11 recovery failed, falling back to GDI: {}",
+                                        e
+                                    );
+                                    self.use_d3d11 = false;
+                                    // Initialize GDI fallback
+                                    self.create_back_buffer(window)?;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(ref d3d11) = self.d3d11_renderer {
+                    return d3d11.render(frame);
+                }
+            }
+
+            // GDI fallback
             return self.render_frame_to_window(frame);
         }
 
@@ -488,7 +578,10 @@ impl WallpaperRenderer for WindowsRenderer {
     fn shutdown(&mut self) {
         #[cfg(all(target_os = "windows", feature = "windows"))]
         {
-            // Clean up back buffer resources
+            // Clean up D3D11 renderer first (releases swap chain, etc.)
+            self.d3d11_renderer = None;
+
+            // Clean up GDI back buffer resources
             self.cleanup_back_buffer();
 
             // Destroy our window
@@ -503,7 +596,7 @@ impl WallpaperRenderer for WindowsRenderer {
         }
 
         self.initialized = false;
-        tracing::info!("Windows WorkerW renderer shutdown complete");
+        tracing::info!("Windows renderer shutdown complete");
     }
 }
 
@@ -586,6 +679,23 @@ fn rgba_to_bgra(rgba: &[u8]) -> Vec<u8> {
     bgra
 }
 
+/// Convert RGBA to BGRA format, reusing an existing buffer
+/// This avoids allocating ~8MB per frame (240MB/s at 30fps)
+/// Windows bitmaps expect BGRA byte order
+#[cfg(all(target_os = "windows", feature = "windows"))]
+fn rgba_to_bgra_reuse(rgba: &[u8], bgra: &mut Vec<u8>) {
+    // Ensure buffer has correct capacity
+    bgra.clear();
+    bgra.reserve(rgba.len());
+
+    for chunk in rgba.chunks_exact(4) {
+        bgra.push(chunk[2]); // B
+        bgra.push(chunk[1]); // G
+        bgra.push(chunk[0]); // R
+        bgra.push(chunk[3]); // A
+    }
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -652,7 +762,10 @@ mod tests {
         // Initialize
         let result = renderer.init(&DisplayId("test".to_string()));
         if result.is_err() {
-            eprintln!("Windows init failed (may need desktop session): {:?}", result);
+            eprintln!(
+                "Windows init failed (may need desktop session): {:?}",
+                result
+            );
             return;
         }
 

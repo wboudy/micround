@@ -9,11 +9,11 @@ use crate::core::{CameraCapability, CaptureSettings, NegotiatedFormat, PixelForm
 /// MJPEG is preferred for hardware decode efficiency
 fn format_priority(format: PixelFormat) -> u32 {
     match format {
-        PixelFormat::Mjpeg => 0,  // Best: hardware decode possible
-        PixelFormat::Yuyv => 1,   // Good: common, efficient
-        PixelFormat::Nv12 => 2,   // Good: common on some hardware
-        PixelFormat::Rgb24 => 3,  // OK: no conversion needed for display
-        PixelFormat::Rgba32 => 4, // OK: larger but display-ready
+        PixelFormat::Mjpeg => 0,    // Best: hardware decode possible
+        PixelFormat::Yuyv => 1,     // Good: common, efficient
+        PixelFormat::Nv12 => 2,     // Good: common on some hardware
+        PixelFormat::Rgb24 => 3,    // OK: no conversion needed for display
+        PixelFormat::Rgba32 => 4,   // OK: larger but display-ready
         PixelFormat::Unknown => 99, // Avoid if possible
     }
 }
@@ -41,7 +41,7 @@ impl MatchScore {
 
         Self {
             exact_resolution: cap.width == settings.width && cap.height == settings.height,
-            exact_format: settings.format.map_or(true, |f| f == cap.format),
+            exact_format: settings.format.is_none_or(|f| f == cap.format),
             pixel_diff: (actual_pixels - requested_pixels).abs(),
             format_priority: format_priority(cap.format),
             fps_diff: (cap.framerate - settings.framerate).abs(),
@@ -112,7 +112,7 @@ pub fn negotiate_format(
     // Determine if this is an exact match
     let is_exact = best_cap.width == settings.width
         && best_cap.height == settings.height
-        && settings.format.map_or(true, |f| f == best_cap.format)
+        && settings.format.is_none_or(|f| f == best_cap.format)
         && (best_cap.framerate - settings.framerate).abs() < 1.0;
 
     Some(NegotiatedFormat::from_capability(best_cap, is_exact))

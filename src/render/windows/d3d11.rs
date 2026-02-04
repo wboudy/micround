@@ -26,11 +26,11 @@ use windows::{
                 D3D11_USAGE_DYNAMIC,
             },
             Dxgi::{
-                CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1, DXGI_FORMAT_B8G8R8A8_UNORM,
-                DXGI_PRESENT, DXGI_SAMPLE_DESC, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1,
+                CreateDXGIFactory1, IDXGIFactory2, IDXGISwapChain1,
+                DXGI_PRESENT, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1,
                 DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT,
             },
-            Dxgi::Common::DXGI_ALPHA_MODE_IGNORE,
+            Dxgi::Common::{DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC},
         },
     },
 };

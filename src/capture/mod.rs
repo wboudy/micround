@@ -32,6 +32,10 @@ pub mod media_foundation;
 #[cfg(target_os = "macos")]
 pub mod avfoundation;
 
+// Nokhwa-based cross-platform capture (preferred when available)
+#[cfg(any(feature = "macos", feature = "linux", feature = "windows"))]
+pub mod nokhwa_backend;
+
 // Simulator module is always available - it's production code, not mocks
 pub mod simulator;
 
@@ -95,28 +99,28 @@ pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
     Box::new(v4l2::V4l2Enumerator::new())
 }
 
+/// Create a platform-appropriate capture backend (macOS) - uses nokhwa
+#[cfg(target_os = "macos")]
+pub fn create_backend() -> Box<dyn CaptureBackend> {
+    Box::new(nokhwa_backend::NokhwaBackend::new())
+}
+
+/// Create a platform-appropriate camera enumerator (macOS) - uses nokhwa
+#[cfg(target_os = "macos")]
+pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
+    Box::new(nokhwa_backend::NokhwaEnumerator::new())
+}
+
 /// Create a platform-appropriate capture backend (Windows)
 #[cfg(target_os = "windows")]
 pub fn create_backend() -> Box<dyn CaptureBackend> {
-    Box::new(media_foundation::MFBackend::new())
+    Box::new(media_foundation::MediaFoundationBackend::new())
 }
 
 /// Create a platform-appropriate camera enumerator (Windows)
 #[cfg(target_os = "windows")]
 pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
-    Box::new(media_foundation::MFEnumerator::new())
-}
-
-/// Create a platform-appropriate capture backend (macOS)
-#[cfg(target_os = "macos")]
-pub fn create_backend() -> Box<dyn CaptureBackend> {
-    Box::new(avfoundation::AVFoundationBackend::new())
-}
-
-/// Create a platform-appropriate camera enumerator (macOS)
-#[cfg(target_os = "macos")]
-pub fn create_enumerator() -> Box<dyn CameraEnumerator> {
-    Box::new(avfoundation::AVFoundationEnumerator::new())
+    Box::new(media_foundation::MediaFoundationEnumerator::new())
 }
 
 /// Create a simulator backend for testing (requires test-simulator feature)

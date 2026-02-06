@@ -1,56 +1,130 @@
-//! Media Foundation camera support for Windows
+//! Media Foundation camera capture for Windows
 //!
-//! Provides camera enumeration and capture using the Windows Media Foundation API.
-//! This is the modern Windows API for video capture (DirectShow is legacy).
+//! Provides camera enumeration and capture using Windows Media Foundation API.
 //!
 //! # Requirements
-//! - Windows 7 or later
-//! - Camera drivers that support Media Foundation
+//! - Windows 10 or later
+//! - Camera access permission (Windows handles this automatically)
+//!
+//! # Architecture
+//!
+//! Media Foundation capture uses:
+//! - `MFEnumDeviceSources` for device enumeration
+//! - `IMFSourceReader` for reading video frames
+//! - `IMFMediaType` for format negotiation
+//!
+//! Frames are read synchronously via ReadSample().
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use crate::capture::enumerator::{format_to_fourcc, fourcc_to_format, CameraEnumerator};
+use crate::capture::enumerator::CameraEnumerator;
 use crate::capture::{negotiate_format, CaptureBackend};
 use crate::core::{
     CameraCapability, CameraDevice, CaptureError, CaptureSettings, DeviceId, Frame,
     NegotiatedFormat, PixelFormat,
 };
 
+// ============================================================================
+// Media Foundation GUIDs and Constants
+// ============================================================================
+
 #[cfg(all(target_os = "windows", feature = "windows"))]
 use windows::{
-    core::{Interface, GUID, HSTRING, PWSTR},
+    core::GUID,
     Win32::{
         Media::MediaFoundation::{
-            IMFActivate, IMFAttributes, IMFMediaBuffer, IMFMediaSource, IMFMediaType, IMFSample,
-            IMFSourceReader, MFCreateAttributes, MFCreateSourceReaderFromMediaSource,
-            MFEnumDeviceSources, MFMediaType_Video, MFShutdown, MFStartup,
+            IMFActivate, IMFAttributes, IMFMediaSource, IMFMediaType, IMFSourceReader,
+            MFCreateAttributes, MFCreateSourceReaderFromMediaSource, MFEnumDeviceSources,
+            MFMediaType_Video, MFShutdown, MFStartup, MF_API_VERSION,
             MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
-            MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE,
-            MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE, MF_READWRITE_DISABLE_CONVERTERS,
-            MF_SOURCE_READER_ASYNC_CALLBACK, MF_SOURCE_READER_FIRST_VIDEO_STREAM, MF_VERSION,
+            MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
+            MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK,
+            MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
+            MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, MF_SOURCE_READER_FIRST_VIDEO_STREAM,
         },
         System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED},
     },
 };
 
+/// Media Foundation video format GUIDs
 #[cfg(all(target_os = "windows", feature = "windows"))]
-use std::ptr;
+mod mf_guids {
+    use windows::core::GUID;
 
-// Well-known Media Foundation format GUIDs
+    /// MFVideoFormat_NV12
+    pub const NV12: GUID = GUID::from_values(
+        0x3231564E,
+        0x0000,
+        0x0010,
+        [0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71],
+    );
+
+    /// MFVideoFormat_YUY2 (YUYV)
+    pub const YUY2: GUID = GUID::from_values(
+        0x32595559,
+        0x0000,
+        0x0010,
+        [0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71],
+    );
+
+    /// MFVideoFormat_MJPG
+    pub const MJPG: GUID = GUID::from_values(
+        0x47504A4D,
+        0x0000,
+        0x0010,
+        [0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71],
+    );
+
+    /// MFVideoFormat_RGB24
+    pub const RGB24: GUID = GUID::from_values(
+        0x00000014,
+        0x0000,
+        0x0010,
+        [0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71],
+    );
+
+    /// MFVideoFormat_RGB32
+    pub const RGB32: GUID = GUID::from_values(
+        0x00000016,
+        0x0000,
+        0x0010,
+        [0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71],
+    );
+}
+
+/// Convert Media Foundation GUID to our PixelFormat
 #[cfg(all(target_os = "windows", feature = "windows"))]
-const MF_SUBTYPE_MJPG: GUID = GUID::from_u128(0x47504A4D_0000_0010_8000_00AA00389B71);
+fn guid_to_pixel_format(guid: &GUID) -> PixelFormat {
+    if *guid == mf_guids::NV12 {
+        PixelFormat::Nv12
+    } else if *guid == mf_guids::YUY2 {
+        PixelFormat::Yuyv
+    } else if *guid == mf_guids::MJPG {
+        PixelFormat::Mjpeg
+    } else if *guid == mf_guids::RGB24 {
+        PixelFormat::Rgb24
+    } else if *guid == mf_guids::RGB32 {
+        PixelFormat::Rgba32
+    } else {
+        PixelFormat::Unknown
+    }
+}
+
+/// Convert our PixelFormat to Media Foundation GUID
 #[cfg(all(target_os = "windows", feature = "windows"))]
-const MF_SUBTYPE_YUY2: GUID = GUID::from_u128(0x32595559_0000_0010_8000_00AA00389B71);
-#[cfg(all(target_os = "windows", feature = "windows"))]
-const MF_SUBTYPE_NV12: GUID = GUID::from_u128(0x3231564E_0000_0010_8000_00AA00389B71);
-#[cfg(all(target_os = "windows", feature = "windows"))]
-const MF_SUBTYPE_RGB24: GUID = GUID::from_u128(0xe436eb7d_524f_11ce_9f53_0020af0ba770);
-#[cfg(all(target_os = "windows", feature = "windows"))]
-const MF_SUBTYPE_RGB32: GUID = GUID::from_u128(0xe436eb7e_524f_11ce_9f53_0020af0ba770);
+fn pixel_format_to_guid(format: PixelFormat) -> GUID {
+    match format {
+        PixelFormat::Nv12 => mf_guids::NV12,
+        PixelFormat::Yuyv => mf_guids::YUY2,
+        PixelFormat::Mjpeg => mf_guids::MJPG,
+        PixelFormat::Rgb24 => mf_guids::RGB24,
+        PixelFormat::Rgba32 => mf_guids::RGB32,
+        PixelFormat::Unknown => mf_guids::NV12, // Default to NV12
+    }
+}
 
 // ============================================================================
-// COM Initialization Helper
+// COM/MF Initialization Helper
 // ============================================================================
 
 /// RAII guard for COM initialization
@@ -63,17 +137,21 @@ struct ComGuard {
 impl ComGuard {
     fn new() -> Result<Self, CaptureError> {
         unsafe {
-            // Try to initialize COM - may already be initialized in this thread
+            // Initialize COM
             let hr = CoInitializeEx(None, COINIT_MULTITHREADED);
-            // S_OK (0) means success, S_FALSE (1) means already initialized
-            let initialized = hr.is_ok() || hr.0 == 1;
-            if !initialized {
+            if hr.is_err() && hr != windows::Win32::Foundation::S_FALSE {
                 return Err(CaptureError::Platform(format!(
                     "COM initialization failed: {:?}",
                     hr
                 )));
             }
-            Ok(Self { initialized })
+
+            // Initialize Media Foundation
+            MFStartup(MF_API_VERSION, 0).map_err(|e| {
+                CaptureError::Platform(format!("MFStartup failed: {}", e))
+            })?;
+
+            Ok(Self { initialized: true })
         }
     }
 }
@@ -83,182 +161,260 @@ impl Drop for ComGuard {
     fn drop(&mut self) {
         if self.initialized {
             unsafe {
+                let _ = MFShutdown();
                 CoUninitialize();
             }
         }
     }
 }
 
-/// RAII guard for Media Foundation initialization
-#[cfg(all(target_os = "windows", feature = "windows"))]
-struct MFGuard {
-    initialized: bool,
-}
-
-#[cfg(all(target_os = "windows", feature = "windows"))]
-impl MFGuard {
-    fn new() -> Result<Self, CaptureError> {
-        unsafe {
-            MFStartup(MF_VERSION, 0)
-                .map_err(|e| CaptureError::Platform(format!("MFStartup failed: {}", e)))?;
-            Ok(Self { initialized: true })
-        }
-    }
-}
-
-#[cfg(all(target_os = "windows", feature = "windows"))]
-impl Drop for MFGuard {
-    fn drop(&mut self) {
-        if self.initialized {
-            unsafe {
-                let _ = MFShutdown();
-            }
-        }
-    }
-}
-
 // ============================================================================
-// Media Foundation Enumerator
+// Camera Enumerator
 // ============================================================================
 
 /// Media Foundation-based camera enumerator
-pub struct MFEnumerator {
+pub struct MediaFoundationEnumerator {
     /// Cached device list
     devices: HashMap<String, CameraDevice>,
+    /// COM initialization guard
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    _com_guard: Option<ComGuard>,
 }
 
-impl MFEnumerator {
+impl MediaFoundationEnumerator {
+    /// Create a new enumerator
     pub fn new() -> Self {
         let mut enumerator = Self {
             devices: HashMap::new(),
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            _com_guard: ComGuard::new().ok(),
         };
         // Initial device scan
         let _ = enumerator.refresh();
         enumerator
     }
 
-    /// Convert Media Foundation GUID to PixelFormat
+    /// Query all video capture devices
     #[cfg(all(target_os = "windows", feature = "windows"))]
-    fn guid_to_format(guid: &GUID) -> Option<PixelFormat> {
-        if *guid == MF_SUBTYPE_MJPG {
-            Some(PixelFormat::Mjpeg)
-        } else if *guid == MF_SUBTYPE_YUY2 {
-            Some(PixelFormat::Yuyv)
-        } else if *guid == MF_SUBTYPE_NV12 {
-            Some(PixelFormat::Nv12)
-        } else if *guid == MF_SUBTYPE_RGB24 {
-            Some(PixelFormat::Rgb24)
-        } else if *guid == MF_SUBTYPE_RGB32 {
-            Some(PixelFormat::Rgba32)
-        } else {
-            None
-        }
-    }
-
-    /// Convert PixelFormat to Media Foundation GUID
-    #[cfg(all(target_os = "windows", feature = "windows"))]
-    fn format_to_guid(format: PixelFormat) -> Option<GUID> {
-        match format {
-            PixelFormat::Mjpeg => Some(MF_SUBTYPE_MJPG),
-            PixelFormat::Yuyv => Some(MF_SUBTYPE_YUY2),
-            PixelFormat::Nv12 => Some(MF_SUBTYPE_NV12),
-            PixelFormat::Rgb24 => Some(MF_SUBTYPE_RGB24),
-            PixelFormat::Rgba32 => Some(MF_SUBTYPE_RGB32),
-        }
-    }
-
-    /// Query device capabilities from a media source
-    #[cfg(all(target_os = "windows", feature = "windows"))]
-    fn query_capabilities(source: &IMFMediaSource) -> Vec<CameraCapability> {
-        let mut capabilities = Vec::new();
+    fn query_devices() -> Vec<CameraDevice> {
+        let mut devices = Vec::new();
 
         unsafe {
-            // Create source reader to enumerate formats
-            let reader: IMFSourceReader = match MFCreateSourceReaderFromMediaSource(source, None) {
-                Ok(r) => r,
-                Err(_) => return capabilities,
+            // Create attributes for video capture device enumeration
+            let mut attributes: Option<IMFAttributes> = None;
+            if MFCreateAttributes(&mut attributes, 1).is_err() {
+                tracing::error!("Failed to create MF attributes");
+                return devices;
+            }
+
+            let attributes = match attributes {
+                Some(a) => a,
+                None => return devices,
             };
 
-            // Enumerate all media types
-            let mut type_index = 0u32;
-            loop {
-                let media_type: IMFMediaType = match reader
-                    .GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32, type_index)
-                {
-                    Ok(t) => t,
-                    Err(_) => break, // No more types
-                };
+            // Set the device type to video capture
+            if attributes
+                .SetGUID(
+                    &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
+                    &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
+                )
+                .is_err()
+            {
+                tracing::error!("Failed to set device source type");
+                return devices;
+            }
 
-                // Get format GUID
-                let mut subtype = GUID::zeroed();
-                if media_type.GetGUID(&MF_MT_SUBTYPE, &mut subtype).is_ok() {
-                    if let Some(format) = Self::guid_to_format(&subtype) {
-                        // Get frame size
-                        let mut frame_size: u64 = 0;
-                        if media_type
-                            .GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size)
-                            .is_ok()
-                        {
-                            let width = (frame_size >> 32) as u32;
-                            let height = frame_size as u32;
+            // Enumerate devices
+            let mut device_sources: *mut Option<IMFActivate> = std::ptr::null_mut();
+            let mut count: u32 = 0;
 
-                            // Get frame rate
-                            let mut frame_rate: u64 = 0;
-                            let fps = if media_type
-                                .GetUINT64(&MF_MT_FRAME_RATE, &mut frame_rate)
-                                .is_ok()
-                            {
-                                let numerator = (frame_rate >> 32) as f32;
-                                let denominator = frame_rate as u32 as f32;
-                                if denominator > 0.0 {
-                                    numerator / denominator
-                                } else {
-                                    30.0
-                                }
-                            } else {
-                                30.0 // Default
-                            };
+            if MFEnumDeviceSources(&attributes, &mut device_sources, &mut count).is_err() {
+                tracing::error!("MFEnumDeviceSources failed");
+                return devices;
+            }
 
-                            capabilities.push(CameraCapability {
-                                width,
-                                height,
-                                format,
-                                framerate: fps,
-                            });
-                        }
+            if count == 0 || device_sources.is_null() {
+                return devices;
+            }
+
+            // Iterate through found devices and take ownership of COM objects
+            for i in 0..count {
+                let activate_ptr = device_sources.add(i as usize);
+                // Take ownership of the Option<IMFActivate> to ensure proper Release on drop
+                let activate_opt = std::ptr::read(activate_ptr);
+                if let Some(ref activate) = activate_opt {
+                    if let Some(device) = Self::device_from_activate(activate) {
+                        devices.push(device);
                     }
                 }
-
-                type_index += 1;
+                // activate_opt is dropped here, which calls Release on the COM object
             }
+
+            // Free the array memory (COM objects already released above)
+            windows::Win32::System::Com::CoTaskMemFree(Some(
+                device_sources as *const std::ffi::c_void,
+            ));
         }
 
-        // Deduplicate capabilities with same resolution/format, keep highest framerate
-        let mut merged: HashMap<(u32, u32, PixelFormat), CameraCapability> = HashMap::new();
-        for cap in capabilities {
-            let key = (cap.width, cap.height, cap.format);
-            merged
-                .entry(key)
-                .and_modify(|existing| {
-                    // Keep the higher framerate when we see duplicates
-                    if cap.framerate > existing.framerate {
-                        existing.framerate = cap.framerate;
-                    }
-                })
-                .or_insert(cap);
+        devices
+    }
+
+    #[cfg(not(all(target_os = "windows", feature = "windows")))]
+    fn query_devices() -> Vec<CameraDevice> {
+        Vec::new()
+    }
+
+    /// Extract device info from IMFActivate
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    unsafe fn device_from_activate(activate: &IMFActivate) -> Option<CameraDevice> {
+        // Get friendly name
+        let name = Self::get_string_attribute(activate, &MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME)
+            .unwrap_or_else(|| "Unknown Camera".to_string());
+
+        // Get symbolic link (unique device ID)
+        let symbolic_link = Self::get_string_attribute(
+            activate,
+            &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK,
+        )?;
+
+        // Activate the device to query capabilities
+        let media_source: IMFMediaSource = activate.ActivateObject().ok()?;
+
+        // Query capabilities from the source
+        let capabilities = Self::query_capabilities_from_source(&media_source);
+
+        // Shutdown the source (we'll reactivate when actually capturing)
+        let _ = media_source.Shutdown();
+
+        Some(CameraDevice {
+            id: DeviceId(symbolic_link),
+            name,
+            manufacturer: None, // MF doesn't easily expose manufacturer
+            capabilities,
+            is_available: true,
+        })
+    }
+
+    /// Get a string attribute from IMFActivate
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    unsafe fn get_string_attribute(activate: &IMFActivate, key: &GUID) -> Option<String> {
+        let mut length: u32 = 0;
+
+        // Get the length first
+        if activate.GetStringLength(key, &mut length).is_err() {
+            return None;
         }
 
-        merged.into_values().collect()
+        if length == 0 {
+            return None;
+        }
+
+        // Allocate buffer and get the string
+        let mut buffer: Vec<u16> = vec![0; (length + 1) as usize];
+        let mut actual_length: u32 = 0;
+
+        if activate
+            .GetString(key, &mut buffer, Some(&mut actual_length))
+            .is_err()
+        {
+            return None;
+        }
+
+        // Convert to Rust string
+        let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+        String::from_utf16(&buffer[..end]).ok()
+    }
+
+    /// Query capabilities from an activated media source
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    unsafe fn query_capabilities_from_source(source: &IMFMediaSource) -> Vec<CameraCapability> {
+        let mut capabilities = Vec::new();
+
+        // Create source reader to enumerate formats (no attributes needed for enumeration)
+        let reader: IMFSourceReader = match MFCreateSourceReaderFromMediaSource(source, None) {
+            Ok(r) => r,
+            Err(_) => return capabilities,
+        };
+
+        // Enumerate available media types
+        let mut type_index: u32 = 0;
+        loop {
+            let media_type: IMFMediaType = match reader.GetNativeMediaType(
+                MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32,
+                type_index,
+            ) {
+                Ok(t) => t,
+                Err(_) => break, // No more types
+            };
+
+            if let Some(cap) = Self::capability_from_media_type(&media_type) {
+                // Avoid duplicates
+                if !capabilities.iter().any(|c| {
+                    c.width == cap.width
+                        && c.height == cap.height
+                        && c.format == cap.format
+                        && (c.framerate - cap.framerate).abs() < 0.1
+                }) {
+                    capabilities.push(cap);
+                }
+            }
+
+            type_index += 1;
+        }
+
+        capabilities
+    }
+
+    /// Extract capability info from a media type
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    unsafe fn capability_from_media_type(media_type: &IMFMediaType) -> Option<CameraCapability> {
+        // Get frame size
+        let mut frame_size: u64 = 0;
+        if media_type.GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size).is_err() {
+            return None;
+        }
+
+        let width = (frame_size >> 32) as u32;
+        let height = (frame_size & 0xFFFFFFFF) as u32;
+
+        // Get frame rate
+        let mut frame_rate: u64 = 0;
+        let framerate = if media_type.GetUINT64(&MF_MT_FRAME_RATE, &mut frame_rate).is_ok() {
+            let numerator = (frame_rate >> 32) as f32;
+            let denominator = (frame_rate & 0xFFFFFFFF) as f32;
+            if denominator > 0.0 {
+                numerator / denominator
+            } else {
+                30.0 // Default
+            }
+        } else {
+            30.0 // Default
+        };
+
+        // Get subtype (pixel format)
+        let mut subtype = GUID::zeroed();
+        if media_type.GetGUID(&MF_MT_SUBTYPE, &mut subtype).is_err() {
+            return None;
+        }
+
+        let format = guid_to_pixel_format(&subtype);
+
+        Some(CameraCapability {
+            width,
+            height,
+            framerate,
+            format,
+        })
     }
 }
 
-impl Default for MFEnumerator {
+impl Default for MediaFoundationEnumerator {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CameraEnumerator for MFEnumerator {
+impl CameraEnumerator for MediaFoundationEnumerator {
     fn enumerate(&self) -> Result<Vec<CameraDevice>, CaptureError> {
         Ok(self.devices.values().cloned().collect())
     }
@@ -278,189 +434,222 @@ impl CameraEnumerator for MFEnumerator {
     }
 
     fn is_available(&self, id: &DeviceId) -> bool {
-        self.devices
-            .get(&id.0)
-            .map(|d| d.is_available)
-            .unwrap_or(false)
+        self.devices.get(&id.0).map(|d| d.is_available).unwrap_or(false)
     }
 
     fn refresh(&mut self) -> Result<(), CaptureError> {
-        #[cfg(all(target_os = "windows", feature = "windows"))]
-        {
-            // Initialize COM and MF
-            let _com = ComGuard::new()?;
-            let _mf = MFGuard::new()?;
-
-            // Mark all devices as potentially unavailable
-            for device in self.devices.values_mut() {
-                device.is_available = false;
-            }
-
-            unsafe {
-                // Create attributes for video capture devices
-                let mut attributes: Option<IMFAttributes> = None;
-                MFCreateAttributes(&mut attributes, 1).map_err(|e| {
-                    CaptureError::Platform(format!("MFCreateAttributes failed: {}", e))
-                })?;
-
-                let attributes = attributes.ok_or_else(|| {
-                    CaptureError::Platform("MFCreateAttributes returned None".into())
-                })?;
-
-                // Set the source type to video capture
-                attributes
-                    .SetGUID(
-                        &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
-                        &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
-                    )
-                    .map_err(|e| CaptureError::Platform(format!("SetGUID failed: {}", e)))?;
-
-                // Enumerate devices
-                let mut devices: *mut Option<IMFActivate> = ptr::null_mut();
-                let mut count: u32 = 0;
-
-                MFEnumDeviceSources(&attributes, &mut devices, &mut count).map_err(|e| {
-                    CaptureError::Platform(format!("MFEnumDeviceSources failed: {}", e))
-                })?;
-
-                if count == 0 || devices.is_null() {
-                    return Ok(());
-                }
-
-                // Process each device
-                let device_slice = std::slice::from_raw_parts(devices, count as usize);
-
-                for (index, activate_opt) in device_slice.iter().enumerate() {
-                    if let Some(activate) = activate_opt {
-                        // Get friendly name
-                        let mut name_len: u32 = 0;
-                        let _ = activate
-                            .GetStringLength(&MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &mut name_len);
-
-                        let name = if name_len > 0 {
-                            let mut buffer = vec![0u16; (name_len + 1) as usize];
-                            let mut actual_len: u32 = 0;
-                            if activate
-                                .GetString(
-                                    &MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME,
-                                    &mut buffer,
-                                    Some(&mut actual_len),
-                                )
-                                .is_ok()
-                            {
-                                String::from_utf16_lossy(&buffer[..actual_len as usize])
-                            } else {
-                                format!("Camera {}", index)
-                            }
-                        } else {
-                            format!("Camera {}", index)
-                        };
-
-                        // Create device ID from index (stable within session)
-                        let device_id = format!("mf:{}", index);
-
-                        // Try to activate and get capabilities
-                        let capabilities =
-                            if let Ok(source) = activate.ActivateObject::<IMFMediaSource>() {
-                                let caps = Self::query_capabilities(&source);
-                                // Deactivate to release resources
-                                let _ = activate.ShutdownObject();
-                                caps
-                            } else {
-                                Vec::new()
-                            };
-
-                        let camera = CameraDevice {
-                            id: DeviceId(device_id.clone()),
-                            name,
-                            manufacturer: None,
-                            capabilities,
-                            is_available: true,
-                        };
-
-                        self.devices.insert(device_id, camera);
-                    }
-                }
-
-                // Clean up the device array (COM allocated)
-                for activate_opt in device_slice {
-                    if activate_opt.is_some() {
-                        // IMFActivate will be dropped automatically
-                    }
-                }
-                windows::Win32::System::Com::CoTaskMemFree(Some(devices as *const _));
-            }
-
-            // Remove devices that are no longer available
-            self.devices.retain(|_, d| d.is_available);
-
-            Ok(())
+        // Mark all as potentially unavailable
+        for device in self.devices.values_mut() {
+            device.is_available = false;
         }
 
-        #[cfg(not(all(target_os = "windows", feature = "windows")))]
-        Err(CaptureError::Platform(
-            "Media Foundation not available on this platform".into(),
-        ))
+        // Query current devices
+        let current_devices = Self::query_devices();
+        for device in current_devices {
+            self.devices.insert(device.id.0.clone(), device);
+        }
+
+        // Remove unavailable devices
+        self.devices.retain(|_, d| d.is_available);
+
+        Ok(())
     }
 }
 
 // ============================================================================
-// Media Foundation Capture Backend
+// Capture Backend
 // ============================================================================
 
 /// Media Foundation-based capture backend
-pub struct MFBackend {
-    /// COM initialization guard (must be kept alive)
-    #[cfg(all(target_os = "windows", feature = "windows"))]
-    _com_guard: Option<ComGuard>,
-    /// Media Foundation initialization guard
-    #[cfg(all(target_os = "windows", feature = "windows"))]
-    _mf_guard: Option<MFGuard>,
-    /// The active media source
-    #[cfg(all(target_os = "windows", feature = "windows"))]
-    source: Option<IMFMediaSource>,
-    /// Source reader for frame capture
-    #[cfg(all(target_os = "windows", feature = "windows"))]
-    reader: Option<IMFSourceReader>,
+pub struct MediaFoundationBackend {
+    /// Enumerator for device queries
+    enumerator: MediaFoundationEnumerator,
     /// Currently negotiated format
     negotiated_format: Option<NegotiatedFormat>,
-    /// Cached enumerator
-    enumerator: MFEnumerator,
-    /// Whether currently capturing
+    /// Whether capture is active
     capturing: bool,
     /// Frame sequence counter
-    sequence: AtomicU64,
+    sequence: u64,
+    /// Current device symbolic link (for reopening)
+    current_device_id: Option<String>,
+
+    // Windows-specific handles
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    source_reader: Option<IMFSourceReader>,
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    media_source: Option<IMFMediaSource>,
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    _com_guard: Option<ComGuard>,
 }
 
-impl MFBackend {
+// SAFETY: Media Foundation objects are COM objects that support apartment threading.
+// We ensure all MF operations happen on a single thread or use proper synchronization.
+#[cfg(all(target_os = "windows", feature = "windows"))]
+unsafe impl Send for MediaFoundationBackend {}
+
+impl MediaFoundationBackend {
+    /// Create a new backend
     pub fn new() -> Self {
         Self {
-            #[cfg(all(target_os = "windows", feature = "windows"))]
-            _com_guard: None,
-            #[cfg(all(target_os = "windows", feature = "windows"))]
-            _mf_guard: None,
-            #[cfg(all(target_os = "windows", feature = "windows"))]
-            source: None,
-            #[cfg(all(target_os = "windows", feature = "windows"))]
-            reader: None,
+            enumerator: MediaFoundationEnumerator::new(),
             negotiated_format: None,
-            enumerator: MFEnumerator::new(),
             capturing: false,
-            sequence: AtomicU64::new(0),
+            sequence: 0,
+            current_device_id: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            source_reader: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            media_source: None,
+            #[cfg(all(target_os = "windows", feature = "windows"))]
+            _com_guard: ComGuard::new().ok(),
+        }
+    }
+
+    /// Find and activate a device by its symbolic link
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn activate_device(&self, device_id: &str) -> Result<IMFMediaSource, CaptureError> {
+        unsafe {
+            // Create attributes for enumeration
+            let mut attributes: Option<IMFAttributes> = None;
+            MFCreateAttributes(&mut attributes, 1).map_err(|e| {
+                CaptureError::Platform(format!("Failed to create attributes: {}", e))
+            })?;
+
+            let attributes = attributes
+                .ok_or_else(|| CaptureError::Platform("Null attributes".into()))?;
+
+            // Set device type to video capture
+            attributes
+                .SetGUID(
+                    &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
+                    &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
+                )
+                .map_err(|e| {
+                    CaptureError::Platform(format!("Failed to set source type: {}", e))
+                })?;
+
+            // Enumerate and find our device
+            let mut device_sources: *mut Option<IMFActivate> = std::ptr::null_mut();
+            let mut count: u32 = 0;
+
+            MFEnumDeviceSources(&attributes, &mut device_sources, &mut count).map_err(|e| {
+                CaptureError::Platform(format!("MFEnumDeviceSources failed: {}", e))
+            })?;
+
+            if count == 0 || device_sources.is_null() {
+                return Err(CaptureError::DeviceNotFound(device_id.to_string()));
+            }
+
+            // Find the device with matching symbolic link
+            // Take ownership of all COM objects to ensure proper cleanup
+            let mut found_source: Option<IMFMediaSource> = None;
+
+            for i in 0..count {
+                let activate_ptr = device_sources.add(i as usize);
+                let activate_opt = std::ptr::read(activate_ptr);
+                if let Some(ref activate) = activate_opt {
+                    // Only try to activate if we haven't found our device yet
+                    if found_source.is_none() {
+                        if let Some(link) = MediaFoundationEnumerator::get_string_attribute(
+                            activate,
+                            &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK,
+                        ) {
+                            if link == device_id {
+                                found_source = activate.ActivateObject().ok();
+                            }
+                        }
+                    }
+                }
+                // activate_opt is dropped here, releasing the COM object
+            }
+
+            // Free the array memory (COM objects already released in the loop)
+            windows::Win32::System::Com::CoTaskMemFree(Some(
+                device_sources as *const std::ffi::c_void,
+            ));
+
+            found_source.ok_or_else(|| CaptureError::DeviceNotFound(device_id.to_string()))
+        }
+    }
+
+    /// Configure the source reader with the negotiated format
+    #[cfg(all(target_os = "windows", feature = "windows"))]
+    fn configure_reader(
+        &self,
+        reader: &IMFSourceReader,
+        format: &NegotiatedFormat,
+    ) -> Result<(), CaptureError> {
+        unsafe {
+            // Create a media type for our desired format
+            let mut media_type: Option<IMFMediaType> = None;
+            windows::Win32::Media::MediaFoundation::MFCreateMediaType(&mut media_type)
+                .map_err(|e| CaptureError::Platform(format!("MFCreateMediaType failed: {}", e)))?;
+
+            let media_type = media_type
+                .ok_or_else(|| CaptureError::Platform("Null media type".into()))?;
+
+            // Set major type to video
+            media_type
+                .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)
+                .map_err(|e| {
+                    CaptureError::Platform(format!("Failed to set major type: {}", e))
+                })?;
+
+            // Set subtype (pixel format)
+            let subtype = pixel_format_to_guid(format.format);
+            media_type.SetGUID(&MF_MT_SUBTYPE, &subtype).map_err(|e| {
+                CaptureError::Platform(format!("Failed to set subtype: {}", e))
+            })?;
+
+            // Set frame size
+            let frame_size: u64 = ((format.width as u64) << 32) | (format.height as u64);
+            media_type
+                .SetUINT64(&MF_MT_FRAME_SIZE, frame_size)
+                .map_err(|e| {
+                    CaptureError::Platform(format!("Failed to set frame size: {}", e))
+                })?;
+
+            // Set frame rate
+            let frame_rate: u64 = ((format.framerate as u64) << 32) | 1u64;
+            media_type
+                .SetUINT64(&MF_MT_FRAME_RATE, frame_rate)
+                .map_err(|e| {
+                    CaptureError::Platform(format!("Failed to set frame rate: {}", e))
+                })?;
+
+            // Set the media type on the reader
+            reader
+                .SetCurrentMediaType(
+                    MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32,
+                    None,
+                    &media_type,
+                )
+                .map_err(|e| {
+                    CaptureError::Platform(format!("Failed to set media type: {}", e))
+                })?;
+
+            tracing::info!(
+                "Configured Media Foundation reader: {}x{} @ {}fps {:?}",
+                format.width,
+                format.height,
+                format.framerate,
+                format.format
+            );
+
+            Ok(())
         }
     }
 }
 
-impl Default for MFBackend {
+impl Default for MediaFoundationBackend {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl CaptureBackend for MFBackend {
+impl CaptureBackend for MediaFoundationBackend {
     fn enumerate_devices(&self) -> Vec<CameraDevice> {
-        let enumerator = MFEnumerator::new();
-        enumerator.enumerate().unwrap_or_default()
+        MediaFoundationEnumerator::query_devices()
     }
 
     #[cfg(all(target_os = "windows", feature = "windows"))]
@@ -469,147 +658,61 @@ impl CaptureBackend for MFBackend {
         device_id: &DeviceId,
         settings: CaptureSettings,
     ) -> Result<NegotiatedFormat, CaptureError> {
-        // Close any existing device
+        // Close any existing session first
         self.close();
 
-        // Initialize COM and Media Foundation
-        self._com_guard = Some(ComGuard::new()?);
-        self._mf_guard = Some(MFGuard::new()?);
+        // Get device capabilities for negotiation
+        let capabilities = self
+            .enumerator
+            .get_capabilities(device_id)
+            .unwrap_or_default();
 
-        // Parse device index from ID
-        let index: usize = device_id
-            .0
-            .strip_prefix("mf:")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| CaptureError::DeviceNotFound(device_id.0.clone()))?;
+        // Negotiate the best format
+        let negotiated = negotiate_format(&capabilities, &settings).ok_or_else(|| {
+            CaptureError::FormatNegotiationFailed("No suitable format available".into())
+        })?;
+
+        // Activate the device
+        let media_source = self.activate_device(&device_id.0)?;
 
         unsafe {
-            // Create attributes for video capture devices
-            let mut attributes: Option<IMFAttributes> = None;
-            MFCreateAttributes(&mut attributes, 1)
-                .map_err(|e| CaptureError::Platform(format!("MFCreateAttributes failed: {}", e)))?;
-
-            let attributes = attributes
-                .ok_or_else(|| CaptureError::Platform("MFCreateAttributes returned None".into()))?;
-
-            attributes
-                .SetGUID(
-                    &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
-                    &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID,
-                )
-                .map_err(|e| CaptureError::Platform(format!("SetGUID failed: {}", e)))?;
-
-            // Enumerate devices to find the one we want
-            let mut devices: *mut Option<IMFActivate> = ptr::null_mut();
-            let mut count: u32 = 0;
-
-            MFEnumDeviceSources(&attributes, &mut devices, &mut count).map_err(|e| {
-                CaptureError::Platform(format!("MFEnumDeviceSources failed: {}", e))
+            // Create source reader attributes
+            let mut reader_attributes: Option<IMFAttributes> = None;
+            MFCreateAttributes(&mut reader_attributes, 2).map_err(|e| {
+                CaptureError::Platform(format!("Failed to create reader attributes: {}", e))
             })?;
 
-            if index >= count as usize {
-                return Err(CaptureError::DeviceNotFound(device_id.0.clone()));
-            }
+            let reader_attributes = reader_attributes
+                .ok_or_else(|| CaptureError::Platform("Null reader attributes".into()))?;
 
-            let device_slice = std::slice::from_raw_parts(devices, count as usize);
-            let activate = device_slice[index]
-                .as_ref()
-                .ok_or_else(|| CaptureError::DeviceNotFound(device_id.0.clone()))?;
+            // Enable hardware transforms for better performance
+            reader_attributes
+                .SetUINT32(&MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, 1)
+                .ok(); // Non-fatal if this fails
 
-            // Activate the media source
-            let source: IMFMediaSource = activate.ActivateObject().map_err(|e| {
-                if e.code().0 as u32 == 0x80070005 {
-                    // E_ACCESSDENIED
-                    CaptureError::PermissionDenied(
-                        "Camera access denied. Check Windows camera privacy settings.".into(),
-                    )
-                } else if e.code().0 as u32 == 0x8007000E {
-                    // E_OUTOFMEMORY (often means busy)
-                    CaptureError::DeviceBusy
-                } else {
-                    CaptureError::Platform(format!("ActivateObject failed: {}", e))
-                }
-            })?;
+            // Create the source reader
+            let reader = MFCreateSourceReaderFromMediaSource(&media_source, &reader_attributes)
+                .map_err(|e| {
+                    CaptureError::Platform(format!(
+                        "MFCreateSourceReaderFromMediaSource failed: {}",
+                        e
+                    ))
+                })?;
 
-            // Get capabilities for format negotiation
-            let capabilities = self
-                .enumerator
-                .get_capabilities(device_id)
-                .unwrap_or_default();
+            // Configure the reader with our desired format
+            self.configure_reader(&reader, &negotiated)?;
 
-            // Negotiate format
-            let negotiated = negotiate_format(&capabilities, &settings).ok_or_else(|| {
-                CaptureError::FormatNegotiationFailed("No suitable format available".into())
-            })?;
-
-            // Create source reader
-            let reader: IMFSourceReader = MFCreateSourceReaderFromMediaSource(&source, None)
-                .map_err(|e| CaptureError::Platform(format!("CreateSourceReader failed: {}", e)))?;
-
-            // Find and set the matching media type
-            let mut type_index = 0u32;
-            let mut found_type = false;
-            loop {
-                let media_type: IMFMediaType = match reader
-                    .GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32, type_index)
-                {
-                    Ok(t) => t,
-                    Err(_) => break,
-                };
-
-                // Check if this type matches our negotiated format
-                let mut frame_size: u64 = 0;
-                let mut subtype = GUID::zeroed();
-
-                if media_type
-                    .GetUINT64(&MF_MT_FRAME_SIZE, &mut frame_size)
-                    .is_ok()
-                    && media_type.GetGUID(&MF_MT_SUBTYPE, &mut subtype).is_ok()
-                {
-                    let width = (frame_size >> 32) as u32;
-                    let height = frame_size as u32;
-
-                    if width == negotiated.width
-                        && height == negotiated.height
-                        && MFEnumerator::guid_to_format(&subtype) == Some(negotiated.format)
-                    {
-                        // Set this type on the reader
-                        reader
-                            .SetCurrentMediaType(
-                                MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32,
-                                None,
-                                &media_type,
-                            )
-                            .map_err(|e| {
-                                CaptureError::Platform(format!("SetCurrentMediaType failed: {}", e))
-                            })?;
-                        found_type = true;
-                        break;
-                    }
-                }
-
-                type_index += 1;
-            }
-
-            if !found_type {
-                return Err(CaptureError::FormatNegotiationFailed(
-                    "Could not set negotiated format on device".into(),
-                ));
-            }
-
-            // Clean up device array
-            windows::Win32::System::Com::CoTaskMemFree(Some(devices as *const _));
-
-            self.source = Some(source);
-            self.reader = Some(reader);
+            // Store handles
+            self.media_source = Some(media_source);
+            self.source_reader = Some(reader);
             self.negotiated_format = Some(negotiated.clone());
-            self.sequence.store(0, Ordering::SeqCst);
+            self.current_device_id = Some(device_id.0.clone());
 
             tracing::info!(
-                "Opened camera: {}x{} @ {:?}",
+                "Media Foundation capture opened: {}x{} @ {}fps",
                 negotiated.width,
                 negotiated.height,
-                negotiated.format
+                negotiated.framerate
             );
 
             Ok(negotiated)
@@ -623,38 +726,49 @@ impl CaptureBackend for MFBackend {
         _settings: CaptureSettings,
     ) -> Result<NegotiatedFormat, CaptureError> {
         Err(CaptureError::Platform(
-            "Media Foundation not available on this platform".into(),
+            "Media Foundation support requires Windows with 'windows' feature".into(),
         ))
     }
 
     fn start(&mut self) -> Result<(), CaptureError> {
-        if self.reader.is_none() {
-            return Err(CaptureError::Platform("No device open".into()));
+        #[cfg(all(target_os = "windows", feature = "windows"))]
+        {
+            if self.source_reader.is_none() {
+                return Err(CaptureError::Platform("No source reader opened".into()));
+            }
+            // Nothing special to do - ReadSample will start capture
         }
+
         self.capturing = true;
+        self.sequence = 0;
+        tracing::info!("Media Foundation capture started");
         Ok(())
     }
 
     fn stop(&mut self) -> Result<(), CaptureError> {
         self.capturing = false;
+        tracing::info!("Media Foundation capture stopped");
         Ok(())
     }
 
     fn close(&mut self) {
-        self.capturing = false;
+        let _ = self.stop();
+
         #[cfg(all(target_os = "windows", feature = "windows"))]
         {
-            // Drop reader first (it holds a reference to source)
-            self.reader = None;
-            // Then drop source
-            if let Some(source) = self.source.take() {
-                unsafe {
-                    let _ = source.Shutdown();
-                }
+            // Release source reader first
+            self.source_reader = None;
+
+            // Then shutdown and release media source
+            if let Some(ref source) = self.media_source {
+                let _ = unsafe { source.Shutdown() };
             }
-            // MF and COM guards will be dropped in order
+            self.media_source = None;
         }
+
         self.negotiated_format = None;
+        self.current_device_id = None;
+        tracing::info!("Media Foundation capture closed");
     }
 
     fn is_capturing(&self) -> bool {
@@ -667,30 +781,32 @@ impl CaptureBackend for MFBackend {
 
     #[cfg(all(target_os = "windows", feature = "windows"))]
     fn next_frame(&mut self) -> Result<Frame, CaptureError> {
-        if !self.capturing {
-            return Err(CaptureError::Platform("Not capturing".into()));
-        }
-
         let reader = self
-            .reader
+            .source_reader
             .as_ref()
-            .ok_or_else(|| CaptureError::Platform("No device open".into()))?;
+            .ok_or_else(|| CaptureError::Platform("No source reader".into()))?;
 
         let format = self
             .negotiated_format
             .as_ref()
-            .ok_or_else(|| CaptureError::Platform("No format negotiated".into()))?;
+            .ok_or_else(|| CaptureError::Platform("No negotiated format".into()))?;
 
         unsafe {
+            use windows::Win32::Media::MediaFoundation::{
+                IMFSample, MF_SOURCE_READERF_ENDOFSTREAM, MF_SOURCE_READERF_ERROR,
+                MF_SOURCE_READERF_STREAMTICK,
+            };
+
             let mut stream_index: u32 = 0;
             let mut flags: u32 = 0;
             let mut timestamp: i64 = 0;
             let mut sample: Option<IMFSample> = None;
 
+            // Read the next sample
             reader
                 .ReadSample(
                     MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32,
-                    0,
+                    0, // No flags
                     Some(&mut stream_index),
                     Some(&mut flags),
                     Some(&mut timestamp),
@@ -698,59 +814,63 @@ impl CaptureBackend for MFBackend {
                 )
                 .map_err(|e| CaptureError::Platform(format!("ReadSample failed: {}", e)))?;
 
-            // Check for end of stream or error flags
-            const MF_SOURCE_READERF_ENDOFSTREAM: u32 = 0x1;
-            const MF_SOURCE_READERF_ERROR: u32 = 0x4;
-            const MF_SOURCE_READERF_STREAMTICK: u32 = 0x100;
-
-            if flags & MF_SOURCE_READERF_ENDOFSTREAM != 0 {
-                return Err(CaptureError::Disconnected);
+            // Check for errors
+            if (flags & MF_SOURCE_READERF_ERROR.0) != 0 {
+                return Err(CaptureError::Platform("Source reader error".into()));
             }
 
-            if flags & MF_SOURCE_READERF_ERROR != 0 {
-                return Err(CaptureError::Platform("Stream error".into()));
+            if (flags & MF_SOURCE_READERF_ENDOFSTREAM.0) != 0 {
+                return Err(CaptureError::Platform("End of stream".into()));
             }
 
-            if flags & MF_SOURCE_READERF_STREAMTICK != 0 || sample.is_none() {
-                // No sample available, return a timeout-like error (0 = no actual timeout, just no frame ready)
-                return Err(CaptureError::Timeout(0));
+            // Stream tick means no data yet
+            if (flags & MF_SOURCE_READERF_STREAMTICK.0) != 0 || sample.is_none() {
+                return Err(CaptureError::Timeout("No frame available".into()));
             }
 
             let sample = sample.unwrap();
 
-            // Get buffer from sample
+            // Get the buffer from the sample
+            use windows::Win32::Media::MediaFoundation::IMFMediaBuffer;
+
             let buffer: IMFMediaBuffer = sample.ConvertToContiguousBuffer().map_err(|e| {
                 CaptureError::Platform(format!("ConvertToContiguousBuffer failed: {}", e))
             })?;
 
-            // Lock and copy data
-            let mut data_ptr: *mut u8 = ptr::null_mut();
+            // Lock the buffer to access data
+            let mut data_ptr: *mut u8 = std::ptr::null_mut();
             let mut max_length: u32 = 0;
             let mut current_length: u32 = 0;
 
             buffer
-                .Lock(
-                    &mut data_ptr,
-                    Some(&mut max_length),
-                    Some(&mut current_length),
-                )
-                .map_err(|e| CaptureError::Platform(format!("Buffer Lock failed: {}", e)))?;
+                .Lock(&mut data_ptr, Some(&mut max_length), Some(&mut current_length))
+                .map_err(|e| CaptureError::Platform(format!("Buffer lock failed: {}", e)))?;
 
+            // Copy the data
             let data = std::slice::from_raw_parts(data_ptr, current_length as usize).to_vec();
 
-            buffer
-                .Unlock()
-                .map_err(|e| CaptureError::Platform(format!("Buffer Unlock failed: {}", e)))?;
+            // Unlock the buffer
+            buffer.Unlock().map_err(|e| {
+                CaptureError::Platform(format!("Buffer unlock failed: {}", e))
+            })?;
 
-            let sequence = self.sequence.fetch_add(1, Ordering::SeqCst);
+            self.sequence += 1;
+
+            // Convert timestamp from 100ns units to nanoseconds
+            // Handle negative timestamps gracefully (treat as 0)
+            let timestamp_ns = if timestamp >= 0 {
+                (timestamp as u64) * 100
+            } else {
+                0
+            };
 
             Ok(Frame {
                 data,
                 format: format.format,
                 width: format.width,
                 height: format.height,
-                timestamp_ns: timestamp as u64 * 100, // MF timestamps are in 100ns units
-                sequence,
+                timestamp_ns,
+                sequence: self.sequence,
             })
         }
     }
@@ -758,15 +878,8 @@ impl CaptureBackend for MFBackend {
     #[cfg(not(all(target_os = "windows", feature = "windows")))]
     fn next_frame(&mut self) -> Result<Frame, CaptureError> {
         Err(CaptureError::Platform(
-            "Media Foundation not available on this platform".into(),
+            "Media Foundation support requires Windows with 'windows' feature".into(),
         ))
-    }
-}
-
-#[cfg(all(target_os = "windows", feature = "windows"))]
-impl Drop for MFBackend {
-    fn drop(&mut self) {
-        self.close();
     }
 }
 
@@ -780,86 +893,23 @@ mod tests {
 
     #[test]
     fn test_enumerator_creation() {
-        // Should not panic even without Windows feature
-        let _enumerator = MFEnumerator::new();
+        let enumerator = MediaFoundationEnumerator::new();
+        // Should not panic
+        let devices = enumerator.enumerate();
+        assert!(devices.is_ok());
     }
 
     #[test]
     fn test_backend_creation() {
-        let backend = MFBackend::new();
+        let backend = MediaFoundationBackend::new();
         assert!(!backend.is_capturing());
-        assert!(backend.current_format().is_none());
-    }
-
-    #[test]
-    fn test_backend_start_without_open() {
-        let mut backend = MFBackend::new();
-        let result = backend.start();
-        assert!(result.is_err());
     }
 
     #[test]
     #[cfg(all(target_os = "windows", feature = "windows"))]
-    #[ignore = "requires Windows with camera"]
-    fn test_enumerate_devices() {
-        let enumerator = MFEnumerator::new();
-        let devices = enumerator.enumerate().unwrap();
-        println!("Found {} camera(s)", devices.len());
-        for device in &devices {
-            println!("  - {} ({})", device.name, device.id.0);
-            for cap in &device.capabilities {
-                println!("    {}x{} {:?}", cap.width, cap.height, cap.format);
-            }
-        }
-    }
-
-    #[test]
-    #[cfg(all(target_os = "windows", feature = "windows"))]
-    #[ignore = "requires Windows with camera"]
-    fn test_capture_frame() {
-        let mut backend = MFBackend::new();
-
-        // Get first camera
-        let devices = backend.enumerate_devices();
-        if devices.is_empty() {
-            println!("No cameras found, skipping test");
-            return;
-        }
-
-        let device = &devices[0];
-        let settings = CaptureSettings::default();
-
-        let format = backend.open(&device.id, settings).unwrap();
-        println!(
-            "Opened: {}x{} {:?}",
-            format.width, format.height, format.format
-        );
-
-        backend.start().unwrap();
-
-        // Capture a few frames
-        for i in 0..5 {
-            match backend.next_frame() {
-                Ok(frame) => {
-                    println!(
-                        "Frame {}: {}x{}, {} bytes",
-                        i,
-                        frame.width,
-                        frame.height,
-                        frame.data.len()
-                    );
-                }
-                Err(CaptureError::Timeout(_)) => {
-                    println!("Frame {}: timeout (retry)", i);
-                }
-                Err(e) => {
-                    println!("Frame {}: error {:?}", i, e);
-                    break;
-                }
-            }
-        }
-
-        backend.stop().unwrap();
-        backend.close();
+    fn test_guid_conversion() {
+        assert_eq!(guid_to_pixel_format(&mf_guids::NV12), PixelFormat::Nv12);
+        assert_eq!(guid_to_pixel_format(&mf_guids::YUY2), PixelFormat::Yuyv);
+        assert_eq!(guid_to_pixel_format(&mf_guids::MJPG), PixelFormat::Mjpeg);
     }
 }

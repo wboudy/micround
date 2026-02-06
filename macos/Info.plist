@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Bundle Identification -->
+    <key>CFBundleIdentifier</key>
+    <string>com.micround.app</string>
+    <key>CFBundleName</key>
+    <string>Micround</string>
+    <key>CFBundleDisplayName</key>
+    <string>Micround</string>
+    <key>CFBundleExecutable</key>
+    <string>micround</string>
+
+    <!-- Versioning -->
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+
+    <!-- Bundle Type -->
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+
+    <!-- Icon -->
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
+
+    <!-- macOS Requirements -->
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSUIElement</key>
+    <false/>
+
+    <!-- Category -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+
+    <!-- Privacy Descriptions (Required for App Store and Notarization) -->
+    <key>NSCameraUsageDescription</key>
+    <string>Micround needs camera access to capture live microscope feed and display it as your desktop wallpaper.</string>
+
+    <!-- Copyright -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2026. All rights reserved.</string>
+
+    <!-- App Transport Security -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
+
+    <!-- Supported Document Types (none for this app) -->
+
+    <!-- URL Schemes (none for this app) -->
+
+    <!-- Hardened Runtime -->
+    <key>NSSupportsAutomaticTermination</key>
+    <true/>
+    <key>NSSupportsSuddenTermination</key>
+    <false/>
+</dict>
+</plist>

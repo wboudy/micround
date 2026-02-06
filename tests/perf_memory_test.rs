@@ -3,6 +3,9 @@
 //! Monitors memory usage during extended capture sessions to detect leaks.
 //! Target: No significant memory growth over extended test periods.
 //!
+//! Note: This test uses /proc/self/status which is Linux-specific.
+//! On macOS, tests that require memory sampling will be skipped gracefully.
+//!
 //! Run with: cargo test --test perf_memory_test -- --nocapture
 
 mod common;
@@ -511,11 +514,18 @@ fn test_memory_allocation_patterns() {
     }
     eprintln!("╚════════════════════════════════════════════════════════════╝\n");
 
-    // Ensure samples were collected
-    assert!(
-        analysis.samples.len() > 0,
-        "Should have collected memory samples"
-    );
+    // Ensure samples were collected (skip on non-Linux platforms)
+    if analysis.samples.is_empty() {
+        #[cfg(not(target_os = "linux"))]
+        {
+            eprintln!("⚠️ Skipping memory sample assertion - /proc/self/status not available on this platform");
+            return;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            panic!("Should have collected memory samples on Linux");
+        }
+    }
 }
 
 #[test]
@@ -609,11 +619,18 @@ fn test_memory_detailed_report() {
     analysis.print_report("Detailed Report");
     analysis.print_memory_graph();
 
-    // Informational test - always passes if samples collected
-    assert!(
-        analysis.samples.len() > 0,
-        "Should have collected memory samples"
-    );
+    // Informational test - passes if samples collected or skip on non-Linux
+    if analysis.samples.is_empty() {
+        #[cfg(not(target_os = "linux"))]
+        {
+            eprintln!("⚠️ Skipping memory sample assertion - /proc/self/status not available on this platform");
+            return;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            panic!("Should have collected memory samples on Linux");
+        }
+    }
 
     // Log summary
     eprintln!(

@@ -316,36 +316,158 @@ mod windows {
 }
 
 // ============================================================================
-// macOS Implementation (Stub)
+// macOS Implementation (LaunchAgent)
 // ============================================================================
 
 #[cfg(target_os = "macos")]
 mod macos {
     use super::*;
+    use std::env;
+    use std::fs;
+    use std::path::PathBuf;
 
-    // TODO: Implement macOS autostart
-    // Modern (macOS 13+): SMAppService.mainApp.register()
-    // Legacy: LaunchAgent plist in ~/Library/LaunchAgents/
+    /// LaunchAgent plist filename
+    const LAUNCH_AGENT_FILENAME: &str = "com.micround.app.plist";
+
+    /// Bundle identifier for the LaunchAgent
+    const BUNDLE_ID: &str = "com.micround.app";
+
+    /// Get the LaunchAgents directory (~Library/LaunchAgents/)
+    fn launch_agents_dir() -> AutostartResult<PathBuf> {
+        dirs::home_dir()
+            .map(|h| h.join("Library").join("LaunchAgents"))
+            .ok_or_else(|| AutostartError::PathError("Cannot determine home directory".into()))
+    }
+
+    /// Get the path to our LaunchAgent plist
+    fn plist_path() -> AutostartResult<PathBuf> {
+        Ok(launch_agents_dir()?.join(LAUNCH_AGENT_FILENAME))
+    }
+
+    /// Get the path to the application executable
+    fn app_executable_path() -> AutostartResult<PathBuf> {
+        // First try to find the app bundle
+        let current_exe = env::current_exe()
+            .map_err(|e| AutostartError::Io(format!("Cannot determine executable path: {}", e)))?;
+
+        // If running from app bundle, use that path
+        // App bundle structure: Micround.app/Contents/MacOS/micround
+        if let Some(contents_dir) = current_exe.parent().and_then(|p| p.parent()) {
+            if contents_dir.file_name().map(|n| n == "Contents").unwrap_or(false) {
+                // We're in an app bundle
+                return Ok(current_exe);
+            }
+        }
+
+        // Otherwise, check if we're in /Applications
+        let app_path = PathBuf::from("/Applications/Micround.app/Contents/MacOS/micround");
+        if app_path.exists() {
+            return Ok(app_path);
+        }
+
+        // Fall back to current executable
+        Ok(current_exe)
+    }
+
+    /// Generate the LaunchAgent plist content
+    pub(crate) fn plist_content(exe_path: &PathBuf) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{}</string>
+        <string>--minimized</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>
+"#,
+            BUNDLE_ID,
+            exe_path.display()
+        )
+    }
 
     pub fn is_enabled() -> AutostartResult<bool> {
-        // TODO: Check SMAppService or LaunchAgent
-        Err(AutostartError::NotSupported(
-            "macOS autostart not yet implemented".into(),
-        ))
+        let path = plist_path()?;
+
+        if !path.exists() {
+            return Ok(false);
+        }
+
+        // Check if the plist has RunAtLoad set to true
+        let content = fs::read_to_string(&path)?;
+
+        // Simple check - if RunAtLoad and true are both present, it's enabled
+        if content.contains("<key>RunAtLoad</key>") && content.contains("<true/>") {
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 
     pub fn enable() -> AutostartResult<()> {
-        // TODO: Register with SMAppService or create LaunchAgent
-        Err(AutostartError::NotSupported(
-            "macOS autostart not yet implemented".into(),
-        ))
+        let launch_agents_dir = launch_agents_dir()?;
+        let plist_path = plist_path()?;
+        let exe_path = app_executable_path()?;
+
+        // Create LaunchAgents directory if it doesn't exist
+        if !launch_agents_dir.exists() {
+            fs::create_dir_all(&launch_agents_dir)?;
+        }
+
+        // Write the plist
+        let content = plist_content(&exe_path);
+        fs::write(&plist_path, content)?;
+
+        // Load the LaunchAgent (optional - it will load on next login anyway)
+        // We don't error if this fails since the plist is already installed
+        let _ = std::process::Command::new("launchctl")
+            .args(["load", "-w"])
+            .arg(&plist_path)
+            .output();
+
+        tracing::info!(
+            path = %plist_path.display(),
+            "Autostart enabled (LaunchAgent installed)"
+        );
+
+        Ok(())
     }
 
     pub fn disable() -> AutostartResult<()> {
-        // TODO: Unregister SMAppService or remove LaunchAgent
-        Err(AutostartError::NotSupported(
-            "macOS autostart not yet implemented".into(),
-        ))
+        let plist_path = plist_path()?;
+
+        if plist_path.exists() {
+            // Unload the LaunchAgent first
+            let _ = std::process::Command::new("launchctl")
+                .args(["unload", "-w"])
+                .arg(&plist_path)
+                .output();
+
+            // Remove the plist file
+            fs::remove_file(&plist_path)?;
+
+            tracing::info!(
+                path = %plist_path.display(),
+                "Autostart disabled (LaunchAgent removed)"
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -371,6 +493,45 @@ mod tests {
         // Just verify the function compiles and routes correctly
         // Actual functionality is tested in platform-specific tests
         let _ = is_autostart_enabled();
+    }
+
+    #[cfg(target_os = "macos")]
+    mod macos_tests {
+        use super::*;
+        use serial_test::serial;
+        use std::env;
+        use std::path::PathBuf;
+        use tempfile::TempDir;
+
+        #[test]
+        fn test_plist_content() {
+            let exe_path = PathBuf::from("/Applications/Micround.app/Contents/MacOS/micround");
+            let content = macos::plist_content(&exe_path);
+
+            assert!(content.contains("<?xml version=\"1.0\""));
+            assert!(content.contains("<key>Label</key>"));
+            assert!(content.contains("<string>com.micround.app</string>"));
+            assert!(content.contains("<key>ProgramArguments</key>"));
+            assert!(content.contains("/Applications/Micround.app/Contents/MacOS/micround"));
+            assert!(content.contains("--minimized"));
+            assert!(content.contains("<key>RunAtLoad</key>"));
+            assert!(content.contains("<true/>"));
+        }
+
+        #[test]
+        fn test_is_enabled_no_file() {
+            // When plist doesn't exist, should return false (not error)
+            // This test only works if ~/Library/LaunchAgents/com.micround.app.plist doesn't exist
+            let plist_path = dirs::home_dir()
+                .unwrap()
+                .join("Library")
+                .join("LaunchAgents")
+                .join("com.micround.app.plist");
+
+            if !plist_path.exists() {
+                assert!(!macos::is_enabled().unwrap());
+            }
+        }
     }
 
     #[cfg(target_os = "linux")]

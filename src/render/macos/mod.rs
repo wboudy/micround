@@ -3,6 +3,14 @@
 //! Uses NSWindow at desktop window level to render below all normal windows
 //! but above the system wallpaper.
 //!
+//! # Rendering Backends
+//!
+//! Two rendering backends are available:
+//! - **Software (NSImageView)**: Default, works everywhere but slower
+//! - **Metal (CAMetalLayer)**: GPU-accelerated, much faster, preferred when available
+//!
+//! Use `MetalRenderer` for new code when possible.
+//!
 //! # Implementation Strategy
 //!
 //! The macOS desktop uses window levels to determine Z-order:
@@ -31,6 +39,8 @@
 //! NSWindow and NSView operations must be performed on the main thread.
 //! The caller is responsible for ensuring this. In a typical app architecture,
 //! the render loop should dispatch to the main thread for window updates.
+
+pub mod metal;
 
 use crate::config::AppConfig;
 use crate::core::{DisplayId, RenderError};

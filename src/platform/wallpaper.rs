@@ -595,25 +595,159 @@ fn restore_wallpaper_windows(_info: &WallpaperInfo) -> Result<(), PlatformError>
 }
 
 // ============================================================================
-// macOS Implementation (Stub)
+// macOS Implementation (AppleScript via osascript)
 // ============================================================================
 
 #[cfg(target_os = "macos")]
 fn capture_wallpaper_macos() -> Result<WallpaperInfo, PlatformError> {
-    // TODO: Implement macOS wallpaper capture (bd-3ht)
-    // Use NSWorkspace.shared.desktopImageURL(for:)
-    Err(PlatformError::Unsupported(
-        "macOS wallpaper capture not yet implemented".into(),
-    ))
+    use std::process::Command;
+
+    // Use AppleScript to get the current desktop picture
+    // This works across macOS versions
+    let script = r#"
+        tell application "System Events"
+            tell every desktop
+                get picture
+            end tell
+        end tell
+    "#;
+
+    let output = Command::new("osascript")
+        .args(["-e", script])
+        .output()
+        .map_err(|e| PlatformError::CommandFailed(format!("Failed to run osascript: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(PlatformError::CommandFailed(format!(
+            "osascript failed: {}",
+            stderr.trim()
+        )));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let path_str = stdout.trim();
+
+    // Parse the output - may be a single path or comma-separated for multi-monitor
+    // Format is typically: "file:///path/to/image.jpg" or "/path/to/image.jpg"
+    let paths: Vec<&str> = path_str.split(", ").collect();
+
+    if paths.is_empty() || paths[0].is_empty() {
+        // No wallpaper set or solid color
+        return Ok(WallpaperInfo {
+            path: None,
+            color: Some("#000000".into()), // Default to black
+            desktop_env: Some("macOS".into()),
+            ..Default::default()
+        });
+    }
+
+    // Clean up the path (remove file:// prefix if present)
+    let primary_path = paths[0]
+        .strip_prefix("file://")
+        .unwrap_or(paths[0])
+        .to_string();
+
+    // URL decode the path (spaces become %20, etc.)
+    let decoded_path = urlencoding_decode(&primary_path);
+
+    // Build per-monitor list if multiple monitors
+    let per_monitor: Vec<(String, String)> = paths
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let path = p.strip_prefix("file://").unwrap_or(p);
+            let decoded = urlencoding_decode(path);
+            (format!("desktop_{}", i + 1), decoded)
+        })
+        .collect();
+
+    tracing::debug!(
+        path = %decoded_path,
+        monitors = paths.len(),
+        "Captured macOS wallpaper"
+    );
+
+    Ok(WallpaperInfo {
+        path: Some(decoded_path),
+        style: None,
+        color: None,
+        desktop_env: Some("macOS".into()),
+        per_monitor,
+    })
 }
 
 #[cfg(target_os = "macos")]
-fn restore_wallpaper_macos(_info: &WallpaperInfo) -> Result<(), PlatformError> {
-    // TODO: Implement macOS wallpaper restore (bd-3ht)
-    // Use NSWorkspace.shared.setDesktopImageURL(url:for:options:)
-    Err(PlatformError::Unsupported(
-        "macOS wallpaper restore not yet implemented".into(),
-    ))
+fn restore_wallpaper_macos(info: &WallpaperInfo) -> Result<(), PlatformError> {
+    use std::process::Command;
+
+    let path = info.path.as_ref().ok_or_else(|| {
+        PlatformError::CommandFailed("No wallpaper path to restore".into())
+    })?;
+
+    // Verify the file exists
+    if !std::path::Path::new(path).exists() {
+        return Err(PlatformError::CommandFailed(format!(
+            "Wallpaper file not found: {}",
+            path
+        )));
+    }
+
+    // Use AppleScript to set the desktop picture
+    // POSIX file path is used for compatibility
+    let script = format!(
+        r#"
+        tell application "System Events"
+            tell every desktop
+                set picture to POSIX file "{}"
+            end tell
+        end tell
+        "#,
+        path.replace('\\', "\\\\").replace('"', "\\\"")
+    );
+
+    let output = Command::new("osascript")
+        .args(["-e", &script])
+        .output()
+        .map_err(|e| PlatformError::CommandFailed(format!("Failed to run osascript: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(PlatformError::CommandFailed(format!(
+            "Failed to restore wallpaper: {}",
+            stderr.trim()
+        )));
+    }
+
+    tracing::info!(path = %path, "Restored macOS wallpaper");
+    Ok(())
+}
+
+/// Simple URL decoding for file paths (handles %20 -> space, etc.)
+#[cfg(target_os = "macos")]
+fn urlencoding_decode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            // Try to read two hex digits
+            let hex: String = chars.by_ref().take(2).collect();
+            if hex.len() == 2 {
+                if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                    result.push(byte as char);
+                    continue;
+                }
+            }
+            // Couldn't decode, keep the % and continue
+            result.push('%');
+            result.push_str(&hex);
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
 }
 
 // ============================================================================
@@ -674,5 +808,45 @@ mod tests {
         let info = WallpaperInfo::default();
         let result = restore_wallpaper(&info);
         assert!(result.is_err());
+    }
+
+    #[cfg(target_os = "macos")]
+    mod macos_tests {
+        use super::*;
+
+        #[test]
+        fn test_urlencoding_decode_simple() {
+            assert_eq!(urlencoding_decode("hello"), "hello");
+            assert_eq!(urlencoding_decode("hello%20world"), "hello world");
+            assert_eq!(urlencoding_decode("path%2Fto%2Ffile"), "path/to/file");
+        }
+
+        #[test]
+        fn test_urlencoding_decode_edge_cases() {
+            assert_eq!(urlencoding_decode(""), "");
+            assert_eq!(urlencoding_decode("%"), "%");
+            assert_eq!(urlencoding_decode("%2"), "%2");
+            // %%20 is not valid URL encoding - first % is followed by invalid hex "%2"
+            // so the entire sequence is kept literally
+            assert_eq!(urlencoding_decode("%%20"), "%%20");
+            // %25 is the proper URL encoding of %, %20 is space
+            assert_eq!(urlencoding_decode("%25%20"), "% ");
+        }
+
+        #[test]
+        fn test_capture_wallpaper_macos_runs() {
+            // Just test that it doesn't panic
+            // The actual result depends on system state
+            let result = capture_wallpaper_macos();
+            // It might fail if osascript isn't available, that's OK
+            println!("Capture result: {:?}", result);
+        }
+
+        #[test]
+        fn test_restore_nonexistent_file_fails() {
+            let info = WallpaperInfo::with_path("/nonexistent/wallpaper.jpg".into());
+            let result = restore_wallpaper_macos(&info);
+            assert!(result.is_err());
+        }
     }
 }

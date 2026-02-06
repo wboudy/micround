@@ -15,6 +15,7 @@
 pub mod autostart;
 pub mod display;
 pub mod paths;
+pub mod permissions;
 pub mod system;
 pub mod wallpaper;
 pub mod window;
@@ -28,6 +29,10 @@ pub use autostart::{
 };
 pub use display::*;
 pub use paths::*;
+pub use permissions::{
+    create_permission_handler, ActivityGuard, ActivityType, CameraPermission, PermissionError,
+    PermissionHandler,
+};
 pub use system::*;
 pub use wallpaper::{
     capture_wallpaper, restore_wallpaper, restore_wallpaper_from_path, WallpaperInfo,

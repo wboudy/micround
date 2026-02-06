@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    LaunchAgent for Micround - Launch at Login
+
+    Installation:
+    1. Copy this file to ~/Library/LaunchAgents/
+    2. Run: launchctl load ~/Library/LaunchAgents/com.micround.app.plist
+
+    Removal:
+    1. Run: launchctl unload ~/Library/LaunchAgents/com.micround.app.plist
+    2. Delete ~/Library/LaunchAgents/com.micround.app.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.micround.app</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/Micround.app/Contents/MacOS/micround</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/micround.err</string>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/micround.out</string>
+</dict>
+</plist>

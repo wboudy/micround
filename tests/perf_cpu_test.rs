@@ -3,6 +3,9 @@
 //! Monitors CPU usage during active capture and render cycles.
 //! Target: Average CPU usage under 10% of a single core.
 //!
+//! Note: This test uses /proc/stat which is Linux-specific.
+//! On macOS, tests that require CPU sampling will be skipped.
+//!
 //! Run with: cargo test --test perf_cpu_test -- --nocapture
 
 mod common;
@@ -563,8 +566,20 @@ fn test_cpu_usage_detailed_report() {
     }
     eprintln!("╚════════════════════════════════════════════════════════════╝\n");
 
-    // This test is informational - always passes
-    assert!(stats.samples > 0, "Should have collected CPU samples");
+    // This test is informational - passes if we collected samples
+    // On non-Linux platforms (macOS, Windows), /proc/stat doesn't exist,
+    // so we skip the assertion gracefully
+    if stats.samples == 0 {
+        #[cfg(not(target_os = "linux"))]
+        {
+            eprintln!("⚠️ Skipping CPU sample assertion - /proc/stat not available on this platform");
+            return;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            panic!("Should have collected CPU samples on Linux");
+        }
+    }
 }
 
 #[test]
